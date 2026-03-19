@@ -151,20 +151,10 @@ const sectionItems = computed<NavItem[]>(() =>
                 >
                     <Link :href="item.href">
                         <component :is="item.icon" class="size-4" />
-                        <div
-                            class="grid flex-1 text-left group-data-[collapsible=icon]:hidden"
+                        <span
+                            class="text-sm font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden"
+                            >{{ item.title }}</span
                         >
-                            <span
-                                class="text-sm font-semibold text-sidebar-foreground"
-                                >{{ item.title }}</span
-                            >
-                            <span
-                                v-if="item.description"
-                                class="text-xs text-sidebar-foreground/80 opacity-0 transition-opacity duration-200 group-hover/direct:opacity-100"
-                            >
-                                {{ item.description }}
-                            </span>
-                        </div>
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
@@ -189,12 +179,6 @@ const sectionItems = computed<NavItem[]>(() =>
                     class="size-3 transition-transform duration-200"
                 />
             </SidebarGroupLabel>
-            <p
-                v-if="section.description && !isSectionCollapsed(section.title)"
-                class="px-2 pb-2 text-xs leading-5 text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden"
-            >
-                {{ section.description }}
-            </p>
             <SidebarMenu
                 v-show="!isSectionCollapsed(section.title)"
                 class="gap-1"
@@ -211,20 +195,10 @@ const sectionItems = computed<NavItem[]>(() =>
                         >
                             <Link :href="item.href">
                                 <component :is="item.icon" class="size-4" />
-                                <div
-                                    class="grid flex-1 text-left group-data-[collapsible=icon]:hidden"
+                                <span
+                                    class="text-sm font-medium text-sidebar-foreground group-data-[collapsible=icon]:hidden"
+                                    >{{ item.title }}</span
                                 >
-                                    <span
-                                        class="text-sm font-medium text-sidebar-foreground"
-                                        >{{ item.title }}</span
-                                    >
-                                    <span
-                                        v-if="item.description"
-                                        class="text-xs leading-5 text-sidebar-foreground/75 opacity-0 transition-opacity duration-200 group-hover/item:opacity-100"
-                                    >
-                                        {{ item.description }}
-                                    </span>
-                                </div>
                             </Link>
                         </SidebarMenuButton>
                     </template>

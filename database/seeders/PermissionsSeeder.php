@@ -71,6 +71,24 @@ class PermissionsSeeder extends Seeder
             // Dashboard permissions
             ['name' => 'View Dashboard', 'slug' => 'dashboard.view', 'module' => 'dashboard', 'description' => 'View dashboard and statistics'],
 
+            // FABA permissions
+            ['name' => 'View FABA Dashboard', 'slug' => 'faba_dashboard.view', 'module' => 'faba_dashboard', 'description' => 'View FABA dashboard'],
+            ['name' => 'View FABA Production', 'slug' => 'faba_production.view', 'module' => 'faba_production', 'description' => 'View FABA production entries'],
+            ['name' => 'Create FABA Production', 'slug' => 'faba_production.create', 'module' => 'faba_production', 'description' => 'Create FABA production entries'],
+            ['name' => 'Edit FABA Production', 'slug' => 'faba_production.edit', 'module' => 'faba_production', 'description' => 'Edit FABA production entries'],
+            ['name' => 'Delete FABA Production', 'slug' => 'faba_production.delete', 'module' => 'faba_production', 'description' => 'Delete FABA production entries'],
+            ['name' => 'View FABA Utilization', 'slug' => 'faba_utilization.view', 'module' => 'faba_utilization', 'description' => 'View FABA utilization entries'],
+            ['name' => 'Create FABA Utilization', 'slug' => 'faba_utilization.create', 'module' => 'faba_utilization', 'description' => 'Create FABA utilization entries'],
+            ['name' => 'Edit FABA Utilization', 'slug' => 'faba_utilization.edit', 'module' => 'faba_utilization', 'description' => 'Edit FABA utilization entries'],
+            ['name' => 'Delete FABA Utilization', 'slug' => 'faba_utilization.delete', 'module' => 'faba_utilization', 'description' => 'Delete FABA utilization entries'],
+            ['name' => 'View FABA Recaps', 'slug' => 'faba_recaps.view', 'module' => 'faba_recaps', 'description' => 'View FABA recaps'],
+            ['name' => 'View FABA Approvals', 'slug' => 'faba_approvals.view', 'module' => 'faba_approvals', 'description' => 'View FABA approvals'],
+            ['name' => 'Submit FABA Approvals', 'slug' => 'faba_approvals.submit', 'module' => 'faba_approvals', 'description' => 'Submit FABA monthly approvals'],
+            ['name' => 'Approve FABA Approvals', 'slug' => 'faba_approvals.approve', 'module' => 'faba_approvals', 'description' => 'Approve FABA monthly approvals'],
+            ['name' => 'Reject FABA Approvals', 'slug' => 'faba_approvals.reject', 'module' => 'faba_approvals', 'description' => 'Reject FABA monthly approvals'],
+            ['name' => 'Reopen FABA Approvals', 'slug' => 'faba_approvals.reopen', 'module' => 'faba_approvals', 'description' => 'Reopen approved FABA periods'],
+            ['name' => 'Export FABA Reports', 'slug' => 'faba_reports.export', 'module' => 'faba_reports', 'description' => 'Export FABA reports'],
+
             // Roles & Permissions
             ['name' => 'View Roles', 'slug' => 'roles.view', 'module' => 'roles', 'description' => 'View roles and permissions'],
             ['name' => 'Manage Roles', 'slug' => 'roles.manage', 'module' => 'roles', 'description' => 'Assign permissions to roles'],

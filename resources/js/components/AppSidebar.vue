@@ -33,7 +33,7 @@ const footerNavItems: NavItemWithRequiredHref[] = [];
                 </SidebarMenuItem>
             </SidebarMenu>
             <p
-                class="mt-2 px-1 text-[10px] leading-tight font-medium text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden"
+                class="mt-2 px-1 text-[10px] leading-tight font-semibold text-sidebar-primary group-data-[collapsible=icon]:hidden"
             >
                 Pusat Operasional Limbah
             </p>
