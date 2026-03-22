@@ -17,6 +17,16 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class WasteTransportationsController extends Controller
 {
+    protected function canViewAllTransportations(): bool
+    {
+        return Auth::user()?->hasPermission('transportation.view_all') ?? false;
+    }
+
+    protected function canAccessTransportation(WasteTransportation $wasteTransportation): bool
+    {
+        return $this->canViewAllTransportations() || $wasteTransportation->created_by === Auth::id();
+    }
+
     /**
      * Display a listing of waste transportations.
      */
@@ -32,7 +42,7 @@ class WasteTransportationsController extends Controller
             ->orderBy('created_at', 'desc');
 
         // Filter by user permissions if needed
-        if (! Auth::user()->can('transportation.view_all')) {
+        if (! $this->canViewAllTransportations()) {
             $query->where('created_by', Auth::id());
         }
 
@@ -170,8 +180,15 @@ class WasteTransportationsController extends Controller
     /**
      * Display the specified waste transportation.
      */
-    public function show(WasteTransportation $wasteTransportation): Response
+    public function show(string $id): Response
     {
+        // Manually resolve the model to handle multi-tenancy properly
+        $wasteTransportation = WasteTransportation::findOrFail($id);
+
+        if (! $this->canAccessTransportation($wasteTransportation)) {
+            abort(403, 'You can only view your own transportation records.');
+        }
+
         $wasteTransportation->load([
             'wasteRecord.wasteType.category',
             'wasteRecord.wasteType.characteristic',
@@ -187,8 +204,15 @@ class WasteTransportationsController extends Controller
     /**
      * Show the form for editing the specified waste transportation.
      */
-    public function edit(WasteTransportation $wasteTransportation): Response
+    public function edit(string $id): Response
     {
+        // Manually resolve the model to handle multi-tenancy properly
+        $wasteTransportation = WasteTransportation::findOrFail($id);
+
+        if (! $this->canAccessTransportation($wasteTransportation)) {
+            abort(403, 'You can only edit your own transportation records.');
+        }
+
         // Check if user can edit this transportation
         if (! $wasteTransportation->canBeCancelled()) {
             abort(403, 'This transportation cannot be edited in its current status.');
@@ -207,8 +231,15 @@ class WasteTransportationsController extends Controller
     /**
      * Update the specified waste transportation.
      */
-    public function update(TransportationRequest $request, WasteTransportation $wasteTransportation): RedirectResponse
+    public function update(TransportationRequest $request, string $id): RedirectResponse
     {
+        // Manually resolve the model to handle multi-tenancy properly
+        $wasteTransportation = WasteTransportation::findOrFail($id);
+
+        if (! $this->canAccessTransportation($wasteTransportation)) {
+            abort(403, 'You can only edit your own transportation records.');
+        }
+
         // Check if transportation can still be edited
         if (! $wasteTransportation->canBeCancelled()) {
             return Redirect::back()
@@ -254,8 +285,15 @@ class WasteTransportationsController extends Controller
     /**
      * Remove the specified waste transportation.
      */
-    public function destroy(WasteTransportation $wasteTransportation): RedirectResponse
+    public function destroy(string $id): RedirectResponse
     {
+        // Manually resolve the model to handle multi-tenancy properly
+        $wasteTransportation = WasteTransportation::findOrFail($id);
+
+        if (! $this->canAccessTransportation($wasteTransportation)) {
+            abort(403, 'You can only delete your own transportation records.');
+        }
+
         // Only allow deleting pending transportations
         if (! $wasteTransportation->canBeCancelled()) {
             return Redirect::back()
@@ -271,8 +309,15 @@ class WasteTransportationsController extends Controller
     /**
      * Dispatch the transportation.
      */
-    public function dispatch(WasteTransportation $wasteTransportation): RedirectResponse
+    public function dispatch(string $id): RedirectResponse
     {
+        // Manually resolve the model to handle multi-tenancy properly
+        $wasteTransportation = WasteTransportation::findOrFail($id);
+
+        if (! $this->canAccessTransportation($wasteTransportation)) {
+            abort(403, 'You can only dispatch your own transportation records.');
+        }
+
         if (! $wasteTransportation->canBeDispatched()) {
             return Redirect::back()
                 ->with('error', 'This transportation cannot be dispatched in its current status.');
@@ -287,8 +332,15 @@ class WasteTransportationsController extends Controller
     /**
      * Mark the transportation as delivered.
      */
-    public function deliver(Request $request, WasteTransportation $wasteTransportation): RedirectResponse
+    public function deliver(Request $request, string $id): RedirectResponse
     {
+        // Manually resolve the model to handle multi-tenancy properly
+        $wasteTransportation = WasteTransportation::findOrFail($id);
+
+        if (! $this->canAccessTransportation($wasteTransportation)) {
+            abort(403, 'You can only update your own transportation records.');
+        }
+
         if (! $wasteTransportation->canBeDelivered()) {
             return Redirect::back()
                 ->with('error', 'This transportation cannot be marked as delivered in its current status.');
@@ -307,8 +359,15 @@ class WasteTransportationsController extends Controller
     /**
      * Cancel the transportation.
      */
-    public function cancel(WasteTransportation $wasteTransportation): RedirectResponse
+    public function cancel(string $id): RedirectResponse
     {
+        // Manually resolve the model to handle multi-tenancy properly
+        $wasteTransportation = WasteTransportation::findOrFail($id);
+
+        if (! $this->canAccessTransportation($wasteTransportation)) {
+            abort(403, 'You can only cancel your own transportation records.');
+        }
+
         if (! $wasteTransportation->canBeCancelled()) {
             return Redirect::back()
                 ->with('error', 'This transportation cannot be cancelled in its current status.');
@@ -335,7 +394,7 @@ class WasteTransportationsController extends Controller
             ->orderBy('created_at', 'desc');
 
         // Filter by user permissions if needed
-        if (! Auth::user()->can('transportation.view_all')) {
+        if (! $this->canViewAllTransportations()) {
             $query->where('created_by', Auth::id());
         }
 

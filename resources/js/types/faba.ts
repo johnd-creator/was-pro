@@ -113,3 +113,21 @@ export interface FabaAuditLog {
     actor?: FabaUserRef | null;
     created_at?: string | null;
 }
+
+export interface FabaChartData {
+    label: string;
+    month: number;
+    year: number;
+    production: number;
+    utilization: number;
+    closing_balance: number;
+}
+
+export interface WasteChartData {
+    label: string;
+    month: number;
+    year: number;
+    records_count: number;
+    approved_count: number;
+    transport_delivered_count: number;
+}

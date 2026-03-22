@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Services\TenantService;
+use Carbon\CarbonImmutable;
 use Database\Seeders\PermissionsSeeder;
 use Database\Seeders\RolePermissionsSeeder;
 use Database\Seeders\RolesSeeder;
@@ -180,6 +181,61 @@ test('monthly recap page renders calculated totals', function () {
     );
 });
 
+test('monthly recap defaults to latest period with data', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+
+    FabaProductionEntry::factory()->create([
+        'transaction_date' => '2025-12-05',
+        'quantity' => 10,
+    ]);
+
+    FabaProductionEntry::factory()->create([
+        'transaction_date' => '2026-02-05',
+        'quantity' => 14,
+    ]);
+
+    $this->tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->operator)
+        ->get(route('waste-management.faba.recaps.monthly'));
+
+    $response->assertSuccessful();
+    $response->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('waste-management/faba/recaps/Monthly')
+        ->where('filters.year', 2026)
+        ->where('filters.month', 2)
+        ->where('detail.recap.period_label', 'Februari 2026')
+        ->where('detail.recap.total_production', 14)
+        ->where('resolvedFromLatestPeriod', true)
+        ->has('availablePeriods', 2)
+    );
+});
+
+test('monthly recap allows explicit empty period without redirecting to latest period', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+
+    FabaProductionEntry::factory()->create([
+        'transaction_date' => '2026-02-05',
+        'quantity' => 14,
+    ]);
+
+    $this->tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->operator)
+        ->get(route('waste-management.faba.recaps.monthly', ['year' => 2026, 'month' => 3]));
+
+    $response->assertSuccessful();
+    $response->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('waste-management/faba/recaps/Monthly')
+        ->where('filters.year', 2026)
+        ->where('filters.month', 3)
+        ->where('detail.recap.period_label', 'Maret 2026')
+        ->where('detail.recap.total_production', 0)
+        ->where('detail.recap.total_utilization', 0)
+        ->where('resolvedFromLatestPeriod', false)
+    );
+});
+
 test('approval index only shows periods that have transactions with month labels', function () {
     $this->tenantService->switchToSchema($this->organization->schema_name);
     FabaProductionEntry::factory()->create([
@@ -305,6 +361,18 @@ test('supervisor can store opening balance', function () {
     $this->tenantService->switchToPublic();
 });
 
+test('operator cannot store opening balance', function () {
+    $response = $this->actingAs($this->operator)
+        ->post(route('waste-management.faba.recaps.openingBalance.store'), [
+            'year' => 2026,
+            'month' => 1,
+            'material_type' => 'fly_ash',
+            'quantity' => 25,
+        ]);
+
+    $response->assertForbidden();
+});
+
 test('cannot submit empty period for approval', function () {
     $response = $this->actingAs($this->operator)
         ->post(route('waste-management.faba.approvals.submit'), [
@@ -371,9 +439,209 @@ test('faba export endpoints require correct permission', function () {
 });
 
 test('monthly report csv can be downloaded', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    FabaOpeningBalance::factory()->create([
+        'year' => 2026,
+        'month' => 3,
+        'material_type' => 'fly_ash',
+        'quantity' => 10,
+    ]);
+    FabaProductionEntry::factory()->create([
+        'transaction_date' => '2026-03-05',
+        'material_type' => 'fly_ash',
+        'quantity' => 20,
+    ]);
+    $this->tenantService->switchToPublic();
+
     $response = $this->actingAs($this->operator)
         ->get(route('waste-management.faba.reports.monthly.csv', ['year' => 2026, 'month' => 3]));
 
     $response->assertSuccessful();
     expect($response->headers->get('content-type'))->toContain('text/csv');
+    expect($response->streamedContent())->toContain('period_label,"Maret 2026"')
+        ->toContain('opening_balance,10')
+        ->toContain('closing_balance,30');
+});
+
+test('production export csv respects report filters', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    FabaProductionEntry::factory()->create([
+        'transaction_date' => '2026-03-05',
+        'material_type' => 'fly_ash',
+        'entry_type' => 'production',
+        'quantity' => 7,
+    ]);
+    FabaProductionEntry::factory()->create([
+        'transaction_date' => '2026-04-05',
+        'material_type' => 'bottom_ash',
+        'entry_type' => 'workshop',
+        'quantity' => 11,
+    ]);
+    $this->tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->operator)
+        ->get(route('waste-management.faba.production.export.csv', [
+            'year' => 2026,
+            'month' => 3,
+            'material_type' => 'fly_ash',
+            'entry_type' => 'production',
+        ]));
+
+    $response->assertSuccessful();
+    expect($response->streamedContent())
+        ->toContain('FP-202603-')
+        ->not->toContain('FP-202604-');
+});
+
+test('faba demo seed command creates deterministic tenant data', function () {
+    CarbonImmutable::setTestNow('2026-03-19 10:00:00');
+
+    $response = Artisan::call('faba:seed-demo', [
+        '--tenant' => 'FABADEMO',
+        '--schema' => 'tenant_faba_demo',
+        '--fresh-tenant' => true,
+    ]);
+
+    expect($response)->toBe(0);
+
+    $organization = Organization::query()->where('code', 'FABADEMO')->first();
+
+    expect($organization)->not->toBeNull();
+    expect($this->tenantService->schemaExists('tenant_faba_demo'))->toBeTrue();
+
+    $this->tenantService->switchToSchema('tenant_faba_demo');
+
+    expect(Vendor::query()->count())->toBe(3);
+    expect(FabaProductionEntry::query()->count())->toBe(35);
+    expect(FabaUtilizationEntry::query()->count())->toBe(25);
+    expect(FabaOpeningBalance::query()->count())->toBe(4);
+    expect(FabaMonthlyApproval::query()->count())->toBe(3);
+    expect(
+        FabaMonthlyApproval::query()->orderBy('year')->orderBy('month')->pluck('status')->all()
+    )->toBe([
+        FabaMonthlyApproval::STATUS_APPROVED,
+        FabaMonthlyApproval::STATUS_APPROVED,
+        FabaMonthlyApproval::STATUS_SUBMITTED,
+    ]);
+
+    expect(
+        FabaUtilizationEntry::query()
+            ->where('utilization_type', FabaUtilizationEntry::TYPE_EXTERNAL)
+            ->where(function ($query) {
+                $query->whereNull('vendor_id')
+                    ->orWhereNull('document_number')
+                    ->orWhereNull('document_date');
+            })->exists()
+    )->toBeFalse();
+
+    $recapService = app(\App\Services\FabaRecapService::class);
+    $decemberRecap = $recapService->getMonthlyRecap(2025, 12);
+    $januaryRecap = $recapService->getMonthlyRecap(2026, 1);
+    $februaryRecap = $recapService->getMonthlyRecap(2026, 2);
+
+    expect($januaryRecap['opening_balance'])->toBe($decemberRecap['closing_balance']);
+    expect($februaryRecap['opening_balance'])->toBe($januaryRecap['closing_balance']);
+    expect(collect($februaryRecap['warnings'])->pluck('code')->contains('missing_opening_balance'))->toBeTrue();
+
+    $this->tenantService->switchToPublic();
+
+    expect(
+        User::query()->whereIn('email', [
+            'faba.supervisor.demo@local.test',
+            'faba.operator.demo@local.test',
+        ])->count()
+    )->toBe(2);
+    CarbonImmutable::setTestNow();
+});
+
+test('faba reports default to latest period with data', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+
+    FabaProductionEntry::factory()->create([
+        'transaction_date' => '2026-01-05',
+        'quantity' => 9,
+    ]);
+
+    FabaProductionEntry::factory()->create([
+        'transaction_date' => '2026-02-05',
+        'quantity' => 18,
+    ]);
+
+    $this->tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->operator)
+        ->get(route('waste-management.faba.reports.index'));
+
+    $response->assertSuccessful();
+    $response->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('waste-management/faba/reports/Index')
+        ->where('filters.year', 2026)
+        ->where('filters.month', 2)
+        ->where('monthlyRecap.period_label', 'Februari 2026')
+        ->where('resolvedFromLatestPeriod', true)
+        ->has('availablePeriods', 2)
+    );
+});
+
+test('faba demo seed can populate an existing tenant without overwriting organization metadata', function () {
+    CarbonImmutable::setTestNow('2026-03-19 10:00:00');
+
+    $existingOrganization = Organization::factory()->create([
+        'code' => 'TWMS',
+        'name' => 'Tenant Produksi TWMS',
+        'schema_name' => 'tenant_twms_existing_faba',
+    ]);
+
+    if (! $this->tenantService->schemaExists($existingOrganization->schema_name)) {
+        $this->tenantService->createSchema($existingOrganization->schema_name);
+    }
+
+    $this->tenantService->switchToSchema($existingOrganization->schema_name);
+    Artisan::call('migrate', [
+        '--path' => 'database/migrations/tenant',
+        '--force' => true,
+    ]);
+    $this->tenantService->switchToPublic();
+
+    $john = User::factory()->create([
+        'email' => 'john@d.co',
+        'organization_id' => $existingOrganization->id,
+        'is_super_admin' => true,
+        'role_id' => Role::where('slug', 'super_admin')->value('id'),
+    ]);
+
+    $response = Artisan::call('faba:seed-demo', [
+        '--tenant' => 'TWMS',
+        '--schema' => $existingOrganization->schema_name,
+    ]);
+
+    expect($response)->toBe(0);
+
+    $existingOrganization->refresh();
+    expect($existingOrganization->name)->toBe('Tenant Produksi TWMS');
+    expect(User::query()->find($john->id))->not->toBeNull();
+
+    $this->tenantService->switchToSchema($existingOrganization->schema_name);
+    expect(FabaProductionEntry::query()->count())->toBe(35);
+    expect(FabaUtilizationEntry::query()->count())->toBe(25);
+    expect(FabaMonthlyApproval::query()->count())->toBe(3);
+    $this->tenantService->switchToPublic();
+
+    CarbonImmutable::setTestNow();
+});
+
+test('faba demo seed rejects fresh mode for an existing non-demo tenant', function () {
+    $existingOrganization = Organization::factory()->create([
+        'code' => 'TWMS',
+        'name' => 'Tenant Produksi TWMS',
+        'schema_name' => 'tenant_twms_no_fresh',
+    ]);
+
+    $response = Artisan::call('faba:seed-demo', [
+        '--tenant' => 'TWMS',
+        '--schema' => $existingOrganization->schema_name,
+        '--fresh-tenant' => true,
+    ]);
+
+    expect($response)->toBe(1);
 });

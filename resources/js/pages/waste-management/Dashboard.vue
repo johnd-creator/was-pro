@@ -464,9 +464,9 @@ const hasPendingApprovals = computed(() => {
                                     class="min-h-[44px] focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                                     @click="
                                         router.get(
-                                            wasteManagementRoutes.records.show({
-                                                id: record.id,
-                                            }),
+                                            wasteManagementRoutes.records.show(
+                                                record.id,
+                                            ),
                                         )
                                     "
                                     :aria-label="`View waste record details for ${record.record_number}`"
@@ -519,9 +519,9 @@ const hasPendingApprovals = computed(() => {
                                     class="min-h-[44px] focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                                     @click="
                                         router.get(
-                                            wasteManagementRoutes.records.show({
-                                                id: record.id,
-                                            }),
+                                            wasteManagementRoutes.records.show(
+                                                record.id,
+                                            ),
                                         )
                                     "
                                     :aria-label="`View waste record details for ${record.record_number}`"

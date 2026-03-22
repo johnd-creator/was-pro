@@ -40,12 +40,6 @@ export const appNavigationItems: NavItem[] = [
         labelOnly: true,
         items: [
             {
-                title: 'Dashboard FABA',
-                href: wasteManagementRoutes.faba.dashboard.url(),
-                icon: LayoutGrid,
-                permission: 'faba_dashboard.view',
-            },
-            {
                 title: 'Produksi',
                 href: wasteManagementRoutes.faba.production.index.url(),
                 icon: FileText,

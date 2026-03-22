@@ -2,6 +2,7 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import Heading from '@/components/Heading.vue';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -20,6 +21,12 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import {
+    formatFabaDate,
+    formatFabaMaterial,
+    formatFabaStatus,
+    formatFabaUtilizationType,
+} from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 import type { FabaUtilizationEntry, FabaVendor } from '@/types/faba';
@@ -138,15 +145,17 @@ const filteredEntries = computed(() =>
                 <TableBody>
                     <TableRow v-for="entry in filteredEntries" :key="entry.id">
                         <TableCell>{{ entry.entry_number }}</TableCell>
-                        <TableCell>{{ entry.transaction_date }}</TableCell>
-                        <TableCell>{{ entry.material_type }}</TableCell>
-                        <TableCell>{{ entry.utilization_type }}</TableCell>
+                        <TableCell>{{ formatFabaDate(entry.transaction_date) }}</TableCell>
+                        <TableCell>{{ formatFabaMaterial(entry.material_type) }}</TableCell>
+                        <TableCell>{{ formatFabaUtilizationType(entry.utilization_type) }}</TableCell>
                         <TableCell>{{ entry.vendor?.name || '-' }}</TableCell>
                         <TableCell
                             >{{ entry.quantity }} {{ entry.unit }}</TableCell
                         >
-                        <TableCell class="capitalize">
-                            {{ entry.approval_status.replace('_', ' ') }}
+                        <TableCell>
+                            <Badge variant="secondary">
+                                {{ formatFabaStatus(entry.approval_status) }}
+                            </Badge>
                         </TableCell>
                         <TableCell class="space-x-3">
                             <Link

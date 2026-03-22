@@ -21,8 +21,12 @@ const footerNavItems: NavItemWithRequiredHref[] = [];
 </script>
 
 <template>
-    <Sidebar collapsible="icon" variant="inset">
-        <SidebarHeader class="border-b border-sidebar-border/50 pb-3">
+    <Sidebar
+        collapsible="icon"
+        variant="inset"
+        class="border-none bg-sidebar text-sidebar-foreground shadow-2xl shadow-slate-950/10"
+    >
+        <SidebarHeader class="border-b border-sidebar-border/70 pb-3">
             <SidebarMenu>
                 <SidebarMenuItem>
                     <SidebarMenuButton size="lg" as-child>
@@ -33,7 +37,7 @@ const footerNavItems: NavItemWithRequiredHref[] = [];
                 </SidebarMenuItem>
             </SidebarMenu>
             <p
-                class="mt-2 px-1 text-[10px] leading-tight font-semibold text-sidebar-primary group-data-[collapsible=icon]:hidden"
+                class="mt-2 px-1 text-[10px] leading-tight font-semibold text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden"
             >
                 Pusat Operasional Limbah
             </p>

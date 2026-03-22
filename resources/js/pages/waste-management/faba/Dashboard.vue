@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { reactive } from 'vue';
 import Heading from '@/components/Heading.vue';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import { formatFabaStatus } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 
-defineProps<{
+const props = defineProps<{
     year: number;
     stats: {
         total_production: number;
@@ -29,9 +35,13 @@ defineProps<{
         status: string;
     }>;
     warnings: Array<{ month: number; period_label: string; message: string; closing_balance: number }>;
-    latestApprovedPeriod?: { id: string; year: number; month: number; status: string } | null;
+    latestApprovedPeriod?: { id: string; year: number; month: number; status: string; period_label: string } | null;
     topVendors: Array<{ vendor_id: string | null; vendor_name: string; total_quantity: number }>;
 }>();
+
+const filterForm = reactive({
+    year: props.year,
+});
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
@@ -39,6 +49,10 @@ const breadcrumbItems: BreadcrumbItem[] = [
         href: wasteManagementRoutes.faba.dashboard.url(),
     },
 ];
+
+function applyFilters(): void {
+    router.get(wasteManagementRoutes.faba.dashboard(), filterForm);
+}
 </script>
 
 <template>
@@ -52,6 +66,13 @@ const breadcrumbItems: BreadcrumbItem[] = [
                 title="Dashboard FABA"
                 description="Ringkasan operasional modul FABA."
             />
+            <div class="flex flex-col gap-3 rounded-xl border p-4 md:flex-row md:items-end">
+                <div class="grid gap-2">
+                    <Label>Tahun</Label>
+                    <Input v-model="filterForm.year" type="number" class="w-full md:w-40" />
+                </div>
+                <Button @click="applyFilters">Terapkan</Button>
+            </div>
             <div class="grid gap-4 md:grid-cols-4">
                 <Card
                     ><CardHeader
@@ -83,6 +104,54 @@ const breadcrumbItems: BreadcrumbItem[] = [
             </div>
             <div class="grid gap-6 md:grid-cols-2">
                 <Card>
+                    <CardHeader><CardTitle>Periode Approved Terakhir</CardTitle></CardHeader>
+                    <CardContent>
+                        <p
+                            v-if="!latestApprovedPeriod"
+                            class="text-sm text-muted-foreground"
+                        >
+                            Belum ada periode yang disetujui.
+                        </p>
+                        <div v-else class="space-y-2 text-sm">
+                            <p>{{ latestApprovedPeriod.period_label }}</p>
+                            <Badge variant="secondary">
+                                {{ formatFabaStatus(latestApprovedPeriod.status) }}
+                            </Badge>
+                            <div>
+                                <Link
+                                    class="text-primary underline-offset-4 hover:underline"
+                                    :href="wasteManagementRoutes.faba.approvals.review([latestApprovedPeriod.year, latestApprovedPeriod.month]).url"
+                                >
+                                    Lihat review periode
+                                </Link>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader><CardTitle>Tren 12 Bulan</CardTitle></CardHeader>
+                    <CardContent>
+                        <p
+                            v-if="trend.length === 0"
+                            class="text-sm text-muted-foreground"
+                        >
+                            Belum ada tren produksi dan pemanfaatan pada tahun ini.
+                        </p>
+                        <div v-else class="space-y-2 text-sm">
+                            <div
+                                v-for="item in trend"
+                                :key="item.month"
+                                class="grid grid-cols-[1fr_auto_auto_auto] gap-3 rounded-md border px-3 py-2"
+                            >
+                                <span>{{ item.label }}</span>
+                                <span>Produksi {{ item.production }}</span>
+                                <span>Pemanfaatan {{ item.utilization }}</span>
+                                <span>Saldo {{ item.closing_balance }}</span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
                     <CardHeader
                         ><CardTitle>Pending Approval</CardTitle></CardHeader
                     >
@@ -95,8 +164,14 @@ const breadcrumbItems: BreadcrumbItem[] = [
                         </p>
                         <ul v-else class="space-y-2">
                             <li v-for="item in pendingApprovals" :key="item.id">
-                                {{ item.period_label }} -
-                                {{ item.status }}
+                                <Link
+                                    class="text-primary underline-offset-4 hover:underline"
+                                    :href="wasteManagementRoutes.faba.approvals.review([item.year, item.month]).url"
+                                >
+                                    {{ item.period_label }}
+                                </Link>
+                                -
+                                {{ formatFabaStatus(item.status) }}
                             </li>
                         </ul>
                     </CardContent>

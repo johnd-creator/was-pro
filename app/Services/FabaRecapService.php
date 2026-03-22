@@ -12,6 +12,96 @@ use Illuminate\Support\Collection;
 
 class FabaRecapService
 {
+    /**
+     * @return array{year: int, month: int}|null
+     */
+    public function getLatestAvailablePeriod(): ?array
+    {
+        $productionPeriod = FabaProductionEntry::query()
+            ->selectRaw('extract(year from transaction_date)::integer as year, extract(month from transaction_date)::integer as month')
+            ->orderByRaw('extract(year from transaction_date) desc, extract(month from transaction_date) desc')
+            ->first();
+
+        $utilizationPeriod = FabaUtilizationEntry::query()
+            ->selectRaw('extract(year from transaction_date)::integer as year, extract(month from transaction_date)::integer as month')
+            ->orderByRaw('extract(year from transaction_date) desc, extract(month from transaction_date) desc')
+            ->first();
+
+        $periods = collect([$productionPeriod, $utilizationPeriod])
+            ->filter()
+            ->map(fn ($period): array => [
+                'year' => (int) $period->year,
+                'month' => (int) $period->month,
+            ])
+            ->sortByDesc(fn (array $period): string => sprintf('%04d-%02d', $period['year'], $period['month']))
+            ->values();
+
+        return $periods->first();
+    }
+
+    /**
+     * @return array{year: int, month: int, resolved_from_latest: bool}
+     */
+    public function resolveRequestedOrLatestPeriod(?int $year = null, ?int $month = null): array
+    {
+        if ($year !== null && $month !== null) {
+            return [
+                'year' => $year,
+                'month' => $month,
+                'resolved_from_latest' => false,
+            ];
+        }
+
+        $latestPeriod = $this->getLatestAvailablePeriod();
+
+        if ($latestPeriod) {
+            return [
+                'year' => $latestPeriod['year'],
+                'month' => $latestPeriod['month'],
+                'resolved_from_latest' => true,
+            ];
+        }
+
+        return [
+            'year' => (int) now()->year,
+            'month' => (int) now()->month,
+            'resolved_from_latest' => false,
+        ];
+    }
+
+    /**
+     * @return array<int, array{year: int, month: int, period_label: string}>
+     */
+    public function getAvailablePeriodOptions(): array
+    {
+        $productionPeriods = FabaProductionEntry::query()
+            ->selectRaw('extract(year from transaction_date)::integer as year, extract(month from transaction_date)::integer as month')
+            ->groupByRaw('extract(year from transaction_date), extract(month from transaction_date)')
+            ->get();
+
+        $utilizationPeriods = FabaUtilizationEntry::query()
+            ->selectRaw('extract(year from transaction_date)::integer as year, extract(month from transaction_date)::integer as month')
+            ->groupByRaw('extract(year from transaction_date), extract(month from transaction_date)')
+            ->get();
+
+        return $productionPeriods
+            ->concat($utilizationPeriods)
+            ->map(fn ($item): string => sprintf('%04d-%02d', (int) $item->year, (int) $item->month))
+            ->unique()
+            ->map(function (string $period): array {
+                [$year, $month] = array_map('intval', explode('-', $period));
+
+                return [
+                    'year' => $year,
+                    'month' => $month,
+                    'period_label' => $this->formatPeriodLabel($year, $month),
+                ];
+            })
+            ->sortByDesc(fn (array $period): string => sprintf('%04d-%02d', $period['year'], $period['month']))
+            ->values()
+            ->all();
+    }
+
     public function getMonthlyRecap(int $year, int $month): array
     {
         $production = FabaProductionEntry::query()->forPeriod($year, $month);
@@ -232,8 +322,8 @@ class FabaRecapService
 
     public function getCurrentBalance(): float
     {
-        $now = CarbonImmutable::now();
-        $recap = $this->getMonthlyRecap((int) $now->format('Y'), (int) $now->format('n'));
+        $period = $this->resolveRequestedOrLatestPeriod();
+        $recap = $this->getMonthlyRecap($period['year'], $period['month']);
 
         return $recap['closing_balance'];
     }

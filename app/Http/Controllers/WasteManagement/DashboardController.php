@@ -14,6 +14,16 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
+    protected function canApproveWasteRecords(): bool
+    {
+        return Auth::user()?->hasPermission('waste_records.approve') ?? false;
+    }
+
+    protected function canViewAllWasteRecords(): bool
+    {
+        return Auth::user()?->hasPermission('waste_records.view_all') ?? false;
+    }
+
     /**
      * Display the waste management dashboard.
      */
@@ -110,7 +120,7 @@ class DashboardController extends Controller
 
         // Pending Approvals (for supervisors/admins)
         $pendingApprovals = [];
-        if ($user->can('waste_records.approve') || $user->can('waste_records.view_all')) {
+        if ($this->canApproveWasteRecords() || $this->canViewAllWasteRecords()) {
             $pendingApprovals = WasteRecord::pendingApproval()
                 ->with(['wasteType', 'wasteType.category', 'submittedByUser'])
                 ->orderBy('submitted_at', 'desc')

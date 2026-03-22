@@ -67,6 +67,9 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Create Transportation', 'slug' => 'transportation.create', 'module' => 'transportation', 'description' => 'Create waste transportation'],
             ['name' => 'Edit Transportation', 'slug' => 'transportation.edit', 'module' => 'transportation', 'description' => 'Edit waste transportation'],
             ['name' => 'Delete Transportation', 'slug' => 'transportation.delete', 'module' => 'transportation', 'description' => 'Delete waste transportation'],
+            ['name' => 'Dispatch Transportation', 'slug' => 'transportation.dispatch', 'module' => 'transportation', 'description' => 'Dispatch waste transportation'],
+            ['name' => 'Deliver Transportation', 'slug' => 'transportation.deliver', 'module' => 'transportation', 'description' => 'Mark waste transportation as delivered'],
+            ['name' => 'Cancel Transportation', 'slug' => 'transportation.cancel', 'module' => 'transportation', 'description' => 'Cancel waste transportation'],
 
             // Dashboard permissions
             ['name' => 'View Dashboard', 'slug' => 'dashboard.view', 'module' => 'dashboard', 'description' => 'View dashboard and statistics'],
@@ -82,6 +85,7 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Edit FABA Utilization', 'slug' => 'faba_utilization.edit', 'module' => 'faba_utilization', 'description' => 'Edit FABA utilization entries'],
             ['name' => 'Delete FABA Utilization', 'slug' => 'faba_utilization.delete', 'module' => 'faba_utilization', 'description' => 'Delete FABA utilization entries'],
             ['name' => 'View FABA Recaps', 'slug' => 'faba_recaps.view', 'module' => 'faba_recaps', 'description' => 'View FABA recaps'],
+            ['name' => 'Manage FABA Opening Balance', 'slug' => 'faba_opening_balance.manage', 'module' => 'faba_recaps', 'description' => 'Manage FABA opening balances'],
             ['name' => 'View FABA Approvals', 'slug' => 'faba_approvals.view', 'module' => 'faba_approvals', 'description' => 'View FABA approvals'],
             ['name' => 'Submit FABA Approvals', 'slug' => 'faba_approvals.submit', 'module' => 'faba_approvals', 'description' => 'Submit FABA monthly approvals'],
             ['name' => 'Approve FABA Approvals', 'slug' => 'faba_approvals.approve', 'module' => 'faba_approvals', 'description' => 'Approve FABA monthly approvals'],

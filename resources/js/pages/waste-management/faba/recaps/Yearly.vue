@@ -2,6 +2,7 @@
 import { Head, router } from '@inertiajs/vue3';
 import { reactive } from 'vue';
 import Heading from '@/components/Heading.vue';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -19,7 +20,14 @@ import type { BreadcrumbItem } from '@/types';
 const props = defineProps<{
     recap: {
         year: number;
-        months: Array<Record<string, number>>;
+        months: Array<{
+            month: number;
+            period_label: string;
+            total_production: number;
+            total_utilization: number;
+            closing_balance: number;
+            warnings?: Array<{ code: string; message: string }>;
+        }>;
         totals: Record<string, number>;
     };
     filters: { year: number };
@@ -52,6 +60,15 @@ function applyFilters(): void {
                 <Input v-model="form.year" type="number" class="max-w-40" />
                 <Button @click="applyFilters">Terapkan</Button>
             </div>
+            <Alert
+                v-if="recap.months.some((month) => (month.warnings?.length ?? 0) > 0)"
+                variant="destructive"
+            >
+                <AlertTitle>Peringatan tahunan</AlertTitle>
+                <AlertDescription>
+                    Ada periode yang masih memiliki warning operasional. Tinjau bulan terkait sebelum finalisasi laporan.
+                </AlertDescription>
+            </Alert>
             <Table>
                 <TableHeader>
                     <TableRow>

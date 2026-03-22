@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,11 +15,13 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import { formatFabaMaterial } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 
 const props = defineProps<{
     currentBalance: number;
+    canManageOpeningBalance: boolean;
     yearlyRecap: {
         year: number;
         totals: { total_production: number; total_utilization: number };
@@ -43,6 +46,8 @@ const breadcrumbItems: BreadcrumbItem[] = [
         href: wasteManagementRoutes.faba.recaps.balance.url(),
     },
 ];
+
+const canManageOpeningBalance = computed(() => props.canManageOpeningBalance);
 
 function submit(): void {
     form.post(wasteManagementRoutes.faba.recaps.openingBalance.store.url());
@@ -85,7 +90,7 @@ function submit(): void {
                     }}</CardContent></Card
                 >
             </div>
-            <Card>
+            <Card v-if="canManageOpeningBalance">
                 <CardHeader><CardTitle>Set Opening Balance</CardTitle></CardHeader>
                 <CardContent class="grid gap-4 md:grid-cols-2">
                     <div class="grid gap-2">
@@ -101,8 +106,8 @@ function submit(): void {
                         <Select v-model="form.material_type">
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="fly_ash">fly_ash</SelectItem>
-                                <SelectItem value="bottom_ash">bottom_ash</SelectItem>
+                                <SelectItem value="fly_ash">{{ formatFabaMaterial('fly_ash') }}</SelectItem>
+                                <SelectItem value="bottom_ash">{{ formatFabaMaterial('bottom_ash') }}</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -117,6 +122,12 @@ function submit(): void {
                     <div class="md:col-span-2">
                         <Button @click="submit" :disabled="form.processing">Simpan opening balance</Button>
                     </div>
+                </CardContent>
+            </Card>
+            <Card v-else>
+                <CardHeader><CardTitle>Opening Balance</CardTitle></CardHeader>
+                <CardContent class="text-sm text-muted-foreground">
+                    Anda dapat melihat saldo TPS, tetapi perubahan opening balance hanya tersedia untuk role yang memiliki izin pengelolaan saldo awal.
                 </CardContent>
             </Card>
         </div>

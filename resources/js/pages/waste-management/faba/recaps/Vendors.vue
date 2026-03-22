@@ -21,6 +21,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import { formatFabaDate, formatFabaMaterial } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 import type { FabaVendor } from '@/types/faba';
@@ -33,6 +34,15 @@ const props = defineProps<{
             vendor_name: string;
             total_quantity: number;
             transactions_count: number;
+            materials: string[];
+            history: Array<{
+                id: string;
+                transaction_date: string;
+                entry_number: string;
+                material_type: string;
+                quantity: number;
+                unit: string;
+            }>;
         }>;
     };
     vendors: FabaVendor[];
@@ -109,6 +119,7 @@ function applyFilters(): void {
                 <TableHeader>
                     <TableRow>
                         <TableHead>Vendor</TableHead>
+                        <TableHead>Material</TableHead>
                         <TableHead>Total Qty</TableHead>
                         <TableHead>Jumlah Transaksi</TableHead>
                     </TableRow>
@@ -119,11 +130,26 @@ function applyFilters(): void {
                         :key="item.vendor_id ?? item.vendor_name"
                     >
                         <TableCell>{{ item.vendor_name }}</TableCell>
+                        <TableCell>{{ item.materials.map((material) => formatFabaMaterial(material)).join(', ') }}</TableCell>
                         <TableCell>{{ item.total_quantity }}</TableCell>
                         <TableCell>{{ item.transactions_count }}</TableCell>
                     </TableRow>
                 </TableBody>
             </Table>
+            <div
+                v-if="filters.vendor_id && recap.vendors[0]?.history?.length"
+                class="rounded-xl border p-6"
+            >
+                <Heading
+                    title="Histori Vendor"
+                    description="Detail transaksi vendor sesuai filter saat ini."
+                />
+                <div class="mt-4 space-y-2 text-sm">
+                    <div v-for="item in recap.vendors[0].history" :key="item.id">
+                        {{ formatFabaDate(item.transaction_date) }} - {{ item.entry_number }} - {{ formatFabaMaterial(item.material_type) }} - {{ item.quantity }} {{ item.unit }}
+                    </div>
+                </div>
+            </div>
         </div>
     </WasteManagementLayout>
 </template>

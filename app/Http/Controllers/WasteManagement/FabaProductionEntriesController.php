@@ -173,8 +173,17 @@ class FabaProductionEntriesController extends Controller
 
     public function exportCsv(): StreamedResponse
     {
+        $year = request('year');
+        $month = request('month');
+        $materialType = request('material_type');
+        $entryType = request('entry_type');
+
         $entries = FabaProductionEntry::query()
             ->with(['createdByUser:id,name'])
+            ->when($year, fn ($query) => $query->whereYear('transaction_date', (int) $year))
+            ->when($month, fn ($query) => $query->whereMonth('transaction_date', (int) $month))
+            ->when($materialType, fn ($query) => $query->where('material_type', $materialType))
+            ->when($entryType, fn ($query) => $query->where('entry_type', $entryType))
             ->orderByDesc('transaction_date')
             ->get();
 
@@ -191,6 +200,8 @@ class FabaProductionEntriesController extends Controller
                 'Transaction Date',
                 'Material Type',
                 'Entry Type',
+                'Period',
+                'Approval Status',
                 'Quantity',
                 'Unit',
                 'Note',
@@ -204,6 +215,14 @@ class FabaProductionEntriesController extends Controller
                     $entry->transaction_date->format('Y-m-d'),
                     $entry->material_type,
                     $entry->entry_type,
+                    $this->fabaRecapService->formatPeriodLabel(
+                        (int) $entry->transaction_date->format('Y'),
+                        (int) $entry->transaction_date->format('n'),
+                    ),
+                    $this->fabaRecapService->getPeriodStatus(
+                        (int) $entry->transaction_date->format('Y'),
+                        (int) $entry->transaction_date->format('n'),
+                    ),
                     $entry->quantity,
                     $entry->unit,
                     $entry->note,

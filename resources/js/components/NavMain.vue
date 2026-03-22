@@ -147,12 +147,12 @@ const sectionItems = computed<NavItem[]>(() =>
                     as-child
                     size="lg"
                     :is-active="isCurrentUrl(item.href)"
-                    class="group/direct h-auto rounded-xl border border-sidebar-border bg-sidebar-accent/30 px-3 py-2.5 transition-colors hover:bg-sidebar-accent/50 data-[active=true]:bg-sidebar-primary/90 data-[active=true]:text-sidebar-primary-foreground data-[active=true]:shadow-sm"
+                    class="group/direct h-auto rounded-xl border border-transparent bg-transparent px-3 py-2.5 text-sidebar-foreground/88 transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:border-sidebar-primary/20 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:shadow-lg data-[active=true]:shadow-emerald-950/20"
                 >
                     <Link :href="item.href">
                         <component :is="item.icon" class="size-4" />
                         <span
-                            class="text-sm font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden"
+                            class="text-sm font-semibold text-current group-data-[collapsible=icon]:hidden"
                             >{{ item.title }}</span
                         >
                     </Link>
@@ -166,7 +166,7 @@ const sectionItems = computed<NavItem[]>(() =>
             class="px-0 py-0"
         >
             <SidebarGroupLabel
-                class="flex cursor-pointer items-center justify-between px-2 text-[11px] font-semibold tracking-[0.18em] text-sidebar-foreground/75 uppercase transition-colors select-none hover:text-sidebar-foreground"
+                class="flex cursor-pointer items-center justify-between px-2 text-[11px] font-semibold tracking-[0.18em] text-sidebar-foreground/58 uppercase transition-colors select-none hover:text-sidebar-foreground/88"
                 @click="toggleSection(section.title)"
             >
                 <span>{{ section.title }}</span>
@@ -191,12 +191,12 @@ const sectionItems = computed<NavItem[]>(() =>
                         <SidebarMenuButton
                             as-child
                             :is-active="isCurrentUrl(item.href)"
-                            class="group/item h-auto rounded-xl px-3 py-2 transition-colors hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent/80 data-[active=true]:font-semibold data-[active=true]:text-sidebar-foreground"
+                            class="group/item h-auto rounded-xl px-3 py-2 text-sidebar-foreground/78 transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold data-[active=true]:text-sidebar-accent-foreground"
                         >
                             <Link :href="item.href">
                                 <component :is="item.icon" class="size-4" />
                                 <span
-                                    class="text-sm font-medium text-sidebar-foreground group-data-[collapsible=icon]:hidden"
+                                    class="text-sm font-medium text-current group-data-[collapsible=icon]:hidden"
                                     >{{ item.title }}</span
                                 >
                             </Link>

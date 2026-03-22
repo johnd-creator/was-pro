@@ -1,16 +1,30 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import { reactive } from 'vue';
+import { computed, reactive } from 'vue';
 import Heading from '@/components/Heading.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import {
+    formatFabaDate,
+    formatFabaDateTime,
+    formatFabaEntryType,
+    formatFabaMaterial,
+    formatFabaUtilizationType,
+} from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 import type {
+    FabaAuditLog,
     FabaMonthlyRecap,
     FabaProductionEntry,
     FabaUtilizationEntry,
@@ -22,7 +36,10 @@ const props = defineProps<{
         production_entries: FabaProductionEntry[];
         utilization_entries: FabaUtilizationEntry[];
         opening_balances: Array<{ material_type: string; quantity: number }>;
+        audit_logs: FabaAuditLog[];
     };
+    availablePeriods: Array<{ year: number; month: number; period_label: string }>;
+    resolvedFromLatestPeriod: boolean;
     filters: { year: number; month: number };
 }>();
 const breadcrumbItems: BreadcrumbItem[] = [
@@ -32,10 +49,18 @@ const breadcrumbItems: BreadcrumbItem[] = [
     },
 ];
 
-const form = reactive({ ...props.filters });
+const form = reactive({
+    selectedPeriod: `${props.filters.year}-${String(props.filters.month).padStart(2, '0')}`,
+});
+
+const hasEntries = computed(() => {
+    return props.detail.production_entries.length > 0 || props.detail.utilization_entries.length > 0;
+});
 
 function applyFilters(): void {
-    router.get(wasteManagementRoutes.faba.recaps.monthly(), form);
+    const [year, month] = form.selectedPeriod.split('-').map(Number);
+
+    router.get(wasteManagementRoutes.faba.recaps.monthly(), { year, month });
 }
 </script>
 
@@ -47,22 +72,32 @@ function applyFilters(): void {
         <Head title="Rekap Bulanan FABA" />
         <div class="space-y-6 p-6">
             <Heading
-                title="Rekap Bulanan FABA"
+                :title="`Rekap ${detail.recap.period_label}`"
                 description="Lihat total produksi, pemanfaatan, dan saldo per bulan."
             />
+            <Alert v-if="resolvedFromLatestPeriod && availablePeriods.length > 0">
+                <AlertTitle>Periode default disesuaikan</AlertTitle>
+                <AlertDescription>
+                    Halaman otomatis menampilkan periode terakhir yang memiliki transaksi FABA, yaitu {{ detail.recap.period_label }}.
+                </AlertDescription>
+            </Alert>
             <div class="grid gap-4 md:grid-cols-3">
                 <div class="grid gap-2">
-                    <Label>Tahun</Label>
-                    <Input v-model="form.year" type="number" />
-                </div>
-                <div class="grid gap-2">
-                    <Label>Bulan</Label>
-                    <Input
-                        v-model="form.month"
-                        type="number"
-                        min="1"
-                        max="12"
-                    />
+                    <Label>Periode</Label>
+                    <Select v-model="form.selectedPeriod">
+                        <SelectTrigger>
+                            <SelectValue placeholder="Pilih periode rekap" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="period in availablePeriods"
+                                :key="`${period.year}-${period.month}`"
+                                :value="`${period.year}-${String(period.month).padStart(2, '0')}`"
+                            >
+                                {{ period.period_label }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
                 <div class="flex items-end">
                     <Button @click="applyFilters">Terapkan</Button>
@@ -135,12 +170,20 @@ function applyFilters(): void {
                     }}</CardContent></Card
                 >
             </div>
+            <Card v-if="!hasEntries">
+                <CardHeader>
+                    <CardTitle>Periode Belum Memiliki Transaksi</CardTitle>
+                </CardHeader>
+                <CardContent class="text-sm text-muted-foreground">
+                    Belum ada transaksi produksi atau pemanfaatan FABA pada periode {{ detail.recap.period_label }}.
+                </CardContent>
+            </Card>
             <div class="grid gap-6 md:grid-cols-2">
                 <Card>
                     <CardHeader><CardTitle>Opening Balance</CardTitle></CardHeader>
                     <CardContent class="space-y-2 text-sm">
                         <div v-for="item in detail.opening_balances" :key="item.material_type">
-                            {{ item.material_type }}: {{ item.quantity }} ton
+                            {{ formatFabaMaterial(item.material_type) }}: {{ item.quantity }} ton
                         </div>
                     </CardContent>
                 </Card>
@@ -151,7 +194,7 @@ function applyFilters(): void {
                             Tidak ada transaksi produksi pada periode ini.
                         </p>
                         <div v-for="item in detail.production_entries" :key="item.id">
-                            {{ item.transaction_date }} - {{ item.entry_number }} - {{ item.material_type }} - {{ item.quantity }} ton
+                            {{ formatFabaDate(item.transaction_date) }} - {{ item.entry_number }} - {{ formatFabaMaterial(item.material_type) }} - {{ formatFabaEntryType(item.entry_type) }} - {{ item.quantity }} ton
                         </div>
                     </CardContent>
                 </Card>
@@ -162,7 +205,20 @@ function applyFilters(): void {
                             Tidak ada transaksi pemanfaatan pada periode ini.
                         </p>
                         <div v-for="item in detail.utilization_entries" :key="item.id">
-                            {{ item.transaction_date }} - {{ item.entry_number }} - {{ item.utilization_type }} - {{ item.vendor?.name || '-' }} - {{ item.quantity }} ton
+                            {{ formatFabaDate(item.transaction_date) }} - {{ item.entry_number }} - {{ formatFabaUtilizationType(item.utilization_type) }} - {{ item.vendor?.name || '-' }} - {{ item.quantity }} ton
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card class="md:col-span-2">
+                    <CardHeader>
+                        <CardTitle>Log Periode</CardTitle>
+                    </CardHeader>
+                    <CardContent class="space-y-2 text-sm">
+                        <p v-if="detail.audit_logs.length === 0" class="text-muted-foreground">
+                            Belum ada audit trail pada periode ini.
+                        </p>
+                        <div v-for="item in detail.audit_logs" :key="item.id">
+                            {{ formatFabaDateTime(item.created_at) }} - {{ item.actor?.name || 'Sistem' }} - {{ item.summary }}
                         </div>
                     </CardContent>
                 </Card>

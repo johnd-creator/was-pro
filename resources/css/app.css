@@ -118,15 +118,15 @@
     --chart-4: hsl(43 74% 66%);
     --chart-5: hsl(27 87% 67%);
     --radius: 0.5rem;
-    --sidebar-background: hsl(143 35% 96%);
-    --sidebar-foreground: hsl(143 25% 15%);
-    --sidebar-primary: hsl(143 70% 35%);
-    --sidebar-primary-foreground: hsl(143 35% 98%);
-    --sidebar-accent: hsl(143 40% 90%);
-    --sidebar-accent-foreground: hsl(143 25% 20%);
-    --sidebar-border: hsl(143 35% 85%);
-    --sidebar-ring: hsl(143 70% 45%);
-    --sidebar: hsl(143 35% 96%);
+    --sidebar-background: hsl(216 34% 13%);
+    --sidebar-foreground: hsl(210 28% 94%);
+    --sidebar-primary: hsl(149 66% 44%);
+    --sidebar-primary-foreground: hsl(0 0% 100%);
+    --sidebar-accent: hsl(216 26% 18%);
+    --sidebar-accent-foreground: hsl(210 20% 96%);
+    --sidebar-border: hsl(216 24% 22%);
+    --sidebar-ring: hsl(149 66% 44%);
+    --sidebar: hsl(216 34% 13%);
 }
 
 .dark {
@@ -154,15 +154,15 @@
     --chart-3: hsl(30 80% 55%);
     --chart-4: hsl(280 65% 60%);
     --chart-5: hsl(340 75% 55%);
-    --sidebar-background: hsl(143 20% 8%);
-    --sidebar-foreground: hsl(143 15% 92%);
-    --sidebar-primary: hsl(143 60% 50%);
-    --sidebar-primary-foreground: hsl(143 35% 98%);
-    --sidebar-accent: hsl(143 25% 15%);
-    --sidebar-accent-foreground: hsl(143 20% 90%);
-    --sidebar-border: hsl(143 25% 12%);
-    --sidebar-ring: hsl(143 70% 45%);
-    --sidebar: hsl(143 20% 10%);
+    --sidebar-background: hsl(216 34% 10%);
+    --sidebar-foreground: hsl(210 25% 94%);
+    --sidebar-primary: hsl(149 66% 46%);
+    --sidebar-primary-foreground: hsl(0 0% 100%);
+    --sidebar-accent: hsl(216 24% 16%);
+    --sidebar-accent-foreground: hsl(210 20% 96%);
+    --sidebar-border: hsl(216 22% 18%);
+    --sidebar-ring: hsl(149 66% 46%);
+    --sidebar: hsl(216 34% 10%);
 }
 
 @layer base {
@@ -171,5 +171,16 @@
     }
     body {
         @apply bg-background text-foreground;
+    }
+
+    /* Fix double scrollbar issue */
+    html,
+    body {
+        @apply h-full overflow-x-hidden;
+    }
+
+    /* Ensure scrolling happens within the app container, not on body level */
+    [data-slot="sidebar-wrapper"] {
+        @apply h-full;
     }
 }

@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\WasteManagement\DashboardController;
-use App\Http\Controllers\WasteManagement\FabaDashboardController;
 use App\Http\Controllers\WasteManagement\FabaMonthlyApprovalsController;
 use App\Http\Controllers\WasteManagement\FabaProductionEntriesController;
 use App\Http\Controllers\WasteManagement\FabaRecapsController;
@@ -24,8 +23,11 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
         ->name('dashboard');
 
     Route::prefix('faba')->name('faba.')->group(function () {
+        // Redirect old FABA dashboard to unified dashboard
         Route::middleware(['permission:faba_dashboard.view'])
-            ->get('/dashboard', [FabaDashboardController::class, 'index'])
+            ->get('/dashboard', function () {
+                return redirect()->to('/dashboard');
+            })
             ->name('dashboard');
 
         Route::prefix('production')->name('production.')->group(function () {
@@ -95,7 +97,7 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
             Route::middleware(['permission:faba_recaps.view'])
                 ->get('/balance', [FabaRecapsController::class, 'balance'])
                 ->name('balance');
-            Route::middleware(['permission:faba_recaps.view'])
+            Route::middleware(['permission:faba_opening_balance.manage'])
                 ->post('/opening-balance', [FabaRecapsController::class, 'storeOpeningBalance'])
                 ->name('openingBalance.store');
         });
@@ -224,6 +226,16 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
             ->post('/', [WasteRecordsController::class, 'store'])
             ->name('store');
 
+        // Pending Approval
+        Route::middleware(['permission:waste_records.approve|waste_records.reject'])
+            ->get('/pending-approval', [WasteRecordsController::class, 'pendingApproval'])
+            ->name('pending-approval');
+
+        // Export
+        Route::middleware(['permission:waste_records.view_all|waste_records.view_own'])
+            ->get('/export/csv', [WasteRecordsController::class, 'exportCsv'])
+            ->name('export.csv');
+
         // Show
         Route::middleware(['permission:waste_records.view_all|waste_records.view_own'])
             ->get('/{wasteRecord}', [WasteRecordsController::class, 'show'])
@@ -259,16 +271,6 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
         Route::middleware(['permission:waste_records.submit'])
             ->post('/{wasteRecord}/return-to-draft', [WasteRecordsController::class, 'returnToDraft'])
             ->name('return-to-draft');
-
-        // Pending Approval
-        Route::middleware(['permission:waste_records.approve|waste_records.reject'])
-            ->get('/pending-approval', [WasteRecordsController::class, 'pendingApproval'])
-            ->name('pending-approval');
-
-        // Export
-        Route::middleware(['permission:waste_records.view_all|waste_records.view_own'])
-            ->get('/export/csv', [WasteRecordsController::class, 'exportCsv'])
-            ->name('export.csv');
     });
 
     // Waste Transportations Routes
@@ -286,6 +288,11 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
         Route::middleware(['permission:transportation.create'])
             ->post('/', [WasteTransportationsController::class, 'store'])
             ->name('store');
+
+        // Export
+        Route::middleware(['permission:transportation.view_all|transportation.view_own'])
+            ->get('/export/csv', [WasteTransportationsController::class, 'exportCsv'])
+            ->name('export.csv');
 
         // Show
         Route::middleware(['permission:transportation.view_all|transportation.view_own'])
@@ -319,9 +326,5 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
             ->post('/{wasteTransportation}/cancel', [WasteTransportationsController::class, 'cancel'])
             ->name('cancel');
 
-        // Export
-        Route::middleware(['permission:transportation.view_all|transportation.view_own'])
-            ->get('/export/csv', [WasteTransportationsController::class, 'exportCsv'])
-            ->name('export.csv');
     });
 });

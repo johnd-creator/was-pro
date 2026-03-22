@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
 import Heading from '@/components/Heading.vue';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import {
+    formatFabaDate,
+    formatFabaMaterial,
+    formatFabaStatus,
+    formatFabaUtilizationType,
+} from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 import type { FabaUtilizationEntry } from '@/types/faba';
@@ -36,13 +43,13 @@ const breadcrumbItems: BreadcrumbItem[] = [
                 <CardHeader><CardTitle>Informasi utama</CardTitle></CardHeader>
                 <CardContent class="grid gap-4 md:grid-cols-2">
                     <div>
-                        <strong>Tanggal:</strong> {{ entry.transaction_date }}
+                        <strong>Tanggal:</strong> {{ formatFabaDate(entry.transaction_date) }}
                     </div>
                     <div>
-                        <strong>Material:</strong> {{ entry.material_type }}
+                        <strong>Material:</strong> {{ formatFabaMaterial(entry.material_type) }}
                     </div>
                     <div>
-                        <strong>Tipe:</strong> {{ entry.utilization_type }}
+                        <strong>Tipe:</strong> {{ formatFabaUtilizationType(entry.utilization_type) }}
                     </div>
                     <div>
                         <strong>Vendor:</strong> {{ entry.vendor?.name || '-' }}
@@ -53,7 +60,9 @@ const breadcrumbItems: BreadcrumbItem[] = [
                     </div>
                     <div>
                         <strong>Status bulan:</strong>
-                        {{ entry.approval_status }}
+                        <Badge variant="secondary">
+                            {{ formatFabaStatus(entry.approval_status) }}
+                        </Badge>
                     </div>
                     <div>
                         <strong>Dokumen:</strong>
@@ -61,7 +70,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
                     </div>
                     <div>
                         <strong>Tanggal dokumen:</strong>
-                        {{ entry.document_date || '-' }}
+                        {{ formatFabaDate(entry.document_date) }}
                     </div>
                     <div>
                         <strong>Lampiran:</strong>

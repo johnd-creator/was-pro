@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
 import Heading from '@/components/Heading.vue';
+import { Badge } from '@/components/ui/badge';
 import {
     Table,
     TableBody,
@@ -10,6 +11,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import { formatFabaDateTime, formatFabaStatus } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 import type { FabaAuditLog, FabaMonthlyApproval } from '@/types/faba';
@@ -61,7 +63,11 @@ const breadcrumbItems: BreadcrumbItem[] = [
                                 `${approval.month}/${approval.year}`
                             }}</TableCell
                         >
-                        <TableCell>{{ approval.status }}</TableCell>
+                        <TableCell>
+                            <Badge variant="secondary">
+                                {{ formatFabaStatus(approval.status) }}
+                            </Badge>
+                        </TableCell>
                         <TableCell>{{
                             approval.submitted_by_user?.name || '-'
                         }}</TableCell>
@@ -97,7 +103,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
                     </TableHeader>
                     <TableBody>
                         <TableRow v-for="log in auditLogs" :key="log.id">
-                            <TableCell>{{ log.created_at || '-' }}</TableCell>
+                            <TableCell>{{ formatFabaDateTime(log.created_at) }}</TableCell>
                             <TableCell>{{ log.module }}</TableCell>
                             <TableCell>{{ log.action }}</TableCell>
                             <TableCell>{{ log.actor?.name || '-' }}</TableCell>

@@ -22,11 +22,17 @@ class FabaRecapsController extends Controller
 
     public function monthly(): Response
     {
-        $year = (int) request('year', now()->year);
-        $month = (int) request('month', now()->month);
+        $resolvedPeriod = $this->fabaRecapService->resolveRequestedOrLatestPeriod(
+            request()->filled('year') ? (int) request('year') : null,
+            request()->filled('month') ? (int) request('month') : null,
+        );
+        $year = $resolvedPeriod['year'];
+        $month = $resolvedPeriod['month'];
 
         return Inertia::render('waste-management/faba/recaps/Monthly', [
             'detail' => $this->fabaRecapService->getMonthlyRecapDetail($year, $month),
+            'availablePeriods' => $this->fabaRecapService->getAvailablePeriodOptions(),
+            'resolvedFromLatestPeriod' => $resolvedPeriod['resolved_from_latest'],
             'filters' => compact('year', 'month'),
         ]);
     }
@@ -58,12 +64,15 @@ class FabaRecapsController extends Controller
 
     public function balance(): Response
     {
+        $resolvedPeriod = $this->fabaRecapService->resolveRequestedOrLatestPeriod();
+
         return Inertia::render('waste-management/faba/recaps/Balance', [
             'currentBalance' => $this->fabaRecapService->getCurrentBalance(),
-            'yearlyRecap' => $this->fabaRecapService->getYearlyRecap((int) now()->year),
+            'yearlyRecap' => $this->fabaRecapService->getYearlyRecap($resolvedPeriod['year']),
+            'canManageOpeningBalance' => Auth::user()?->hasPermission('faba_opening_balance.manage') ?? false,
             'openingBalanceDefaults' => [
-                'year' => (int) now()->year,
-                'month' => (int) now()->month,
+                'year' => $resolvedPeriod['year'],
+                'month' => $resolvedPeriod['month'],
             ],
         ]);
     }

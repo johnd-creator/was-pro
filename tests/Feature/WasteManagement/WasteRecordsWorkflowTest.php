@@ -740,3 +740,111 @@ test('record number is auto-generated correctly', function () {
         'record_number' => $prefix.'-0006',
     ]);
 });
+
+test('waste management demo command seeds deterministic data for three previous months', function () {
+    $tenantCode = 'TWMSWMDEMO';
+    $schemaName = 'tenant_twms_wm_demo';
+
+    $this->artisan('waste-management:seed-demo', [
+        '--tenant' => $tenantCode,
+        '--schema' => $schemaName,
+        '--fresh-tenant' => true,
+    ])->assertSuccessful();
+
+    $organization = Organization::query()->where('code', $tenantCode)->first();
+
+    expect($organization)->not->toBeNull()
+        ->and($organization?->schema_name)->toBe($schemaName);
+
+    $tenantService = app(\App\Services\TenantService::class);
+    $tenantService->switchToSchema($schemaName);
+
+    expect(\App\Models\WasteCategory::query()->count())->toBe(3)
+        ->and(\App\Models\WasteCharacteristic::query()->count())->toBe(3)
+        ->and(WasteType::query()->count())->toBe(4)
+        ->and(Vendor::query()->count())->toBe(3)
+        ->and(WasteRecord::query()->count())->toBe(36)
+        ->and(WasteTransportation::query()->count())->toBe(15);
+
+    $periods = [
+        now()->startOfMonth()->subMonthsNoOverflow(3),
+        now()->startOfMonth()->subMonthsNoOverflow(2),
+        now()->startOfMonth()->subMonthsNoOverflow(1),
+    ];
+
+    foreach ($periods as $period) {
+        expect(
+            WasteRecord::query()
+                ->whereYear('date', $period->year)
+                ->whereMonth('date', $period->month)
+                ->count()
+        )->toBe(12);
+    }
+
+    expect(WasteRecord::query()->where('status', 'pending_review')->count())->toBe(9)
+        ->and(WasteRecord::query()->where('status', 'approved')->count())->toBe(12)
+        ->and(WasteTransportation::query()->where('status', 'pending')->count())->toBe(3)
+        ->and(WasteTransportation::query()->where('status', 'in_transit')->count())->toBe(3)
+        ->and(WasteTransportation::query()->where('status', 'delivered')->count())->toBe(6)
+        ->and(WasteTransportation::query()->where('status', 'cancelled')->count())->toBe(3);
+
+    $hasOverflowTransportation = WasteTransportation::query()
+        ->get()
+        ->contains(fn (WasteTransportation $transportation): bool => $transportation->quantityExceedsRecord());
+
+    expect($hasOverflowTransportation)->toBeFalse();
+});
+
+test('waste management demo seed can populate an existing tenant without overwriting organization metadata', function () {
+    $existingOrganization = Organization::factory()->create([
+        'code' => 'TWMSWM',
+        'name' => 'Tenant Produksi Waste',
+        'schema_name' => 'tenant_twms_wm_existing',
+    ]);
+
+    $tenantService = app(\App\Services\TenantService::class);
+    if (! $tenantService->schemaExists($existingOrganization->schema_name)) {
+        $tenantService->createSchema($existingOrganization->schema_name);
+    }
+
+    $tenantService->switchToSchema($existingOrganization->schema_name);
+    \Illuminate\Support\Facades\Artisan::call('migrate', [
+        '--path' => 'database/migrations/tenant',
+        '--force' => true,
+    ]);
+    $tenantService->switchToPublic();
+
+    $john = User::factory()->create([
+        'email' => 'john-wm@d.co',
+        'organization_id' => $existingOrganization->id,
+        'role_id' => Role::where('slug', 'super_admin')->value('id'),
+        'is_super_admin' => true,
+    ]);
+
+    $response = $this->artisan('waste-management:seed-demo', [
+        '--tenant' => 'TWMSWM',
+        '--schema' => $existingOrganization->schema_name,
+    ]);
+
+    $response->assertSuccessful();
+
+    $existingOrganization->refresh();
+    expect($existingOrganization->name)->toBe('Tenant Produksi Waste')
+        ->and(User::query()->find($john->id))->not->toBeNull();
+});
+
+test('waste management demo seed rejects fresh mode for an existing non-demo tenant', function () {
+    $existingOrganization = Organization::factory()->create([
+        'code' => 'TWMSWMFRESH',
+        'name' => 'Tenant Waste No Fresh',
+        'schema_name' => 'tenant_twms_wm_no_fresh',
+    ]);
+
+    $response = $this->artisan('waste-management:seed-demo', [
+        '--tenant' => 'TWMSWMFRESH',
+        '--schema' => $existingOrganization->schema_name,
+        '--fresh-tenant' => true,
+    ]);
+
+    $response->assertFailed();
+});

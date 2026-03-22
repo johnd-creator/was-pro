@@ -19,6 +19,26 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class WasteRecordsController extends Controller
 {
+    protected function canViewAllRecords(): bool
+    {
+        return Auth::user()?->hasPermission('waste_records.view_all') ?? false;
+    }
+
+    protected function canApproveRecords(): bool
+    {
+        return Auth::user()?->hasPermission('waste_records.approve') ?? false;
+    }
+
+    protected function canRejectRecords(): bool
+    {
+        return Auth::user()?->hasPermission('waste_records.reject') ?? false;
+    }
+
+    protected function canAccessRecord(WasteRecord $wasteRecord): bool
+    {
+        return $this->canViewAllRecords() || $wasteRecord->created_by === Auth::id();
+    }
+
     /**
      * Display a listing of waste records.
      */
@@ -29,7 +49,7 @@ class WasteRecordsController extends Controller
             ->orderBy('created_at', 'desc');
 
         // Filter by user permissions
-        if (! Auth::user()->can('waste_records.view_all')) {
+        if (! $this->canViewAllRecords()) {
             $query->byUser(Auth::id());
         }
 
@@ -88,8 +108,15 @@ class WasteRecordsController extends Controller
     /**
      * Display the specified waste record.
      */
-    public function show(WasteRecord $wasteRecord): Response
+    public function show(string $id): Response
     {
+        // Manually resolve the model to handle multi-tenancy properly
+        $wasteRecord = WasteRecord::findOrFail($id);
+
+        if (! $this->canAccessRecord($wasteRecord)) {
+            abort(403, 'You can only view your own records.');
+        }
+
         $wasteRecord->load(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser', 'createdBy']);
 
         return Inertia::render('waste-management/records/Show', [
@@ -100,15 +127,18 @@ class WasteRecordsController extends Controller
     /**
      * Show the form for editing the specified waste record.
      */
-    public function edit(WasteRecord $wasteRecord): Response
+    public function edit(string $id): Response
     {
+        // Manually resolve the model to handle multi-tenancy properly
+        $wasteRecord = WasteRecord::findOrFail($id);
+
         // Check if user can edit this record
         if (! $wasteRecord->canBeEdited()) {
             abort(403, 'This record cannot be edited in its current status.');
         }
 
         // Check if user owns this record (unless they can view all)
-        if (! Auth::user()->can('waste_records.view_all') && $wasteRecord->created_by !== Auth::id()) {
+        if (! $this->canAccessRecord($wasteRecord)) {
             abort(403, 'You can only edit your own records.');
         }
 
@@ -126,8 +156,11 @@ class WasteRecordsController extends Controller
     /**
      * Update the specified waste record.
      */
-    public function update(WasteRecordRequest $request, WasteRecord $wasteRecord): RedirectResponse
+    public function update(WasteRecordRequest $request, string $id): RedirectResponse
     {
+        // Manually resolve the model to handle multi-tenancy properly
+        $wasteRecord = WasteRecord::findOrFail($id);
+
         // Check if user can edit this record
         if (! $wasteRecord->canBeEdited()) {
             return Redirect::back()
@@ -135,7 +168,7 @@ class WasteRecordsController extends Controller
         }
 
         // Check if user owns this record (unless they can view all)
-        if (! Auth::user()->can('waste_records.view_all') && $wasteRecord->created_by !== Auth::id()) {
+        if (! $this->canAccessRecord($wasteRecord)) {
             abort(403, 'You can only edit your own records.');
         }
 
@@ -157,8 +190,11 @@ class WasteRecordsController extends Controller
     /**
      * Remove the specified waste record.
      */
-    public function destroy(WasteRecord $wasteRecord): RedirectResponse
+    public function destroy(string $id): RedirectResponse
     {
+        // Manually resolve the model to handle multi-tenancy properly
+        $wasteRecord = WasteRecord::findOrFail($id);
+
         // Only allow deleting draft or rejected records
         if (! $wasteRecord->canBeEdited()) {
             return Redirect::back()
@@ -166,7 +202,7 @@ class WasteRecordsController extends Controller
         }
 
         // Check if user owns this record (unless they can view all)
-        if (! Auth::user()->can('waste_records.view_all') && $wasteRecord->created_by !== Auth::id()) {
+        if (! $this->canAccessRecord($wasteRecord)) {
             abort(403, 'You can only delete your own records.');
         }
 
@@ -181,7 +217,7 @@ class WasteRecordsController extends Controller
      */
     public function pendingApproval(): Response
     {
-        if (! Auth::user()->can('waste_records.approve') && ! Auth::user()->can('waste_records.view_all')) {
+        if (! $this->canApproveRecords() && ! $this->canViewAllRecords()) {
             abort(403, 'You do not have permission to view pending approvals.');
         }
 
@@ -198,8 +234,11 @@ class WasteRecordsController extends Controller
     /**
      * Submit waste record for approval.
      */
-    public function submit(SubmitWasteRecordRequest $request, WasteRecord $wasteRecord): RedirectResponse
+    public function submit(SubmitWasteRecordRequest $request, string $id): RedirectResponse
     {
+        // Manually resolve the model to handle multi-tenancy properly
+        $wasteRecord = WasteRecord::findOrFail($id);
+
         // Check if user can submit this record
         if (! $wasteRecord->canBeSubmitted()) {
             return Redirect::back()
@@ -225,10 +264,13 @@ class WasteRecordsController extends Controller
     /**
      * Approve the waste record.
      */
-    public function approve(ApproveWasteRecordRequest $request, WasteRecord $wasteRecord): RedirectResponse
+    public function approve(ApproveWasteRecordRequest $request, string $id): RedirectResponse
     {
+        // Manually resolve the model to handle multi-tenancy properly
+        $wasteRecord = WasteRecord::findOrFail($id);
+
         // Check if user has permission to approve
-        if (! Auth::user()->can('waste_records.approve')) {
+        if (! $this->canApproveRecords()) {
             abort(403, 'You do not have permission to approve records.');
         }
 
@@ -249,10 +291,13 @@ class WasteRecordsController extends Controller
     /**
      * Reject the waste record.
      */
-    public function reject(RejectWasteRecordRequest $request, WasteRecord $wasteRecord): RedirectResponse
+    public function reject(RejectWasteRecordRequest $request, string $id): RedirectResponse
     {
+        // Manually resolve the model to handle multi-tenancy properly
+        $wasteRecord = WasteRecord::findOrFail($id);
+
         // Check if user has permission to reject
-        if (! Auth::user()->can('waste_records.reject')) {
+        if (! $this->canRejectRecords()) {
             abort(403, 'You do not have permission to reject records.');
         }
 
@@ -273,8 +318,11 @@ class WasteRecordsController extends Controller
     /**
      * Return rejected record to draft.
      */
-    public function returnToDraft(WasteRecord $wasteRecord): RedirectResponse
+    public function returnToDraft(string $id): RedirectResponse
     {
+        // Manually resolve the model to handle multi-tenancy properly
+        $wasteRecord = WasteRecord::findOrFail($id);
+
         // Check if user owns this rejected record
         if ($wasteRecord->created_by !== Auth::id()) {
             abort(403, 'You can only return your own rejected records to draft.');
@@ -306,7 +354,7 @@ class WasteRecordsController extends Controller
             ->orderBy('created_at', 'desc');
 
         // Filter by user permissions
-        if (! Auth::user()->can('waste_records.view_all')) {
+        if (! $this->canViewAllRecords()) {
             $query->byUser(Auth::id());
         }
 

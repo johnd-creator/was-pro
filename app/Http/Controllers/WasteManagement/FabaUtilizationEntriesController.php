@@ -214,8 +214,19 @@ class FabaUtilizationEntriesController extends Controller
 
     public function exportCsv(): StreamedResponse
     {
+        $year = request('year');
+        $month = request('month');
+        $materialType = request('material_type');
+        $utilizationType = request('utilization_type');
+        $vendorId = request('vendor_id');
+
         $entries = FabaUtilizationEntry::query()
             ->with(['vendor:id,name', 'createdByUser:id,name'])
+            ->when($year, fn ($query) => $query->whereYear('transaction_date', (int) $year))
+            ->when($month, fn ($query) => $query->whereMonth('transaction_date', (int) $month))
+            ->when($materialType, fn ($query) => $query->where('material_type', $materialType))
+            ->when($utilizationType, fn ($query) => $query->where('utilization_type', $utilizationType))
+            ->when($vendorId, fn ($query) => $query->where('vendor_id', $vendorId))
             ->orderByDesc('transaction_date')
             ->get();
 
@@ -233,6 +244,8 @@ class FabaUtilizationEntriesController extends Controller
                 'Material Type',
                 'Utilization Type',
                 'Vendor',
+                'Period',
+                'Approval Status',
                 'Quantity',
                 'Unit',
                 'Document Number',
@@ -250,6 +263,14 @@ class FabaUtilizationEntriesController extends Controller
                     $entry->material_type,
                     $entry->utilization_type,
                     $entry->vendor?->name,
+                    $this->fabaRecapService->formatPeriodLabel(
+                        (int) $entry->transaction_date->format('Y'),
+                        (int) $entry->transaction_date->format('n'),
+                    ),
+                    $this->fabaRecapService->getPeriodStatus(
+                        (int) $entry->transaction_date->format('Y'),
+                        (int) $entry->transaction_date->format('n'),
+                    ),
                     $entry->quantity,
                     $entry->unit,
                     $entry->document_number,

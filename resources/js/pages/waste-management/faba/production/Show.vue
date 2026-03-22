@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
 import Heading from '@/components/Heading.vue';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import {
+    formatFabaDate,
+    formatFabaEntryType,
+    formatFabaMaterial,
+    formatFabaStatus,
+} from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 import type { FabaProductionEntry } from '@/types/faba';
@@ -36,19 +43,21 @@ const breadcrumbItems: BreadcrumbItem[] = [
                 <CardHeader><CardTitle>Informasi utama</CardTitle></CardHeader>
                 <CardContent class="grid gap-4 md:grid-cols-2">
                     <div>
-                        <strong>Tanggal:</strong> {{ entry.transaction_date }}
+                        <strong>Tanggal:</strong> {{ formatFabaDate(entry.transaction_date) }}
                     </div>
                     <div>
-                        <strong>Material:</strong> {{ entry.material_type }}
+                        <strong>Material:</strong> {{ formatFabaMaterial(entry.material_type) }}
                     </div>
-                    <div><strong>Tipe:</strong> {{ entry.entry_type }}</div>
+                    <div><strong>Tipe:</strong> {{ formatFabaEntryType(entry.entry_type) }}</div>
                     <div>
                         <strong>Jumlah:</strong> {{ entry.quantity }}
                         {{ entry.unit }}
                     </div>
                     <div>
                         <strong>Status bulan:</strong>
-                        {{ entry.approval_status }}
+                        <Badge variant="secondary">
+                            {{ formatFabaStatus(entry.approval_status) }}
+                        </Badge>
                     </div>
                     <div><strong>Catatan:</strong> {{ entry.note || '-' }}</div>
                 </CardContent>

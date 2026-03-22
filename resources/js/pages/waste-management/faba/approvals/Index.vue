@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import { formatFabaStatus } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 import type { FabaPeriodSummary } from '@/types/faba';
@@ -71,7 +72,7 @@ function submitPeriod(year: number, month: number): void {
                         <p>Total produksi: {{ item.recap.total_production }} ton</p>
                         <p>Total pemanfaatan: {{ item.recap.total_utilization }} ton</p>
                         <p>Saldo akhir: {{ item.recap.closing_balance }} ton</p>
-                        <p class="capitalize">Status: {{ item.status }}</p>
+                        <p>Status: {{ formatFabaStatus(item.status) }}</p>
                         <p
                             v-if="item.recap.warnings.length > 0"
                             class="text-sm text-amber-600"

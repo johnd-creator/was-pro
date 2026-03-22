@@ -2,6 +2,7 @@
 import { Head, router } from '@inertiajs/vue3';
 import {
     CalendarIcon,
+    Building2Icon,
     UserIcon,
     TruckIcon,
     PackageIcon,
@@ -11,7 +12,7 @@ import {
     CheckIcon,
     XIcon,
 } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -20,7 +21,6 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import ExpiryBadge from '@/components/waste-management/ExpiryBadge.vue';
 import TransportationStatusBadge from '@/components/waste-management/TransportationStatusBadge.vue';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
@@ -94,9 +94,12 @@ const breadcrumbItems: BreadcrumbItem[] = [
 
 const deliveryNotes = ref('');
 
-function formatDate(dateString: string | null) {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('en-US', {
+function formatDate(dateString: string | null): string {
+    if (!dateString) {
+        return '-';
+    }
+
+    return new Date(dateString).toLocaleDateString('id-ID', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -105,15 +108,119 @@ function formatDate(dateString: string | null) {
     });
 }
 
-function formatDateOnly(dateString: string) {
-    return new Date(dateString).toLocaleDateString('en-US', {
+function formatDateOnly(dateString: string | null): string {
+    if (!dateString) {
+        return '-';
+    }
+
+    return new Date(dateString).toLocaleDateString('id-ID', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
     });
 }
 
-function dispatchTransportation() {
+function formatQuantity(value: number | string, unit: string): string {
+    return `${parseFloat(String(value)).toFixed(2)} ${unit}`;
+}
+
+const quickFacts = computed(() => [
+    {
+        label: 'Tanggal angkut',
+        value: formatDateOnly(props.wasteTransportation.transportation_date),
+        icon: CalendarIcon,
+        tone: 'text-blue-600 bg-blue-50 border-blue-100',
+    },
+    {
+        label: 'Vendor',
+        value: props.wasteTransportation.vendor?.name || 'Belum ditetapkan',
+        icon: Building2Icon,
+        tone: 'text-emerald-600 bg-emerald-50 border-emerald-100',
+    },
+    {
+        label: 'Kendaraan',
+        value: props.wasteTransportation.vehicle_number || 'Belum ditetapkan',
+        icon: TruckIcon,
+        tone: 'text-orange-600 bg-orange-50 border-orange-100',
+    },
+    {
+        label: 'Kuantitas',
+        value: formatQuantity(
+            props.wasteTransportation.quantity,
+            props.wasteTransportation.unit,
+        ),
+        icon: PackageIcon,
+        tone: 'text-violet-600 bg-violet-50 border-violet-100',
+    },
+]);
+
+const actionTitle = computed(() => {
+    if (props.wasteTransportation.status === 'pending') {
+        return 'Transportasi siap diberangkatkan';
+    }
+
+    if (props.wasteTransportation.status === 'in_transit') {
+        return 'Transportasi sedang berjalan';
+    }
+
+    return '';
+});
+
+const actionDescription = computed(() => {
+    if (props.wasteTransportation.status === 'pending') {
+        return 'Periksa detail akhir lalu dispatch saat kendaraan siap berangkat.';
+    }
+
+    if (props.wasteTransportation.status === 'in_transit') {
+        return 'Tambahkan catatan penerimaan bila pengiriman sudah sampai tujuan.';
+    }
+
+    return '';
+});
+
+const timelineItems = computed(() => {
+    const items = [
+        {
+            label: 'Dibuat',
+            date: props.wasteTransportation.created_at,
+            tone: 'bg-slate-900',
+            helper: props.wasteTransportation.created_by
+                ? `oleh ${props.wasteTransportation.created_by.name}`
+                : null,
+        },
+    ];
+
+    if (props.wasteTransportation.dispatched_at) {
+        items.push({
+            label: 'Diberangkatkan',
+            date: props.wasteTransportation.dispatched_at,
+            tone: 'bg-blue-600',
+            helper: null,
+        });
+    }
+
+    if (props.wasteTransportation.delivered_at) {
+        items.push({
+            label: 'Selesai diantar',
+            date: props.wasteTransportation.delivered_at,
+            tone: 'bg-emerald-600',
+            helper: null,
+        });
+    }
+
+    if (props.wasteTransportation.status === 'cancelled') {
+        items.push({
+            label: 'Dibatalkan',
+            date: props.wasteTransportation.updated_at,
+            tone: 'bg-red-600',
+            helper: null,
+        });
+    }
+
+    return items;
+});
+
+function dispatchTransportation(): void {
     if (confirm('Are you sure you want to dispatch this transportation?')) {
         router.post(
             wasteManagementRoutes.transportations.dispatch({
@@ -123,7 +230,7 @@ function dispatchTransportation() {
     }
 }
 
-function markAsDelivered() {
+function markAsDelivered(): void {
     router.post(
         wasteManagementRoutes.transportations.deliver({
             wasteTransportation: props.wasteTransportation.id,
@@ -134,7 +241,7 @@ function markAsDelivered() {
     );
 }
 
-function cancelTransportation() {
+function cancelTransportation(): void {
     if (confirm('Are you sure you want to cancel this transportation?')) {
         router.post(
             wasteManagementRoutes.transportations.cancel({
@@ -154,39 +261,70 @@ function cancelTransportation() {
             :title="`Transportation #${wasteTransportation.transportation_number} - Waste Management`"
         />
 
-        <div class="space-y-6">
-            <!-- Header -->
-            <div class="flex items-center justify-between">
-                <div class="space-y-1">
-                    <div class="flex items-center gap-4">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            @click="
-                                router.get(
-                                    wasteManagementRoutes.transportations.index(),
-                                )
-                            "
-                        >
-                            <ArrowLeftIcon class="mr-2 h-4 w-4" />
-                            Back
-                        </Button>
-                        <div>
-                            <h1 class="text-2xl font-bold">
-                                {{ wasteTransportation.transportation_number }}
-                            </h1>
-                            <p class="text-sm text-muted-foreground">
-                                Created on
-                                {{ formatDate(wasteTransportation.created_at) }}
-                            </p>
+        <div class="mx-auto w-full max-w-7xl space-y-6 px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+            <section class="space-y-4">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    class="-ml-2 w-fit text-muted-foreground"
+                    @click="
+                        router.get(wasteManagementRoutes.transportations.index())
+                    "
+                >
+                    <ArrowLeftIcon class="mr-2 h-4 w-4" />
+                    Kembali ke transportasi
+                </Button>
+
+                <div
+                    class="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6 shadow-sm lg:flex-row lg:items-start lg:justify-between"
+                >
+                    <div class="space-y-2">
+                        <p class="text-xs font-semibold tracking-[0.22em] text-muted-foreground uppercase">
+                            Detail Transportasi
+                        </p>
+                        <h1 class="text-3xl font-semibold tracking-tight text-slate-950">
+                            {{ wasteTransportation.transportation_number }}
+                        </h1>
+                        <p class="max-w-2xl text-sm text-muted-foreground">
+                            Dibuat pada
+                            {{ formatDate(wasteTransportation.created_at) }}.
+                            Halaman ini merangkum informasi pengiriman, catatan
+                            limbah terkait, dan vendor tujuan dalam satu tampilan.
+                        </p>
+                    </div>
+
+                    <div class="flex items-start">
+                        <TransportationStatusBadge
+                            :status="wasteTransportation.status"
+                            size="lg"
+                        />
+                    </div>
+                </div>
+
+                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div
+                        v-for="fact in quickFacts"
+                        :key="fact.label"
+                        class="rounded-2xl border p-4 shadow-sm"
+                        :class="fact.tone"
+                    >
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-[11px] font-semibold tracking-wide uppercase opacity-80">
+                                    {{ fact.label }}
+                                </p>
+                                <p class="mt-2 text-sm font-semibold leading-5 text-slate-900">
+                                    {{ fact.value }}
+                                </p>
+                            </div>
+                            <component
+                                :is="fact.icon"
+                                class="mt-0.5 h-4 w-4 shrink-0"
+                            />
                         </div>
                     </div>
                 </div>
-                <TransportationStatusBadge
-                    :status="wasteTransportation.status"
-                    size="lg"
-                />
-            </div>
+            </section>
 
             <!-- Workflow Actions -->
             <Card
@@ -194,70 +332,73 @@ function cancelTransportation() {
                     wasteTransportation.status === 'pending' ||
                     wasteTransportation.status === 'in_transit'
                 "
+                class="border-slate-200/80 shadow-sm"
             >
-                <CardHeader>
-                    <CardTitle>Actions</CardTitle>
+                <CardHeader class="pb-4">
+                    <CardTitle>{{ actionTitle }}</CardTitle>
                     <CardDescription>
-                        Manage this transportation workflow
+                        {{ actionDescription }}
                     </CardDescription>
                 </CardHeader>
-                <CardContent class="flex gap-3">
-                    <Button
-                        v-if="wasteTransportation.status === 'pending'"
-                        @click="dispatchTransportation"
-                    >
-                        <SendIcon class="mr-2 h-4 w-4" />
-                        Dispatch Transportation
-                    </Button>
-
-                    <Button
-                        v-if="wasteTransportation.status === 'in_transit'"
-                        @click="markAsDelivered"
-                    >
-                        <CheckIcon class="mr-2 h-4 w-4" />
-                        Mark as Delivered
-                    </Button>
-
-                    <Button variant="destructive" @click="cancelTransportation">
-                        <XIcon class="mr-2 h-4 w-4" />
-                        Cancel
-                    </Button>
-                </CardContent>
-            </Card>
-
-            <!-- Delivery Notes (for in_transit status) -->
-            <Card v-if="wasteTransportation.status === 'in_transit'">
-                <CardHeader>
-                    <CardTitle>Delivery Notes</CardTitle>
-                    <CardDescription>
-                        Add notes when marking as delivered (optional)
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
+                <CardContent class="space-y-4">
                     <textarea
+                        v-if="wasteTransportation.status === 'in_transit'"
                         v-model="deliveryNotes"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                        class="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                         rows="3"
-                        placeholder="Enter delivery notes, confirmation details, etc..."
+                        placeholder="Tambahkan catatan penerimaan, kondisi barang, atau konfirmasi dari tujuan."
                     />
+
+                    <div class="flex flex-wrap gap-3">
+                        <Button
+                            v-if="wasteTransportation.status === 'pending'"
+                            class="min-w-44"
+                            @click="dispatchTransportation"
+                        >
+                            <SendIcon class="mr-2 h-4 w-4" />
+                            Dispatch transportasi
+                        </Button>
+
+                        <Button
+                            v-if="wasteTransportation.status === 'in_transit'"
+                            class="min-w-44"
+                            @click="markAsDelivered"
+                        >
+                            <CheckIcon class="mr-2 h-4 w-4" />
+                            Tandai selesai
+                        </Button>
+
+                        <Button
+                            variant="destructive"
+                            class="min-w-32"
+                            @click="cancelTransportation"
+                        >
+                            <XIcon class="mr-2 h-4 w-4" />
+                            Batal
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
 
-            <div class="grid gap-6 md:grid-cols-2">
+            <div class="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
                 <!-- Transportation Details -->
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Transportation Details</CardTitle>
+                <Card class="border-slate-200/80 shadow-sm">
+                    <CardHeader class="pb-4">
+                        <CardTitle>Ringkasan Transportasi</CardTitle>
+                        <CardDescription>
+                            Informasi inti pengiriman yang paling sering dicek
+                            saat operasional.
+                        </CardDescription>
                     </CardHeader>
-                    <CardContent class="space-y-4">
-                        <div class="flex items-center gap-3">
-                            <CalendarIcon
-                                class="h-5 w-5 text-muted-foreground"
-                            />
-                            <div>
-                                <p class="text-sm font-medium">
-                                    Transportation Date
-                                </p>
+                    <CardContent class="space-y-6">
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div class="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                                <div class="mb-3 flex items-center gap-2 text-slate-700">
+                                    <CalendarIcon class="h-4 w-4" />
+                                    <p class="text-sm font-semibold">
+                                        Tanggal transportasi
+                                    </p>
+                                </div>
                                 <p class="text-sm text-muted-foreground">
                                     {{
                                         formatDateOnly(
@@ -266,101 +407,95 @@ function cancelTransportation() {
                                     }}
                                 </p>
                             </div>
-                        </div>
 
-                        <Separator />
-
-                        <div class="flex items-center gap-3">
-                            <TruckIcon class="h-5 w-5 text-muted-foreground" />
-                            <div>
-                                <p class="text-sm font-medium">
-                                    Vehicle Information
-                                </p>
+                            <div class="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                                <div class="mb-3 flex items-center gap-2 text-slate-700">
+                                    <TruckIcon class="h-4 w-4" />
+                                    <p class="text-sm font-semibold">
+                                        Kendaraan
+                                    </p>
+                                </div>
                                 <p class="text-sm text-muted-foreground">
                                     {{
                                         wasteTransportation.vehicle_number ||
-                                        'Not assigned'
+                                        'Belum ditetapkan'
                                     }}
                                 </p>
                             </div>
-                        </div>
 
-                        <Separator />
-
-                        <div class="flex items-center gap-3">
-                            <UserIcon class="h-5 w-5 text-muted-foreground" />
-                            <div>
-                                <p class="text-sm font-medium">
-                                    Driver Information
-                                </p>
+                            <div class="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                                <div class="mb-3 flex items-center gap-2 text-slate-700">
+                                    <UserIcon class="h-4 w-4" />
+                                    <p class="text-sm font-semibold">
+                                        Pengemudi
+                                    </p>
+                                </div>
                                 <p class="text-sm text-muted-foreground">
                                     {{
                                         wasteTransportation.driver_name ||
-                                        'Not assigned'
+                                        'Belum ditetapkan'
                                     }}
                                 </p>
                                 <p
                                     v-if="wasteTransportation.driver_phone"
-                                    class="text-sm text-muted-foreground"
+                                    class="mt-1 text-sm text-muted-foreground"
                                 >
                                     {{ wasteTransportation.driver_phone }}
                                 </p>
                             </div>
+
+                            <div class="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                                <div class="mb-3 flex items-center gap-2 text-slate-700">
+                                    <PackageIcon class="h-4 w-4" />
+                                    <p class="text-sm font-semibold">
+                                        Kuantitas
+                                    </p>
+                                </div>
+                                <p class="text-sm text-muted-foreground">
+                                    {{
+                                        formatQuantity(
+                                            wasteTransportation.quantity,
+                                            wasteTransportation.unit,
+                                        )
+                                    }}
+                                </p>
+                            </div>
                         </div>
 
-                        <Separator v-if="wasteTransportation.notes" />
-
                         <div
-                            v-if="wasteTransportation.notes"
-                            class="flex items-center gap-3"
+                            v-if="
+                                wasteTransportation.notes ||
+                                wasteTransportation.delivery_notes
+                            "
+                            class="grid gap-4 md:grid-cols-2"
                         >
-                            <FileTextIcon
-                                class="h-5 w-5 text-muted-foreground"
-                            />
-                            <div>
-                                <p class="text-sm font-medium">Notes</p>
-                                <p class="text-sm text-muted-foreground">
+                            <div
+                                v-if="wasteTransportation.notes"
+                                class="rounded-2xl border border-slate-100 bg-white p-4"
+                            >
+                                <div class="mb-3 flex items-center gap-2 text-slate-700">
+                                    <FileTextIcon class="h-4 w-4" />
+                                    <p class="text-sm font-semibold">
+                                        Catatan transportasi
+                                    </p>
+                                </div>
+                                <p class="text-sm leading-6 text-muted-foreground">
                                     {{ wasteTransportation.notes }}
                                 </p>
                             </div>
-                        </div>
 
-                        <Separator v-if="wasteTransportation.delivery_notes" />
-
-                        <div
-                            v-if="wasteTransportation.delivery_notes"
-                            class="flex items-center gap-3"
-                        >
-                            <FileTextIcon
-                                class="h-5 w-5 text-muted-foreground"
-                            />
-                            <div>
-                                <p class="text-sm font-medium">
-                                    Delivery Notes
-                                </p>
-                                <p class="text-sm text-muted-foreground">
+                            <div
+                                v-if="wasteTransportation.delivery_notes"
+                                class="rounded-2xl border border-slate-100 bg-white p-4"
+                            >
+                                <div class="mb-3 flex items-center gap-2 text-slate-700">
+                                    <FileTextIcon class="h-4 w-4" />
+                                    <p class="text-sm font-semibold">
+                                        Catatan penerimaan
+                                    </p>
+                                </div>
+                                <p class="text-sm leading-6 text-muted-foreground">
                                     {{ wasteTransportation.delivery_notes }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <Separator />
-
-                        <div class="flex items-center gap-3">
-                            <PackageIcon
-                                class="h-5 w-5 text-muted-foreground"
-                            />
-                            <div>
-                                <p class="text-sm font-medium">Quantity</p>
-                                <p class="text-sm text-muted-foreground">
-                                    {{
-                                        parseFloat(
-                                            String(
-                                                wasteTransportation.quantity,
-                                            ),
-                                        ).toFixed(2)
-                                    }}
-                                    {{ wasteTransportation.unit }}
                                 </p>
                             </div>
                         </div>
@@ -370,13 +505,16 @@ function cancelTransportation() {
                 <!-- Waste Record & Vendor -->
                 <div class="space-y-6">
                     <!-- Waste Record -->
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Waste Record</CardTitle>
+                    <Card class="border-slate-200/80 shadow-sm">
+                        <CardHeader class="pb-4">
+                            <CardTitle>Catatan Limbah Terkait</CardTitle>
+                            <CardDescription>
+                                Sumber limbah yang diangkut pada transportasi ini.
+                            </CardDescription>
                         </CardHeader>
                         <CardContent class="space-y-4">
                             <div>
-                                <p class="text-sm font-medium">Record Number</p>
+                                <p class="text-sm font-medium">Nomor catatan</p>
                                 <p class="text-sm text-muted-foreground">
                                     {{
                                         wasteTransportation.waste_record
@@ -386,7 +524,7 @@ function cancelTransportation() {
                             </div>
 
                             <div>
-                                <p class="text-sm font-medium">Waste Type</p>
+                                <p class="text-sm font-medium">Jenis limbah</p>
                                 <p class="text-sm text-muted-foreground">
                                     {{
                                         wasteTransportation.waste_record
@@ -402,7 +540,7 @@ function cancelTransportation() {
                             </div>
 
                             <div>
-                                <p class="text-sm font-medium">Record Date</p>
+                                <p class="text-sm font-medium">Tanggal catatan</p>
                                 <p class="text-sm text-muted-foreground">
                                     {{
                                         wasteTransportation.waste_record
@@ -421,7 +559,7 @@ function cancelTransportation() {
                                         ?.expiry_date
                                 "
                             >
-                                <p class="text-sm font-medium">Expiry Status</p>
+                                <p class="text-sm font-medium">Status kedaluwarsa</p>
                                 <ExpiryBadge
                                     :expiry-date="
                                         wasteTransportation.waste_record
@@ -434,13 +572,16 @@ function cancelTransportation() {
                     </Card>
 
                     <!-- Vendor -->
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Vendor</CardTitle>
+                    <Card class="border-slate-200/80 shadow-sm">
+                        <CardHeader class="pb-4">
+                            <CardTitle>Vendor Tujuan</CardTitle>
+                            <CardDescription>
+                                Informasi mitra pengangkutan atau penerima limbah.
+                            </CardDescription>
                         </CardHeader>
                         <CardContent class="space-y-4">
                             <div>
-                                <p class="text-sm font-medium">Vendor Name</p>
+                                <p class="text-sm font-medium">Nama vendor</p>
                                 <p class="text-sm text-muted-foreground">
                                     {{
                                         wasteTransportation.vendor?.name || '-'
@@ -454,7 +595,7 @@ function cancelTransportation() {
                                 "
                             >
                                 <p class="text-sm font-medium">
-                                    Contact Person
+                                    Kontak PIC
                                 </p>
                                 <p class="text-sm text-muted-foreground">
                                     {{
@@ -465,7 +606,7 @@ function cancelTransportation() {
                             </div>
 
                             <div v-if="wasteTransportation.vendor?.phone">
-                                <p class="text-sm font-medium">Phone</p>
+                                <p class="text-sm font-medium">Telepon</p>
                                 <p class="text-sm text-muted-foreground">
                                     {{ wasteTransportation.vendor.phone }}
                                 </p>
@@ -483,97 +624,34 @@ function cancelTransportation() {
             </div>
 
             <!-- Timeline -->
-            <Card>
-                <CardHeader>
-                    <CardTitle>Activity Timeline</CardTitle>
+            <Card class="border-slate-200/80 shadow-sm">
+                <CardHeader class="pb-4">
+                    <CardTitle>Timeline Aktivitas</CardTitle>
+                    <CardDescription>
+                        Jejak perubahan status transportasi dari awal hingga kondisi saat ini.
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div class="space-y-4">
-                        <div class="flex gap-4">
-                            <div class="flex flex-col items-center">
-                                <div
-                                    class="h-3 w-3 rounded-full bg-primary"
-                                ></div>
-                                <div class="w-0.5 flex-1 bg-muted"></div>
-                            </div>
-                            <div class="pb-4">
-                                <p class="text-sm font-medium">Created</p>
-                                <p class="text-sm text-muted-foreground">
-                                    {{
-                                        formatDate(
-                                            wasteTransportation.created_at,
-                                        )
-                                    }}
-                                </p>
-                                <p
-                                    v-if="wasteTransportation.created_by"
-                                    class="text-xs text-muted-foreground"
-                                >
-                                    by {{ wasteTransportation.created_by.name }}
-                                </p>
-                            </div>
-                        </div>
-
                         <div
-                            v-if="wasteTransportation.dispatched_at"
+                            v-for="(item, index) in timelineItems"
+                            :key="`${item.label}-${index}`"
                             class="flex gap-4"
                         >
                             <div class="flex flex-col items-center">
+                                <div class="h-3 w-3 rounded-full" :class="item.tone"></div>
                                 <div
-                                    class="h-3 w-3 rounded-full bg-primary"
+                                    v-if="index !== timelineItems.length - 1"
+                                    class="w-0.5 flex-1 bg-muted"
                                 ></div>
-                                <div class="w-0.5 flex-1 bg-muted"></div>
                             </div>
-                            <div class="pb-4">
-                                <p class="text-sm font-medium">Dispatched</p>
+                            <div :class="index !== timelineItems.length - 1 ? 'pb-4' : ''">
+                                <p class="text-sm font-medium">{{ item.label }}</p>
                                 <p class="text-sm text-muted-foreground">
-                                    {{
-                                        formatDate(
-                                            wasteTransportation.dispatched_at,
-                                        )
-                                    }}
+                                    {{ formatDate(item.date) }}
                                 </p>
-                            </div>
-                        </div>
-
-                        <div
-                            v-if="wasteTransportation.delivered_at"
-                            class="flex gap-4"
-                        >
-                            <div class="flex flex-col items-center">
-                                <div
-                                    class="h-3 w-3 rounded-full bg-green-600"
-                                ></div>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium">Delivered</p>
-                                <p class="text-sm text-muted-foreground">
-                                    {{
-                                        formatDate(
-                                            wasteTransportation.delivered_at,
-                                        )
-                                    }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div
-                            v-if="wasteTransportation.status === 'cancelled'"
-                            class="flex gap-4"
-                        >
-                            <div class="flex flex-col items-center">
-                                <div
-                                    class="h-3 w-3 rounded-full bg-red-600"
-                                ></div>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium">Cancelled</p>
-                                <p class="text-sm text-muted-foreground">
-                                    {{
-                                        formatDate(
-                                            wasteTransportation.updated_at,
-                                        )
-                                    }}
+                                <p v-if="item.helper" class="text-xs text-muted-foreground">
+                                    {{ item.helper }}
                                 </p>
                             </div>
                         </div>

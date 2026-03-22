@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import Heading from '@/components/Heading.vue';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import {
+    formatFabaDate,
+    formatFabaDateTime,
+    formatFabaMaterial,
+    formatFabaStatus,
+    formatFabaUtilizationType,
+} from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 import type {
@@ -81,7 +89,12 @@ function submitPeriod(): void {
             <Card>
                 <CardHeader><CardTitle>Ringkasan</CardTitle></CardHeader>
                 <CardContent class="grid gap-4 md:grid-cols-3">
-                    <p>Status: {{ approval.status }}</p>
+                    <p>
+                        Status:
+                        <Badge variant="secondary">
+                            {{ formatFabaStatus(approval.status) }}
+                        </Badge>
+                    </p>
                     <p>Total produksi: {{ recap.total_production }}</p>
                     <p>Total pemanfaatan: {{ recap.total_utilization }}</p>
                     <p>Saldo awal: {{ recap.opening_balance }}</p>
@@ -110,8 +123,8 @@ function submitPeriod(): void {
                     </p>
                     <ul v-else class="space-y-2">
                         <li v-for="item in productionEntries" :key="item.id">
-                            {{ item.transaction_date }} -
-                            {{ item.entry_number }} - {{ item.material_type }} -
+                            {{ formatFabaDate(item.transaction_date) }} -
+                            {{ item.entry_number }} - {{ formatFabaMaterial(item.material_type) }} -
                             {{ item.quantity }} {{ item.unit }}
                         </li>
                     </ul>
@@ -128,13 +141,27 @@ function submitPeriod(): void {
                     </p>
                     <ul v-else class="space-y-2">
                         <li v-for="item in utilizationEntries" :key="item.id">
-                            {{ item.transaction_date }} -
+                            {{ formatFabaDate(item.transaction_date) }} -
                             {{ item.entry_number }} - {{ item.quantity }}
-                            {{ item.unit }} - {{ item.vendor?.name || '-' }}
+                            {{ item.unit }} - {{ formatFabaUtilizationType(item.utilization_type) }} - {{ item.vendor?.name || '-' }}
                         </li>
                     </ul>
                 </CardContent>
             </Card>
+            <div class="flex flex-wrap gap-3">
+                <Link
+                    class="text-sm text-primary underline-offset-4 hover:underline"
+                    :href="wasteManagementRoutes.faba.recaps.monthly({ query: { year: approval.year, month: approval.month } }).url"
+                >
+                    Lihat rekap periode
+                </Link>
+                <Link
+                    class="text-sm text-primary underline-offset-4 hover:underline"
+                    :href="wasteManagementRoutes.faba.approvals.history.url()"
+                >
+                    Buka histori approval
+                </Link>
+            </div>
             <div class="grid gap-6 md:grid-cols-2">
                 <Card v-if="approval.can_approve">
                     <CardHeader><CardTitle>Approve</CardTitle></CardHeader>
@@ -195,7 +222,7 @@ function submitPeriod(): void {
                     </p>
                     <ul v-else class="space-y-2 text-sm">
                         <li v-for="log in auditLogs" :key="log.id">
-                            {{ log.created_at }} - {{ log.actor?.name || 'Sistem' }} -
+                            {{ formatFabaDateTime(log.created_at) }} - {{ log.actor?.name || 'Sistem' }} -
                             {{ log.summary }}
                         </li>
                     </ul>

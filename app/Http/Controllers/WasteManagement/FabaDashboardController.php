@@ -16,6 +16,11 @@ class FabaDashboardController extends Controller
     {
         $year = (int) request('year', now()->year);
         $yearlyRecap = $this->fabaRecapService->getYearlyRecap($year);
+        $latestApprovedPeriod = FabaMonthlyApproval::query()
+            ->where('status', FabaMonthlyApproval::STATUS_APPROVED)
+            ->orderByDesc('year')
+            ->orderByDesc('month')
+            ->first();
 
         return Inertia::render('waste-management/faba/Dashboard', [
             'year' => $year,
@@ -50,11 +55,13 @@ class FabaDashboardController extends Controller
                         'closing_balance' => $month['closing_balance'],
                     ])->all())
                 ->values(),
-            'latestApprovedPeriod' => FabaMonthlyApproval::query()
-                ->where('status', FabaMonthlyApproval::STATUS_APPROVED)
-                ->orderByDesc('year')
-                ->orderByDesc('month')
-                ->first()?->only(['id', 'year', 'month', 'status']),
+            'latestApprovedPeriod' => $latestApprovedPeriod ? [
+                'id' => $latestApprovedPeriod->id,
+                'year' => $latestApprovedPeriod->year,
+                'month' => $latestApprovedPeriod->month,
+                'status' => $latestApprovedPeriod->status,
+                'period_label' => $this->fabaRecapService->formatPeriodLabel($latestApprovedPeriod->year, $latestApprovedPeriod->month),
+            ] : null,
             'topVendors' => collect($this->fabaRecapService->getVendorRecap($year)['vendors'])
                 ->sortByDesc('total_quantity')
                 ->take(5)
