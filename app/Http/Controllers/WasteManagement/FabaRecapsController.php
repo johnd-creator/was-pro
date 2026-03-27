@@ -77,6 +77,29 @@ class FabaRecapsController extends Controller
         ]);
     }
 
+    public function stockCard(): Response
+    {
+        $year = (int) request('year', now()->year);
+        $month = request()->filled('month') ? (int) request('month') : null;
+        $materialType = request('material_type');
+
+        return Inertia::render('waste-management/faba/recaps/StockCard', [
+            'stockCard' => $this->fabaRecapService->getStockCard($year, $month, $materialType),
+            'filters' => [
+                'year' => $year,
+                'month' => $month,
+                'material_type' => $materialType,
+            ],
+            'options' => [
+                'materials' => \App\Models\FabaMovement::materialOptions(),
+                'months' => collect(range(1, 12))->map(fn (int $item): array => [
+                    'value' => $item,
+                    'label' => $this->fabaRecapService->formatMonthLabel($item),
+                ])->all(),
+            ],
+        ]);
+    }
+
     public function storeOpeningBalance(StoreFabaOpeningBalanceRequest $request): RedirectResponse
     {
         $validated = $request->validated();

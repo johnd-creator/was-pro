@@ -7,14 +7,14 @@ import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
     formatFabaDate,
     formatFabaMaterial,
+    formatFabaMovementType,
     formatFabaStatus,
-    formatFabaUtilizationType,
 } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
-import type { FabaUtilizationEntry } from '@/types/faba';
+import type { FabaUtilizationMovement } from '@/types/faba';
 
-const props = defineProps<{ entry: FabaUtilizationEntry }>();
+const props = defineProps<{ entry: FabaUtilizationMovement }>();
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
@@ -22,7 +22,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
         href: wasteManagementRoutes.faba.utilization.index.url(),
     },
     {
-        title: props.entry.entry_number,
+        title: props.entry.display_number,
         href: wasteManagementRoutes.faba.utilization.show(props.entry.id).url,
     },
 ];
@@ -36,7 +36,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
         <Head title="Detail Pemanfaatan FABA" />
         <div class="space-y-6 p-6">
             <Heading
-                :title="entry.entry_number"
+                :title="entry.display_number"
                 description="Detail transaksi pemanfaatan FABA."
             />
             <Card>
@@ -49,10 +49,13 @@ const breadcrumbItems: BreadcrumbItem[] = [
                         <strong>Material:</strong> {{ formatFabaMaterial(entry.material_type) }}
                     </div>
                     <div>
-                        <strong>Tipe:</strong> {{ formatFabaUtilizationType(entry.utilization_type) }}
+                        <strong>Tipe:</strong> {{ formatFabaMovementType(entry.movement_type) }}
                     </div>
                     <div>
                         <strong>Vendor:</strong> {{ entry.vendor?.name || '-' }}
+                    </div>
+                    <div>
+                        <strong>Tujuan internal:</strong> {{ entry.internal_destination?.name || '-' }}
                     </div>
                     <div>
                         <strong>Jumlah:</strong> {{ entry.quantity }}
@@ -67,6 +70,10 @@ const breadcrumbItems: BreadcrumbItem[] = [
                     <div>
                         <strong>Dokumen:</strong>
                         {{ entry.document_number || '-' }}
+                    </div>
+                    <div>
+                        <strong>Use-case:</strong>
+                        {{ entry.purpose?.name || '-' }}
                     </div>
                     <div>
                         <strong>Tanggal dokumen:</strong>

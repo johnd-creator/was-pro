@@ -46,10 +46,22 @@ export const appNavigationItems: NavItem[] = [
                 permission: 'faba_production.view',
             },
             {
-                title: 'Pemanfaatan',
-                href: wasteManagementRoutes.faba.utilization.index.url(),
+                title: 'Pemanfaatan Internal',
+                href: wasteManagementRoutes.faba.utilization.index.url({ query: { movement_type: 'utilization_internal' } }),
                 icon: Truck,
                 permission: 'faba_utilization.view',
+            },
+            {
+                title: 'Pemanfaatan Eksternal',
+                href: wasteManagementRoutes.faba.utilization.index.url({ query: { movement_type: 'utilization_external' } }),
+                icon: Truck,
+                permission: 'faba_utilization.view',
+            },
+            {
+                title: 'Adjustment / Koreksi',
+                href: wasteManagementRoutes.faba.adjustments.index.url(),
+                icon: Sparkles,
+                permission: 'faba_adjustments.view',
             },
             {
                 title: 'Rekap',
@@ -58,7 +70,7 @@ export const appNavigationItems: NavItem[] = [
                 permission: 'faba_recaps.view',
             },
             {
-                title: 'Approval',
+                title: 'Closing & Approval',
                 href: wasteManagementRoutes.faba.approvals.index.url(),
                 icon: ShieldCheck,
                 permission: 'faba_approvals.view',

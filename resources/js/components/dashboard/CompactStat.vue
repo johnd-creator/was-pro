@@ -15,12 +15,24 @@ const props = withDefaults(defineProps<Props>(), {
     color: 'blue',
 });
 
-const colorClasses = computed(() => {
+const accentClasses = computed(() => {
     const colors = {
-        blue: 'from-blue-500 to-blue-600',
-        emerald: 'from-emerald-500 to-emerald-600',
-        orange: 'from-orange-500 to-orange-600',
-        red: 'from-red-500 to-red-600',
+        blue: {
+            badge: 'bg-blue-50 text-blue-600',
+            chip: 'bg-blue-50 text-blue-700',
+        },
+        emerald: {
+            badge: 'bg-emerald-50 text-emerald-600',
+            chip: 'bg-emerald-50 text-emerald-700',
+        },
+        orange: {
+            badge: 'bg-orange-50 text-orange-600',
+            chip: 'bg-orange-50 text-orange-700',
+        },
+        red: {
+            badge: 'bg-red-50 text-red-600',
+            chip: 'bg-red-50 text-red-700',
+        },
     };
 
     return colors[props.color];
@@ -28,19 +40,33 @@ const colorClasses = computed(() => {
 </script>
 
 <template>
-    <Card
-        :class="[
-            'border-0 bg-gradient-to-br text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02]',
-            colorClasses,
-        ]"
-    >
-        <CardContent class="p-4">
-            <p class="text-xs font-medium text-white/80 uppercase">
+    <Card class="rounded-2xl border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+        <CardContent class="p-5">
+            <div class="mb-4 flex items-start justify-between gap-3">
+                <div
+                    :class="[
+                        'rounded-xl p-2.5',
+                        accentClasses.badge,
+                    ]"
+                >
+                    <div class="h-2.5 w-2.5 rounded-full bg-current" />
+                </div>
+                <span
+                    :class="[
+                        'rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide',
+                        accentClasses.chip,
+                    ]"
+                >
+                    {{ unit || 'Status' }}
+                </span>
+            </div>
+
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 {{ title }}
             </p>
-            <p class="mt-1 text-2xl font-bold tabular-nums">
+            <p class="mt-2 text-3xl font-black tabular-nums text-slate-900">
                 {{ value }}
-                <span v-if="unit" class="text-sm font-normal text-white/70">
+                <span v-if="unit" class="ml-1 text-sm font-medium text-slate-400">
                     {{ unit }}
                 </span>
             </p>

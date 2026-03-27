@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { usePage } from '@inertiajs/vue3';
-import { Bell, ChevronDown, Shield, AlertTriangle } from 'lucide-vue-next';
+import { Bell, ChevronDown, AlertTriangle } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -88,79 +88,32 @@ const notificationSummary = computed(() => props?.notificationSummary as {
 // Get user from page props
 const user = computed(() => props?.auth?.user as User | undefined);
 
-// Risk status badge
-const riskBadgeClass = computed(() => {
-    if (!header.value) return '';
-
-    switch (header.value.risk_status) {
-        case 'critical':
-            return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
-        case 'warning':
-            return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
-        default:
-            return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-    }
-});
-
-const riskBadgeLabel = computed(() => {
-    if (!header.value) return 'Normal';
-
-    switch (header.value.risk_status) {
-        case 'critical':
-            return 'Kritis';
-        case 'warning':
-            return 'Perlu Perhatian';
-        default:
-            return 'Normal';
-    }
-});
 </script>
 
 <template>
     <header
-        class="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-sidebar-border/70 px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-4"
+        class="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-sidebar-border/70 bg-white px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-5"
     >
-        <!-- Left side: Sidebar trigger and breadcrumbs -->
-        <div class="flex items-center gap-2">
+        <div class="flex min-w-0 items-center gap-2">
             <SidebarTrigger class="-ml-1" />
             <template v-if="breadcrumbs && breadcrumbs.length > 0">
                 <Breadcrumbs :breadcrumbs="breadcrumbs" />
             </template>
         </div>
 
-        <!-- Right side: Operational info -->
         <div class="flex items-center gap-3">
-            <!-- Organization name & risk status -->
-            <div class="hidden items-center gap-2 text-sm lg:flex">
-                <div class="text-muted-foreground">
-                    {{ header?.organization_name }}
-                </div>
-                <div class="h-4 w-px bg-border" />
-                <div
-                    :class="[
-                        'rounded-full px-2 py-0.5 text-xs font-medium',
-                        riskBadgeClass,
-                    ]"
-                >
-                    <Shield class="mr-1 inline h-3 w-3" />
-                    {{ riskBadgeLabel }}
-                </div>
-            </div>
-
-            <!-- Live clock -->
-            <div class="hidden flex-col items-end text-xs text-muted-foreground md:flex">
-                <div class="font-medium tabular-nums text-foreground">
+            <div class="hidden flex-col items-end text-xs md:flex">
+                <div class="font-semibold tabular-nums text-slate-900">
                     {{ currentTime }}
                 </div>
-                <div class="text-[10px]">
+                <div class="text-[10px] text-slate-500">
                     {{ currentDate }} · {{ header?.timezone ?? 'WIB' }}
                 </div>
             </div>
 
-            <!-- Notifications -->
             <DropdownMenu>
                 <DropdownMenuTrigger as-child>
-                    <Button variant="ghost" size="icon" class="relative">
+                    <Button variant="ghost" size="icon" class="relative rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900">
                         <Bell class="h-4 w-4" />
                         <span
                             v-if="notificationSummary && notificationSummary.total_count > 0"
@@ -271,15 +224,15 @@ const riskBadgeLabel = computed(() => {
             <!-- User menu -->
             <DropdownMenu v-if="user">
                 <DropdownMenuTrigger as-child>
-                    <Button variant="ghost" class="flex items-center gap-3 rounded-full px-2">
+                    <Button variant="ghost" class="flex items-center gap-3 rounded-full px-2 hover:bg-slate-100">
                         <div class="hidden md:flex flex-col items-end text-xs text-left">
-                            <span class="font-medium">{{ user.name }}</span>
-                            <span class="text-[10px] text-muted-foreground">
-                                {{ header?.user?.role ?? 'User' }}
+                            <span class="font-semibold text-slate-900">{{ user.name }}</span>
+                            <span class="text-[10px] text-slate-500">
+                                {{ header?.organization_name ?? (header?.user?.role ?? 'User') }}
                             </span>
                         </div>
-                        <Avatar class="size-9 border border-border bg-muted">
-                            <AvatarFallback class="bg-muted text-xs font-semibold text-foreground">
+                        <Avatar class="size-9 border border-blue-200 bg-blue-50">
+                            <AvatarFallback class="bg-blue-50 text-xs font-semibold text-blue-700">
                                 {{ getInitials(user.name) }}
                             </AvatarFallback>
                         </Avatar>

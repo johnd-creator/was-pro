@@ -39,6 +39,10 @@ class DashboardController extends Controller
             'wasteChart' => $data['waste_chart'],
 
             // Notifications & Header
+            'organizationName' => $data['header']['organization_name'],
+            'notificationCount' => $data['notification_summary']['total_count'],
+            'headerRiskLabel' => $data['header']['risk_label'],
+            'headerRiskTone' => $data['header']['risk_tone'],
             'notificationSummary' => $data['notification_summary'],
             'header' => $data['header'],
         ]);

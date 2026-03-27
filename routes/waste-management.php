@@ -1,11 +1,12 @@
 <?php
 
 use App\Http\Controllers\WasteManagement\DashboardController;
+use App\Http\Controllers\WasteManagement\FabaAdjustmentsController;
 use App\Http\Controllers\WasteManagement\FabaMonthlyApprovalsController;
-use App\Http\Controllers\WasteManagement\FabaProductionEntriesController;
+use App\Http\Controllers\WasteManagement\FabaProductionMovementsController;
 use App\Http\Controllers\WasteManagement\FabaRecapsController;
 use App\Http\Controllers\WasteManagement\FabaReportsController;
-use App\Http\Controllers\WasteManagement\FabaUtilizationEntriesController;
+use App\Http\Controllers\WasteManagement\FabaUtilizationMovementsController;
 use App\Http\Controllers\WasteManagement\MasterData\CategoriesController;
 use App\Http\Controllers\WasteManagement\MasterData\CharacteristicsController;
 use App\Http\Controllers\WasteManagement\MasterData\TypesController;
@@ -32,55 +33,79 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
 
         Route::prefix('production')->name('production.')->group(function () {
             Route::middleware(['permission:faba_production.view'])
-                ->get('/', [FabaProductionEntriesController::class, 'index'])
+                ->get('/', [FabaProductionMovementsController::class, 'index'])
                 ->name('index');
             Route::middleware(['permission:faba_production.create'])
-                ->get('/create', [FabaProductionEntriesController::class, 'create'])
+                ->get('/create', [FabaProductionMovementsController::class, 'create'])
                 ->name('create');
             Route::middleware(['permission:faba_production.create'])
-                ->post('/', [FabaProductionEntriesController::class, 'store'])
+                ->post('/', [FabaProductionMovementsController::class, 'store'])
                 ->name('store');
             Route::middleware(['permission:faba_production.view'])
-                ->get('/export/csv', [FabaProductionEntriesController::class, 'exportCsv'])
+                ->get('/export/csv', [FabaProductionMovementsController::class, 'exportCsv'])
                 ->name('export.csv');
             Route::middleware(['permission:faba_production.view'])
-                ->get('/{production}', [FabaProductionEntriesController::class, 'show'])
+                ->get('/{production}', [FabaProductionMovementsController::class, 'show'])
                 ->name('show');
             Route::middleware(['permission:faba_production.edit'])
-                ->get('/{production}/edit', [FabaProductionEntriesController::class, 'edit'])
+                ->get('/{production}/edit', [FabaProductionMovementsController::class, 'edit'])
                 ->name('edit');
             Route::middleware(['permission:faba_production.edit'])
-                ->put('/{production}', [FabaProductionEntriesController::class, 'update'])
+                ->put('/{production}', [FabaProductionMovementsController::class, 'update'])
                 ->name('update');
             Route::middleware(['permission:faba_production.delete'])
-                ->delete('/{production}', [FabaProductionEntriesController::class, 'destroy'])
+                ->delete('/{production}', [FabaProductionMovementsController::class, 'destroy'])
                 ->name('destroy');
         });
 
         Route::prefix('utilization')->name('utilization.')->group(function () {
             Route::middleware(['permission:faba_utilization.view'])
-                ->get('/', [FabaUtilizationEntriesController::class, 'index'])
+                ->get('/', [FabaUtilizationMovementsController::class, 'index'])
                 ->name('index');
             Route::middleware(['permission:faba_utilization.create'])
-                ->get('/create', [FabaUtilizationEntriesController::class, 'create'])
+                ->get('/create', [FabaUtilizationMovementsController::class, 'create'])
                 ->name('create');
             Route::middleware(['permission:faba_utilization.create'])
-                ->post('/', [FabaUtilizationEntriesController::class, 'store'])
+                ->post('/', [FabaUtilizationMovementsController::class, 'store'])
                 ->name('store');
             Route::middleware(['permission:faba_utilization.view'])
-                ->get('/export/csv', [FabaUtilizationEntriesController::class, 'exportCsv'])
+                ->get('/export/csv', [FabaUtilizationMovementsController::class, 'exportCsv'])
                 ->name('export.csv');
             Route::middleware(['permission:faba_utilization.view'])
-                ->get('/{utilization}', [FabaUtilizationEntriesController::class, 'show'])
+                ->get('/{utilization}', [FabaUtilizationMovementsController::class, 'show'])
                 ->name('show');
             Route::middleware(['permission:faba_utilization.edit'])
-                ->get('/{utilization}/edit', [FabaUtilizationEntriesController::class, 'edit'])
+                ->get('/{utilization}/edit', [FabaUtilizationMovementsController::class, 'edit'])
                 ->name('edit');
             Route::middleware(['permission:faba_utilization.edit'])
-                ->put('/{utilization}', [FabaUtilizationEntriesController::class, 'update'])
+                ->put('/{utilization}', [FabaUtilizationMovementsController::class, 'update'])
                 ->name('update');
             Route::middleware(['permission:faba_utilization.delete'])
-                ->delete('/{utilization}', [FabaUtilizationEntriesController::class, 'destroy'])
+                ->delete('/{utilization}', [FabaUtilizationMovementsController::class, 'destroy'])
+                ->name('destroy');
+        });
+
+        Route::prefix('adjustments')->name('adjustments.')->group(function () {
+            Route::middleware(['permission:faba_adjustments.view'])
+                ->get('/', [FabaAdjustmentsController::class, 'index'])
+                ->name('index');
+            Route::middleware(['permission:faba_adjustments.create'])
+                ->get('/create', [FabaAdjustmentsController::class, 'create'])
+                ->name('create');
+            Route::middleware(['permission:faba_adjustments.create'])
+                ->post('/', [FabaAdjustmentsController::class, 'store'])
+                ->name('store');
+            Route::middleware(['permission:faba_adjustments.view'])
+                ->get('/{adjustment}', [FabaAdjustmentsController::class, 'show'])
+                ->name('show');
+            Route::middleware(['permission:faba_adjustments.edit'])
+                ->get('/{adjustment}/edit', [FabaAdjustmentsController::class, 'edit'])
+                ->name('edit');
+            Route::middleware(['permission:faba_adjustments.edit'])
+                ->put('/{adjustment}', [FabaAdjustmentsController::class, 'update'])
+                ->name('update');
+            Route::middleware(['permission:faba_adjustments.delete'])
+                ->delete('/{adjustment}', [FabaAdjustmentsController::class, 'destroy'])
                 ->name('destroy');
         });
 
@@ -97,6 +122,9 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
             Route::middleware(['permission:faba_recaps.view'])
                 ->get('/balance', [FabaRecapsController::class, 'balance'])
                 ->name('balance');
+            Route::middleware(['permission:faba_recaps.view'])
+                ->get('/stock-card', [FabaRecapsController::class, 'stockCard'])
+                ->name('stockCard');
             Route::middleware(['permission:faba_opening_balance.manage'])
                 ->post('/opening-balance', [FabaRecapsController::class, 'storeOpeningBalance'])
                 ->name('openingBalance.store');
@@ -131,11 +159,47 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
                 ->get('/', [FabaReportsController::class, 'index'])
                 ->name('index');
             Route::middleware(['permission:faba_reports.export'])
-                ->get('/monthly.csv', [FabaReportsController::class, 'monthlyCsv'])
-                ->name('monthly.csv');
+                ->get('/monthly.xlsx', [FabaReportsController::class, 'monthlyXlsx'])
+                ->name('monthly.xlsx');
             Route::middleware(['permission:faba_reports.export'])
-                ->get('/yearly.csv', [FabaReportsController::class, 'yearlyCsv'])
-                ->name('yearly.csv');
+                ->get('/monthly.pdf', [FabaReportsController::class, 'monthlyPdf'])
+                ->name('monthly.pdf');
+            Route::middleware(['permission:faba_reports.export'])
+                ->get('/yearly.xlsx', [FabaReportsController::class, 'yearlyXlsx'])
+                ->name('yearly.xlsx');
+            Route::middleware(['permission:faba_reports.export'])
+                ->get('/yearly.pdf', [FabaReportsController::class, 'yearlyPdf'])
+                ->name('yearly.pdf');
+            Route::middleware(['permission:faba_reports.export'])
+                ->get('/vendors.xlsx', [FabaReportsController::class, 'vendorsXlsx'])
+                ->name('vendors.xlsx');
+            Route::middleware(['permission:faba_reports.export'])
+                ->get('/vendors.pdf', [FabaReportsController::class, 'vendorsPdf'])
+                ->name('vendors.pdf');
+            Route::middleware(['permission:faba_reports.export'])
+                ->get('/internal-destinations.xlsx', [FabaReportsController::class, 'internalDestinationsXlsx'])
+                ->name('internal-destinations.xlsx');
+            Route::middleware(['permission:faba_reports.export'])
+                ->get('/internal-destinations.pdf', [FabaReportsController::class, 'internalDestinationsPdf'])
+                ->name('internal-destinations.pdf');
+            Route::middleware(['permission:faba_reports.export'])
+                ->get('/purposes.xlsx', [FabaReportsController::class, 'purposesXlsx'])
+                ->name('purposes.xlsx');
+            Route::middleware(['permission:faba_reports.export'])
+                ->get('/purposes.pdf', [FabaReportsController::class, 'purposesPdf'])
+                ->name('purposes.pdf');
+            Route::middleware(['permission:faba_reports.export'])
+                ->get('/stock-card.xlsx', [FabaReportsController::class, 'stockCardXlsx'])
+                ->name('stock-card.xlsx');
+            Route::middleware(['permission:faba_reports.export'])
+                ->get('/stock-card.pdf', [FabaReportsController::class, 'stockCardPdf'])
+                ->name('stock-card.pdf');
+            Route::middleware(['permission:faba_reports.export'])
+                ->get('/anomalies.xlsx', [FabaReportsController::class, 'anomaliesXlsx'])
+                ->name('anomalies.xlsx');
+            Route::middleware(['permission:faba_reports.export'])
+                ->get('/anomalies.pdf', [FabaReportsController::class, 'anomaliesPdf'])
+                ->name('anomalies.pdf');
         });
     });
 

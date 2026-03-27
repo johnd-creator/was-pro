@@ -10,24 +10,27 @@ import {
     formatFabaDate,
     formatFabaDateTime,
     formatFabaMaterial,
+    formatFabaMovementType,
     formatFabaStatus,
-    formatFabaUtilizationType,
 } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 import type {
     FabaAuditLog,
+    FabaClosingSnapshot,
+    FabaMovement,
     FabaMonthlyApproval,
     FabaMonthlyRecap,
-    FabaProductionEntry,
-    FabaUtilizationEntry,
 } from '@/types/faba';
 
 const props = defineProps<{
     approval: FabaMonthlyApproval;
     recap: FabaMonthlyRecap;
-    productionEntries: FabaProductionEntry[];
-    utilizationEntries: FabaUtilizationEntry[];
+    snapshot?: FabaClosingSnapshot | null;
+    vendorBreakdown: Array<{ vendor_id: string | null; vendor_name: string; quantity: number }>;
+    internalDestinationBreakdown: Array<{ internal_destination_id: string | null; internal_destination_name: string; quantity: number }>;
+    purposeBreakdown: Array<{ purpose_id: string | null; purpose_name: string; quantity: number }>;
+    movements: FabaMovement[];
     auditLogs: FabaAuditLog[];
 }>();
 
@@ -99,7 +102,16 @@ function submitPeriod(): void {
                     <p>Total pemanfaatan: {{ recap.total_utilization }}</p>
                     <p>Saldo awal: {{ recap.opening_balance }}</p>
                     <p>Saldo akhir: {{ recap.closing_balance }}</p>
+                    <p>Status operasional: {{ approval.operational_status || approval.status }}</p>
                     <p v-if="approval.rejection_note">Catatan reject: {{ approval.rejection_note }}</p>
+                </CardContent>
+            </Card>
+            <Card v-if="snapshot">
+                <CardHeader><CardTitle>Closing Snapshot</CardTitle></CardHeader>
+                <CardContent class="grid gap-4 md:grid-cols-3">
+                    <p>Status snapshot: {{ snapshot.status }}</p>
+                    <p>Approved at: {{ formatFabaDateTime(snapshot.approved_at) }}</p>
+                    <p>Approved by: {{ snapshot.approved_by_user?.name || '-' }}</p>
                 </CardContent>
             </Card>
             <Card v-if="recap.warnings.length > 0">
@@ -113,41 +125,63 @@ function submitPeriod(): void {
                 </CardContent>
             </Card>
             <Card>
-                <CardHeader><CardTitle>Produksi</CardTitle></CardHeader>
+                <CardHeader><CardTitle>Movement Ledger</CardTitle></CardHeader>
                 <CardContent>
                     <p
-                        v-if="productionEntries.length === 0"
+                        v-if="movements.length === 0"
                         class="text-sm text-muted-foreground"
                     >
-                        Tidak ada transaksi produksi pada periode ini.
+                        Belum ada movement ledger pada periode ini.
                     </p>
-                    <ul v-else class="space-y-2">
-                        <li v-for="item in productionEntries" :key="item.id">
+                    <ul v-else class="space-y-2 text-sm">
+                        <li v-for="item in movements" :key="item.id">
                             {{ formatFabaDate(item.transaction_date) }} -
-                            {{ item.entry_number }} - {{ formatFabaMaterial(item.material_type) }} -
-                            {{ item.quantity }} {{ item.unit }}
+                            {{ item.display_number || item.id }} -
+                            {{ formatFabaMaterial(item.material_type) }} -
+                            {{ formatFabaMovementType(item.movement_type) }} -
+                            {{ item.stock_effect }} {{ item.quantity }} {{ item.unit }}
                         </li>
                     </ul>
                 </CardContent>
             </Card>
-            <Card>
-                <CardHeader><CardTitle>Pemanfaatan</CardTitle></CardHeader>
-                <CardContent>
-                    <p
-                        v-if="utilizationEntries.length === 0"
-                        class="text-sm text-muted-foreground"
-                    >
-                        Tidak ada transaksi pemanfaatan pada periode ini.
-                    </p>
-                    <ul v-else class="space-y-2">
-                        <li v-for="item in utilizationEntries" :key="item.id">
-                            {{ formatFabaDate(item.transaction_date) }} -
-                            {{ item.entry_number }} - {{ item.quantity }}
-                            {{ item.unit }} - {{ formatFabaUtilizationType(item.utilization_type) }} - {{ item.vendor?.name || '-' }}
-                        </li>
-                    </ul>
-                </CardContent>
-            </Card>
+            <div class="grid gap-6 md:grid-cols-3">
+                <Card>
+                    <CardHeader><CardTitle>Vendor Breakdown</CardTitle></CardHeader>
+                    <CardContent class="space-y-2 text-sm">
+                        <p v-if="vendorBreakdown.length === 0" class="text-muted-foreground">
+                            Belum ada pemanfaatan eksternal pada periode ini.
+                        </p>
+                        <div v-for="item in vendorBreakdown" :key="item.vendor_id ?? item.vendor_name">
+                            {{ item.vendor_name }}: {{ item.quantity }} ton
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader><CardTitle>Tujuan Internal</CardTitle></CardHeader>
+                    <CardContent class="space-y-2 text-sm">
+                        <p v-if="internalDestinationBreakdown.length === 0" class="text-muted-foreground">
+                            Belum ada pemanfaatan internal pada periode ini.
+                        </p>
+                        <div
+                            v-for="item in internalDestinationBreakdown"
+                            :key="item.internal_destination_id ?? item.internal_destination_name"
+                        >
+                            {{ item.internal_destination_name }}: {{ item.quantity }} ton
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader><CardTitle>Purpose / Use-case</CardTitle></CardHeader>
+                    <CardContent class="space-y-2 text-sm">
+                        <p v-if="purposeBreakdown.length === 0" class="text-muted-foreground">
+                            Belum ada purpose yang dicatat pada periode ini.
+                        </p>
+                        <div v-for="item in purposeBreakdown" :key="item.purpose_id ?? item.purpose_name">
+                            {{ item.purpose_name }}: {{ item.quantity }} ton
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
             <div class="flex flex-wrap gap-3">
                 <Link
                     class="text-sm text-primary underline-offset-4 hover:underline"

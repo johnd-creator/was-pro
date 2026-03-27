@@ -16,24 +16,42 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import { formatFabaMovementType } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
-import type { FabaUtilizationEntry, FabaVendor } from '@/types/faba';
+import type {
+    FabaInternalDestination,
+    FabaPurpose,
+    FabaUtilizationMovement,
+    FabaVendor,
+} from '@/types/faba';
 
 const props = defineProps<{
-    entry: FabaUtilizationEntry;
+    entry: FabaUtilizationMovement;
     vendors: FabaVendor[];
+    internalDestinations: FabaInternalDestination[];
+    purposes: FabaPurpose[];
     materialOptions: string[];
-    utilizationTypeOptions: string[];
+    movementTypeOptions: string[];
     defaultUnit: string;
-    requirements: Record<string, { requiresVendor: boolean; requiresDocument: boolean }>;
+    requirements: Record<
+        string,
+        {
+            requiresVendor: boolean;
+            requiresDocument: boolean;
+            requiresInternalDestination: boolean;
+        }
+    >;
 }>();
 
 const NO_VENDOR = '__none__';
+const NO_INTERNAL_DESTINATION = '__none__';
+const NO_PURPOSE = '__none__';
+const initialMovementType = props.entry.movement_type;
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
-        title: 'Pemanfaatan FABA',
+        title: initialMovementType === 'utilization_internal' ? 'Pemanfaatan Internal' : 'Pemanfaatan Eksternal',
         href: wasteManagementRoutes.faba.utilization.index.url(),
     },
     {
@@ -45,8 +63,10 @@ const breadcrumbItems: BreadcrumbItem[] = [
 const form = useForm({
     transaction_date: props.entry.transaction_date,
     material_type: props.entry.material_type,
-    utilization_type: props.entry.utilization_type,
+    movement_type: initialMovementType,
     vendor_id: props.entry.vendor_id ?? NO_VENDOR,
+    internal_destination_id: props.entry.internal_destination_id ?? NO_INTERNAL_DESTINATION,
+    purpose_id: props.entry.purpose_id ?? NO_PURPOSE,
     quantity: String(props.entry.quantity),
     unit: props.entry.unit,
     document_number: props.entry.document_number ?? '',
@@ -59,9 +79,14 @@ function submit(): void {
     form.transform((data) => ({
         ...data,
         vendor_id:
-            data.utilization_type === 'internal' || data.vendor_id === NO_VENDOR
+            data.movement_type === 'utilization_internal' || data.vendor_id === NO_VENDOR
                 ? null
                 : data.vendor_id,
+        internal_destination_id:
+            data.movement_type === 'utilization_external' || data.internal_destination_id === NO_INTERNAL_DESTINATION
+                ? null
+                : data.internal_destination_id,
+        purpose_id: data.purpose_id === NO_PURPOSE ? null : data.purpose_id,
     })).put(wasteManagementRoutes.faba.utilization.update(props.entry.id).url);
 }
 
@@ -71,12 +96,14 @@ function updateAttachment(event: Event): void {
 }
 
 watch(
-    () => form.utilization_type,
+    () => form.movement_type,
     (value) => {
-        if (value === 'internal') {
+        if (value === 'utilization_internal') {
             form.vendor_id = NO_VENDOR;
             form.document_number = '';
             form.document_date = '';
+        } else if (value === 'utilization_external') {
+            form.internal_destination_id = NO_INTERNAL_DESTINATION;
         }
     },
 );
@@ -85,13 +112,27 @@ watch(
 <template>
     <WasteManagementLayout
         :breadcrumbs="breadcrumbItems"
-        title="Edit Pemanfaatan FABA"
+        :title="
+            form.movement_type === 'utilization_internal'
+                ? 'Edit Pemanfaatan Internal'
+                : 'Edit Pemanfaatan Eksternal'
+        "
     >
-        <Head title="Edit Pemanfaatan FABA" />
+        <Head
+            :title="
+                form.movement_type === 'utilization_internal'
+                    ? 'Edit Pemanfaatan Internal'
+                    : 'Edit Pemanfaatan Eksternal'
+            "
+        />
         <div class="mx-auto max-w-3xl space-y-6">
             <Heading
-                title="Edit Pemanfaatan FABA"
-                description="Perbarui transaksi pemanfaatan."
+                :title="
+                    form.movement_type === 'utilization_internal'
+                        ? 'Edit Pemanfaatan Internal'
+                        : 'Edit Pemanfaatan Eksternal'
+                "
+                description="Perbarui movement pemanfaatan."
             />
             <form class="space-y-6" @submit.prevent="submit">
                 <Card>
@@ -125,16 +166,16 @@ watch(
                             </div>
                             <div class="grid gap-2">
                                 <Label>Tipe pemanfaatan</Label>
-                                <Select v-model="form.utilization_type">
+                                <Select v-model="form.movement_type">
                                     <SelectTrigger
                                         ><SelectValue
                                     /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem
-                                            v-for="item in utilizationTypeOptions"
+                                            v-for="item in movementTypeOptions"
                                             :key="item"
                                             :value="item"
-                                            >{{ item }}</SelectItem
+                                            >{{ formatFabaMovementType(item) }}</SelectItem
                                         >
                                     </SelectContent>
                                 </Select>
@@ -142,8 +183,34 @@ watch(
                         </div>
                         <div class="grid gap-6 md:grid-cols-2">
                             <div class="grid gap-2">
-                                <Label>Vendor</Label>
-                                <Select v-model="form.vendor_id">
+                                <Label>
+                                    {{
+                                        form.movement_type === 'utilization_internal'
+                                            ? 'Tujuan internal'
+                                            : 'Vendor'
+                                    }}
+                                </Label>
+                                <Select
+                                    v-if="form.movement_type === 'utilization_internal'"
+                                    v-model="form.internal_destination_id"
+                                >
+                                    <SelectTrigger
+                                        ><SelectValue
+                                            placeholder="Pilih tujuan internal"
+                                    /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem :value="NO_INTERNAL_DESTINATION"
+                                            >Pilih tujuan internal</SelectItem
+                                        >
+                                        <SelectItem
+                                            v-for="destination in internalDestinations"
+                                            :key="destination.id"
+                                            :value="destination.id"
+                                            >{{ destination.name }}</SelectItem
+                                        >
+                                    </SelectContent>
+                                </Select>
+                                <Select v-else v-model="form.vendor_id">
                                     <SelectTrigger
                                         ><SelectValue
                                             placeholder="Pilih vendor"
@@ -160,12 +227,18 @@ watch(
                                         >
                                     </SelectContent>
                                 </Select>
-                                <InputError :message="form.errors.vendor_id" />
+                                <InputError
+                                    :message="
+                                        form.movement_type === 'utilization_internal'
+                                            ? form.errors.internal_destination_id
+                                            : form.errors.vendor_id
+                                    "
+                                />
                                 <p class="text-sm text-muted-foreground">
                                     {{
-                                        props.requirements[form.utilization_type]?.requiresVendor
+                                        props.requirements[form.movement_type]?.requiresVendor
                                             ? 'Vendor wajib untuk pemanfaatan eksternal.'
-                                            : 'Vendor boleh dikosongkan untuk pemanfaatan internal.'
+                                            : 'Tujuan internal wajib dipilih untuk pemanfaatan internal.'
                                     }}
                                 </p>
                             </div>
@@ -196,7 +269,7 @@ watch(
                                     v-model="form.document_number"
                                 />
                                 <p
-                                    v-if="props.requirements[form.utilization_type]?.requiresDocument"
+                                    v-if="props.requirements[form.movement_type]?.requiresDocument"
                                     class="text-sm text-muted-foreground"
                                 >
                                     Nomor dokumen wajib untuk transaksi eksternal.
@@ -212,11 +285,31 @@ watch(
                                     type="date"
                                 />
                                 <p
-                                    v-if="props.requirements[form.utilization_type]?.requiresDocument"
+                                    v-if="props.requirements[form.movement_type]?.requiresDocument"
                                     class="text-sm text-muted-foreground"
                                 >
                                     Tanggal dokumen wajib untuk transaksi eksternal.
                                 </p>
+                            </div>
+                            <div class="grid gap-2">
+                                <Label>Use-case / purpose</Label>
+                                <Select v-model="form.purpose_id">
+                                    <SelectTrigger
+                                        ><SelectValue placeholder="Pilih use-case (opsional)"
+                                    /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem :value="NO_PURPOSE"
+                                            >Tanpa use-case</SelectItem
+                                        >
+                                        <SelectItem
+                                            v-for="purpose in purposes"
+                                            :key="purpose.id"
+                                            :value="purpose.id"
+                                            >{{ purpose.name }}</SelectItem
+                                        >
+                                    </SelectContent>
+                                </Select>
+                                <InputError :message="form.errors.purpose_id" />
                             </div>
                         </div>
                         <div class="grid gap-2">

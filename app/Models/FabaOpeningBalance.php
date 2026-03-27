@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\FabaMovementLedgerService;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -34,6 +35,17 @@ class FabaOpeningBalance extends Model
     public function setByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'set_by');
+    }
+
+    protected static function booted(): void
+    {
+        static::saved(function (self $balance): void {
+            app(FabaMovementLedgerService::class)->syncOpeningBalance($balance);
+        });
+
+        static::deleted(function (self $balance): void {
+            app(FabaMovementLedgerService::class)->deleteOpeningBalanceMovement($balance);
+        });
     }
 
     public function scopeForPeriod($query, int $year, int $month)

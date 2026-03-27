@@ -9,6 +9,7 @@ export interface FabaMonthlyApproval {
     month: number;
     period_label?: string;
     status: 'draft' | 'submitted' | 'approved' | 'rejected';
+    operational_status?: 'draft' | 'open' | 'ready_to_submit' | 'submitted' | 'approved';
     rejection_note?: string | null;
     submitted_at?: string | null;
     approved_at?: string | null;
@@ -28,12 +29,17 @@ export interface FabaWarning {
     message: string;
 }
 
-export interface FabaProductionEntry {
+export interface FabaVendor {
     id: string;
-    entry_number: string;
+    name: string;
+}
+
+export interface FabaProductionMovement {
+    id: string;
+    display_number: string;
     transaction_date: string;
     material_type: 'fly_ash' | 'bottom_ash';
-    entry_type: 'production' | 'pok' | 'workshop' | 'reject';
+    movement_type: 'production' | 'disposal_pok' | 'workshop' | 'reject';
     quantity: number;
     unit: string;
     note: string | null;
@@ -42,19 +48,28 @@ export interface FabaProductionEntry {
     created_by_user?: FabaUserRef | null;
 }
 
-export interface FabaVendor {
+export interface FabaInternalDestination {
     id: string;
     name: string;
 }
 
-export interface FabaUtilizationEntry {
+export interface FabaPurpose {
     id: string;
-    entry_number: string;
+    name: string;
+}
+
+export interface FabaUtilizationMovement {
+    id: string;
+    display_number: string;
     transaction_date: string;
     material_type: 'fly_ash' | 'bottom_ash';
-    utilization_type: 'external' | 'internal';
+    movement_type: 'utilization_external' | 'utilization_internal';
     vendor_id: string | null;
     vendor?: FabaVendor | null;
+    internal_destination_id: string | null;
+    internal_destination?: FabaInternalDestination | null;
+    purpose_id: string | null;
+    purpose?: FabaPurpose | null;
     quantity: number;
     unit: string;
     document_number: string | null;
@@ -85,10 +100,70 @@ export interface FabaMonthlyRecap {
     warning_negative_balance: boolean;
     warning_utilization_without_production: boolean;
     warning_missing_opening_balance: boolean;
-    production_entries_count: number;
-    utilization_entries_count: number;
+    production_movements_count: number;
+    utilization_movements_count: number;
+    movement_summary?: {
+        inflow_fly_ash: number;
+        inflow_bottom_ash: number;
+        outflow_fly_ash: number;
+        outflow_bottom_ash: number;
+    };
     approval?: FabaMonthlyApproval | null;
     warnings: FabaWarning[];
+}
+
+export interface FabaMovement {
+    id: string;
+    transaction_date: string;
+    material_type: 'fly_ash' | 'bottom_ash';
+    movement_type: string;
+    stock_effect: 'in' | 'out';
+    quantity: number;
+    unit: string;
+    vendor?: FabaVendor | null;
+    internal_destination?: FabaInternalDestination | null;
+    purpose?: FabaPurpose | null;
+    document_number: string | null;
+    document_date: string | null;
+    reference_type: string | null;
+    reference_id: string | null;
+    note: string | null;
+    display_number?: string | null;
+}
+
+export interface FabaStockCardRow {
+    id: string;
+    transaction_date: string;
+    display_number: string;
+    material_type: 'fly_ash' | 'bottom_ash';
+    movement_type: string;
+    stock_effect: 'in' | 'out';
+    quantity: number;
+    unit: string;
+    vendor_name?: string | null;
+    internal_destination_name?: string | null;
+    purpose_name?: string | null;
+    running_balance: number;
+    document_number?: string | null;
+}
+
+export interface FabaAnomalyItem {
+    year: number;
+    month: number;
+    period_label: string;
+    code: string;
+    message: string;
+}
+
+export interface FabaClosingSnapshot {
+    id: string;
+    year: number;
+    month: number;
+    status: string;
+    approved_at: string | null;
+    approved_by_user?: FabaUserRef | null;
+    warning_summary?: FabaWarning[] | null;
+    snapshot_payload?: Record<string, unknown> | null;
 }
 
 export interface FabaPeriodSummary {

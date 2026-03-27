@@ -24,25 +24,31 @@ import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
     formatFabaDate,
     formatFabaMaterial,
+    formatFabaMovementType,
     formatFabaStatus,
-    formatFabaUtilizationType,
 } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
-import type { FabaUtilizationEntry, FabaVendor } from '@/types/faba';
+import type { FabaUtilizationMovement, FabaVendor } from '@/types/faba';
 
 const props = defineProps<{
-    entries: FabaUtilizationEntry[];
+    entries: FabaUtilizationMovement[];
     vendors: FabaVendor[];
-    filters: { materials: string[]; utilizationTypes: string[] };
+    initialMovementType?: string | null;
+    filters: { materials: string[]; movementTypes: string[] };
 }>();
 
 const search = ref('');
-const utilizationType = ref('all');
+const movementType = ref(props.initialMovementType ?? 'all');
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
-        title: 'Pemanfaatan FABA',
+        title:
+            movementType.value === 'utilization_internal'
+                ? 'Pemanfaatan Internal'
+                : movementType.value === 'utilization_external'
+                  ? 'Pemanfaatan Eksternal'
+                  : 'Pemanfaatan FABA',
         href: wasteManagementRoutes.faba.utilization.index.url(),
     },
 ];
@@ -53,11 +59,11 @@ const filteredEntries = computed(() =>
 
         return (
             (query.length === 0 ||
-                entry.entry_number.toLowerCase().includes(query) ||
+                entry.display_number.toLowerCase().includes(query) ||
                 entry.material_type.toLowerCase().includes(query) ||
-                (entry.vendor?.name ?? '').toLowerCase().includes(query)) &&
-            (utilizationType.value === 'all' ||
-                entry.utilization_type === utilizationType.value)
+                (entry.vendor?.name ?? '').toLowerCase().includes(query) ||
+                (entry.internal_destination?.name ?? '').toLowerCase().includes(query)) &&
+            (movementType.value === 'all' || entry.movement_type === movementType.value)
         );
     }),
 );
@@ -66,16 +72,42 @@ const filteredEntries = computed(() =>
 <template>
     <WasteManagementLayout
         :breadcrumbs="breadcrumbItems"
-        title="Pemanfaatan FABA"
+        :title="
+            movementType === 'utilization_internal'
+                ? 'Pemanfaatan Internal'
+                : movementType === 'utilization_external'
+                  ? 'Pemanfaatan Eksternal'
+                  : 'Pemanfaatan FABA'
+        "
     >
-        <Head title="Pemanfaatan FABA" />
+        <Head
+            :title="
+                movementType === 'utilization_internal'
+                    ? 'Pemanfaatan Internal'
+                    : movementType === 'utilization_external'
+                      ? 'Pemanfaatan Eksternal'
+                      : 'Pemanfaatan FABA'
+            "
+        />
         <div class="space-y-6 p-6">
             <div
                 class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
             >
                 <Heading
-                    title="Pemanfaatan FABA"
-                    description="Kelola transaksi pemanfaatan internal dan eksternal."
+                    :title="
+                        movementType === 'utilization_internal'
+                            ? 'Pemanfaatan Internal'
+                            : movementType === 'utilization_external'
+                              ? 'Pemanfaatan Eksternal'
+                              : 'Pemanfaatan FABA'
+                    "
+                    :description="
+                        movementType === 'utilization_internal'
+                            ? 'Kelola movement pemanfaatan untuk tujuan internal.'
+                            : movementType === 'utilization_external'
+                              ? 'Kelola movement pemanfaatan untuk vendor eksternal.'
+                              : 'Kelola movement pemanfaatan internal dan eksternal.'
+                    "
                 />
                 <div class="flex gap-2">
                     <Button
@@ -91,11 +123,19 @@ const filteredEntries = computed(() =>
                     <Button
                         @click="
                             router.get(
-                                wasteManagementRoutes.faba.utilization.create(),
+                                movementType !== 'all'
+                                    ? wasteManagementRoutes.faba.utilization.create.url({ query: { movement_type: movementType } })
+                                    : wasteManagementRoutes.faba.utilization.create(),
                             )
                         "
                     >
-                        Tambah pemanfaatan
+                        {{
+                            movementType === 'utilization_internal'
+                                ? 'Tambah internal'
+                                : movementType === 'utilization_external'
+                                  ? 'Tambah eksternal'
+                                  : 'Tambah pemanfaatan'
+                        }}
                     </Button>
                 </div>
             </div>
@@ -105,18 +145,18 @@ const filteredEntries = computed(() =>
                     v-model="search"
                     placeholder="Cari nomor / vendor / material"
                 />
-                <Select v-model="utilizationType">
+                <Select v-model="movementType">
                     <SelectTrigger
                         ><SelectValue placeholder="Semua tipe"
                     /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">Semua tipe</SelectItem>
                         <SelectItem
-                            v-for="item in filters.utilizationTypes"
+                            v-for="item in filters.movementTypes"
                             :key="item"
                             :value="item"
                         >
-                            {{ item }}
+                            {{ formatFabaMovementType(item) }}
                         </SelectItem>
                     </SelectContent>
                 </Select>
@@ -144,11 +184,11 @@ const filteredEntries = computed(() =>
                 </TableHeader>
                 <TableBody>
                     <TableRow v-for="entry in filteredEntries" :key="entry.id">
-                        <TableCell>{{ entry.entry_number }}</TableCell>
+                        <TableCell>{{ entry.display_number }}</TableCell>
                         <TableCell>{{ formatFabaDate(entry.transaction_date) }}</TableCell>
                         <TableCell>{{ formatFabaMaterial(entry.material_type) }}</TableCell>
-                        <TableCell>{{ formatFabaUtilizationType(entry.utilization_type) }}</TableCell>
-                        <TableCell>{{ entry.vendor?.name || '-' }}</TableCell>
+                        <TableCell>{{ formatFabaMovementType(entry.movement_type) }}</TableCell>
+                        <TableCell>{{ entry.vendor?.name || entry.internal_destination?.name || '-' }}</TableCell>
                         <TableCell
                             >{{ entry.quantity }} {{ entry.unit }}</TableCell
                         >

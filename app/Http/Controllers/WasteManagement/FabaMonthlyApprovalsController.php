@@ -9,8 +9,6 @@ use App\Http\Requests\WasteManagement\ReopenFabaMonthlyApprovalRequest;
 use App\Http\Requests\WasteManagement\SubmitFabaMonthlyApprovalRequest;
 use App\Models\FabaAuditLog;
 use App\Models\FabaMonthlyApproval;
-use App\Models\FabaProductionEntry;
-use App\Models\FabaUtilizationEntry;
 use App\Services\FabaAuditService;
 use App\Services\FabaRecapService;
 use Illuminate\Http\RedirectResponse;
@@ -38,14 +36,16 @@ class FabaMonthlyApprovalsController extends Controller
 
     public function review(int $year, int $month): Response
     {
-        $approval = $this->fabaRecapService->getMonthlyApproval($year, $month);
         $detail = $this->fabaRecapService->getMonthlyRecapDetail($year, $month);
 
         return Inertia::render('waste-management/faba/approvals/Review', [
             'approval' => $this->fabaRecapService->getPeriodMeta($year, $month),
             'recap' => $detail['recap'],
-            'productionEntries' => $detail['production_entries'],
-            'utilizationEntries' => $detail['utilization_entries'],
+            'snapshot' => $detail['snapshot'],
+            'vendorBreakdown' => $detail['vendor_breakdown'],
+            'internalDestinationBreakdown' => $detail['internal_destination_breakdown'],
+            'purposeBreakdown' => $detail['purpose_breakdown'],
+            'movements' => $detail['movements'],
             'auditLogs' => $detail['audit_logs'],
         ]);
     }
@@ -71,8 +71,7 @@ class FabaMonthlyApprovalsController extends Controller
         $validated = $request->validated();
         $year = (int) $validated['year'];
         $month = (int) $validated['month'];
-        $hasTransactions = FabaProductionEntry::query()->forPeriod($year, $month)->exists()
-            || FabaUtilizationEntry::query()->forPeriod($year, $month)->exists();
+        $hasTransactions = $this->fabaRecapService->hasTransactionsForPeriod($year, $month);
 
         if (! $hasTransactions) {
             return Redirect::back()->with('error', 'Periode kosong tidak dapat diajukan untuk approval.');
@@ -130,6 +129,8 @@ class FabaMonthlyApprovalsController extends Controller
             'rejection_note' => null,
         ]);
 
+        $snapshot = $this->fabaRecapService->storeMonthlyClosingSnapshot($year, $month, Auth::id());
+
         $this->fabaAuditService->log(
             Auth::id(),
             'approve',
@@ -139,8 +140,25 @@ class FabaMonthlyApprovalsController extends Controller
             $year,
             $month,
             'Periode disetujui.',
-            ['approval_note' => $request->validated('approval_note')]
+            [
+                'approval_note' => $request->validated('approval_note'),
+                'snapshot_id' => $snapshot?->id,
+            ]
         );
+
+        if ($snapshot) {
+            $this->fabaAuditService->log(
+                Auth::id(),
+                'snapshot_generated',
+                FabaAuditLog::MODULE_SNAPSHOT,
+                FabaMonthlyApproval::class,
+                $approval->id,
+                $year,
+                $month,
+                'Snapshot closing bulanan dibuat.',
+                ['snapshot_id' => $snapshot->id]
+            );
+        }
 
         return Redirect::route('waste-management.faba.approvals.review', [$year, $month])
             ->with('success', 'Periode berhasil disetujui.');
@@ -162,6 +180,8 @@ class FabaMonthlyApprovalsController extends Controller
             'rejected_at' => now(),
             'rejection_note' => $request->validated('rejection_note'),
         ]);
+
+        $this->fabaRecapService->deleteMonthlyClosingSnapshot($year, $month);
 
         $this->fabaAuditService->log(
             Auth::id(),
@@ -195,6 +215,8 @@ class FabaMonthlyApprovalsController extends Controller
             'rejected_at' => now(),
             'rejection_note' => $request->validated('reopen_note'),
         ]);
+
+        $this->fabaRecapService->deleteMonthlyClosingSnapshot($year, $month);
 
         $this->fabaAuditService->log(
             Auth::id(),

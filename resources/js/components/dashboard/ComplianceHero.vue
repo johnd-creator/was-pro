@@ -33,6 +33,26 @@ const warningCount = computed(
         props.fabaWarnings,
 );
 
+const primaryMessage = computed(() => {
+    if (props.expiredWaste > 0) {
+        return `${props.expiredWaste} catatan limbah sudah melewati batas simpan dan perlu penanganan segera.`;
+    }
+
+    if (props.pendingWasteApprovals + props.pendingFabaApprovals > 0) {
+        return `Terdapat ${props.pendingWasteApprovals + props.pendingFabaApprovals} antrian approval yang menunggu keputusan untuk menjaga ritme operasional tetap aman.`;
+    }
+
+    if (props.fabaWarnings > 0) {
+        return `${props.fabaWarnings} periode FABA memerlukan perhatian karena warning saldo atau konsistensi data.`;
+    }
+
+    if (props.expiringSoonWaste > 0) {
+        return `${props.expiringSoonWaste} catatan limbah akan mendekati batas simpan dalam 7 hari ke depan.`;
+    }
+
+    return 'Kepatuhan operasional berada dalam kondisi terkendali dan tidak ada anomali utama yang perlu ditindaklanjuti sekarang.';
+});
+
 const statusLabel = computed(() => {
     if (hasAlerts.value) return 'Kritis';
     if (hasWarnings.value) return 'Perlu Perhatian';
@@ -40,9 +60,9 @@ const statusLabel = computed(() => {
 });
 
 const statusColor = computed(() => {
-    if (hasAlerts.value) return 'from-red-500 via-red-600 to-red-700';
-    if (hasWarnings.value) return 'from-orange-400 via-orange-500 to-orange-600';
-    return 'from-emerald-500 via-emerald-600 to-emerald-700';
+    if (hasAlerts.value) return 'from-[#005ab3] via-[#1d4ed8] to-[#3155b7]';
+    if (hasWarnings.value) return 'from-[#1d4ed8] via-[#3155b7] to-[#2563eb]';
+    return 'from-[#0f766e] via-[#0f9f8d] to-[#14b8a6]';
 });
 </script>
 
@@ -53,24 +73,27 @@ const statusColor = computed(() => {
             statusColor,
         ]"
     >
-        <div class="flex flex-col gap-6 p-6 lg:p-8">
+        <div class="flex flex-col gap-5 p-6 lg:p-8">
             <!-- Header -->
             <div class="flex items-start justify-between gap-4">
-                <div class="space-y-2">
+                <div class="max-w-3xl space-y-3">
                     <div
                         class="inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-medium backdrop-blur-sm"
                     >
                         <ShieldAlert class="size-3.5" />
                         Status Kepatuhan: {{ statusLabel }}
                     </div>
-                    <h2 class="text-xl font-bold lg:text-2xl">
+                    <h2 class="text-xl font-bold tracking-tight lg:text-3xl">
                         Tinjau Risiko Kepatuhan
                     </h2>
+                    <p class="max-w-2xl text-sm leading-6 text-white/80">
+                        {{ primaryMessage }}
+                    </p>
                 </div>
                 <div
-                    class="rounded-full bg-white/20 px-4 py-2 text-center backdrop-blur-sm"
+                    class="rounded-2xl bg-white/15 px-4 py-3 text-center backdrop-blur-sm"
                 >
-                    <p class="text-xs font-medium text-white/80">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-white/75">
                         {{ alertCount }} Risiko
                     </p>
                     <p class="text-2xl font-bold">{{ warningCount }}</p>
@@ -79,7 +102,7 @@ const statusColor = computed(() => {
 
             <!-- Alert Grid -->
             <div
-                class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+                class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
             >
                 <!-- Expired Waste -->
                 <div
@@ -161,7 +184,7 @@ const statusColor = computed(() => {
             <div>
                 <Button
                     as-child
-                    class="bg-white text-red-700 shadow-lg transition-all duration-200 hover:bg-red-50"
+                    class="bg-white text-[#0f3f7a] shadow-lg transition-all duration-200 hover:bg-blue-50"
                 >
                     <Link
                         :href="

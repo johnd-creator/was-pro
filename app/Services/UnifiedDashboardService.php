@@ -379,12 +379,26 @@ class UnifiedDashboardService
             $riskStatus = 'warning';
         }
 
+        $riskLabel = match ($riskStatus) {
+            'critical' => 'Kritis',
+            'warning' => 'Perlu Perhatian',
+            default => 'Normal',
+        };
+
+        $riskTone = match ($riskStatus) {
+            'critical' => 'red',
+            'warning' => 'orange',
+            default => 'green',
+        };
+
         return [
             'organization_name' => $organization?->name ?? 'Unknown Organization',
             'timezone' => 'WIB',
             'current_date' => now()->format('l, j F Y'),
             'current_time' => now()->format('H:i'),
             'risk_status' => $riskStatus,
+            'risk_label' => $riskLabel,
+            'risk_tone' => $riskTone,
             'user' => [
                 'name' => $user?->name ?? 'Unknown User',
                 'email' => $user?->email ?? '',

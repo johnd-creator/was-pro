@@ -6,15 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
     formatFabaDate,
-    formatFabaEntryType,
     formatFabaMaterial,
+    formatFabaMovementType,
     formatFabaStatus,
 } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
-import type { FabaProductionEntry } from '@/types/faba';
+import type { FabaProductionMovement } from '@/types/faba';
 
-const props = defineProps<{ entry: FabaProductionEntry }>();
+const props = defineProps<{ entry: FabaProductionMovement }>();
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
@@ -22,7 +22,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
         href: wasteManagementRoutes.faba.production.index.url(),
     },
     {
-        title: props.entry.entry_number,
+        title: props.entry.display_number,
         href: wasteManagementRoutes.faba.production.show(props.entry.id).url,
     },
 ];
@@ -36,7 +36,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
         <Head title="Detail Produksi FABA" />
         <div class="space-y-6 p-6">
             <Heading
-                :title="entry.entry_number"
+                :title="entry.display_number"
                 description="Detail transaksi produksi FABA."
             />
             <Card>
@@ -48,7 +48,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
                     <div>
                         <strong>Material:</strong> {{ formatFabaMaterial(entry.material_type) }}
                     </div>
-                    <div><strong>Tipe:</strong> {{ formatFabaEntryType(entry.entry_type) }}</div>
+                    <div><strong>Tipe:</strong> {{ formatFabaMovementType(entry.movement_type) }}</div>
                     <div>
                         <strong>Jumlah:</strong> {{ entry.quantity }}
                         {{ entry.unit }}

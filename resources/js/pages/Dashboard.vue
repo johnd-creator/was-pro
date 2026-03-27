@@ -8,9 +8,6 @@ import CombinedApprovals from '@/components/dashboard/CombinedApprovals.vue';
 import CompactStat from '@/components/dashboard/CompactStat.vue';
 import ComplianceHero from '@/components/dashboard/ComplianceHero.vue';
 import FabaTrendChart from '@/components/dashboard/FabaTrendChart.vue';
-import MiniChart from '@/components/dashboard/MiniChart.vue';
-import StatusDistribution from '@/components/dashboard/StatusDistribution.vue';
-import WasteTrendChart from '@/components/dashboard/WasteTrendChart.vue';
 import Heading from '@/components/Heading.vue';
 
 import {
@@ -80,10 +77,10 @@ interface StatusData {
 }
 
 interface Props {
+    organizationName: string;
     stats: Stats;
     pendingApprovals: ApprovalItem[];
     wasteByCategory: CategoryData[];
-    transportationByStatus: StatusData[];
     fabaStats: FabaStats;
     fabaChart: Array<{
         label: string;
@@ -93,33 +90,8 @@ interface Props {
         utilization: number;
         closing_balance: number;
     }>;
-    wasteChart: Array<{
-        label: string;
-        month: number;
-        year: number;
-        records_count: number;
-        approved_count: number;
-        transport_delivered_count: number;
-    }>;
     fabaPendingApprovals: ApprovalItem[];
-    fabaWarnings: Array<{
-        month: number;
-        period_label: string;
-        message: string;
-        closing_balance: number;
-    }>;
-    latestFabaPeriod?: {
-        id: string;
-        year: number;
-        month: number;
-        status: string;
-        period_label: string;
-    } | null;
-    topVendors: Array<{
-        vendor_id: string | null;
-        vendor_name: string;
-        total_quantity: number;
-    }>;
+    fabaWarnings: Array<{ month: number; period_label: string; message: string; closing_balance: number }>;
 }
 
 const props = defineProps<Props>();
@@ -138,11 +110,10 @@ const combinedApprovals = computed(() => {
     return [...wasteApprovals, ...fabaApprovals];
 });
 
-const vendorData = computed(() =>
-    props.topVendors.map((v) => ({
-        label: v.vendor_name,
-        value: v.total_quantity,
-    })),
+const pageDescription = computed(() =>
+    props.organizationName
+        ? `Pantau risiko kepatuhan, operasional limbah, dan data FABA untuk ${props.organizationName} dalam satu tampilan terpadu.`
+        : 'Pantau risiko kepatuhan, operasional limbah, dan data FABA dalam satu tampilan terpadu.',
 );
 
 // Animation
@@ -165,12 +136,13 @@ const entranceAnimationClass = computed(() =>
     <Head title="Dashboard" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div :class="['space-y-6 p-6 lg:p-8', entranceAnimationClass]">
-            <!-- Page Header -->
-            <Heading
-                title="Dashboard Terpadu"
-                description="Pantau risiko kepatuhan, operasional limbah, dan data FABA dalam satu tampilan terpadu."
-            />
+        <div :class="['space-y-8 p-6 lg:p-8', entranceAnimationClass]">
+            <div class="sr-only">
+                <Heading
+                    title="Dashboard Terpadu"
+                    :description="pageDescription"
+                />
+            </div>
 
             <!-- Row 1: Compliance & Risk Hero -->
             <section>
@@ -223,57 +195,27 @@ const entranceAnimationClass = computed(() =>
             </section>
 
             <!-- Row 3: Trend Charts (2 columns) -->
-            <section class="grid gap-6 lg:grid-cols-2">
-                <!-- FABA Trend Chart -->
+            <section class="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.95fr)]">
                 <FabaTrendChart :data="fabaChart" />
 
-                <!-- Waste Trend Chart -->
-                <WasteTrendChart :data="wasteChart" />
+                <Card class="border-slate-200/80 shadow-sm">
+                    <CardHeader class="space-y-2">
+                        <CardTitle class="text-lg">
+                            Distribusi Kategori Limbah
+                        </CardTitle>
+                        <CardDescription>
+                            Komposisi kategori limbah yang paling dominan untuk
+                            membantu prioritas operasional saat ini.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <CategoryChart :data="wasteByCategory" />
+                    </CardContent>
+                </Card>
             </section>
 
-            <!-- Row 4: Approvals & Analytics (2 columns) -->
-            <section class="grid gap-6 lg:grid-cols-2">
-                <!-- Left: Combined Approvals -->
+            <section>
                 <CombinedApprovals :approvals="combinedApprovals" />
-
-                <!-- Right: Secondary Analytics -->
-                <div class="space-y-6">
-                    <MiniChart title="Top Vendor FABA" :data="vendorData" />
-
-                    <div class="grid gap-6 xl:grid-cols-2">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle class="text-base">
-                                    Distribusi Kategori Limbah
-                                </CardTitle>
-                                <CardDescription>
-                                    Komposisi kategori limbah yang paling dominan
-                                    untuk membantu prioritas operasional.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <CategoryChart :data="wasteByCategory" />
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle class="text-base">
-                                    Status Transportasi
-                                </CardTitle>
-                                <CardDescription>
-                                    Ringkasan pengiriman untuk memantau progres
-                                    dari penjadwalan hingga pengantaran.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <StatusDistribution
-                                    :data="transportationByStatus"
-                                />
-                            </CardContent>
-                        </Card>
-                    </div>
-                </div>
             </section>
         </div>
     </AppLayout>

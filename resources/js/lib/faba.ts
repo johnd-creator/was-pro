@@ -68,6 +68,7 @@ export function formatFabaEntryType(value: string): string {
     const labels: Record<string, string> = {
         production: 'Produksi',
         pok: 'POK',
+        disposal_pok: 'Disposal / POK',
         workshop: 'Workshop',
         reject: 'Reject',
     };
@@ -79,6 +80,24 @@ export function formatFabaUtilizationType(value: string): string {
     const labels: Record<string, string> = {
         internal: 'Internal',
         external: 'Eksternal',
+        utilization_internal: 'Internal',
+        utilization_external: 'Eksternal',
+    };
+
+    return labels[value] ?? value;
+}
+
+export function formatFabaMovementType(value: string): string {
+    const labels: Record<string, string> = {
+        opening_balance: 'Opening Balance',
+        production: 'Produksi',
+        workshop: 'Workshop',
+        utilization_external: 'Pemanfaatan Eksternal',
+        utilization_internal: 'Pemanfaatan Internal',
+        reject: 'Reject',
+        disposal_pok: 'Disposal / POK',
+        adjustment_in: 'Adjustment In',
+        adjustment_out: 'Adjustment Out',
     };
 
     return labels[value] ?? value;

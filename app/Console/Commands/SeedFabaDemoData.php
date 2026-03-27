@@ -40,10 +40,12 @@ class SeedFabaDemoData extends Command
         $this->line('Schema: '.$summary['schema_name']);
         $this->line('Periode: '.implode(', ', $summary['periods']));
         $this->line('Vendor aktif: '.$summary['vendors_count']);
-        $this->line('Transaksi produksi: '.$summary['production_count']);
-        $this->line('Transaksi pemanfaatan: '.$summary['utilization_count']);
+        $this->line('Tujuan internal aktif: '.$summary['internal_destinations_count']);
+        $this->line('Purpose aktif: '.$summary['purposes_count']);
+        $this->line('Movement FABA: '.$summary['movements_count']);
         $this->line('Approval bulanan: '.$summary['approvals_count']);
         $this->line('Opening balance eksplisit: '.$summary['opening_balances_count']);
+        $this->line('Closing snapshot: '.$summary['snapshots_count']);
         $this->newLine();
         $this->comment('Login demo:');
         $this->line('- Supervisor: faba.supervisor.demo@local.test / password');

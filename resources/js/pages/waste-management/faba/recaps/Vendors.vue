@@ -38,7 +38,7 @@ const props = defineProps<{
             history: Array<{
                 id: string;
                 transaction_date: string;
-                entry_number: string;
+                display_number: string;
                 material_type: string;
                 quantity: number;
                 unit: string;
@@ -146,7 +146,7 @@ function applyFilters(): void {
                 />
                 <div class="mt-4 space-y-2 text-sm">
                     <div v-for="item in recap.vendors[0].history" :key="item.id">
-                        {{ formatFabaDate(item.transaction_date) }} - {{ item.entry_number }} - {{ formatFabaMaterial(item.material_type) }} - {{ item.quantity }} {{ item.unit }}
+                        {{ formatFabaDate(item.transaction_date) }} - {{ item.display_number }} - {{ formatFabaMaterial(item.material_type) }} - {{ item.quantity }} {{ item.unit }}
                     </div>
                 </div>
             </div>

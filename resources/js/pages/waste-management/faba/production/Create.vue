@@ -21,7 +21,7 @@ import type { BreadcrumbItem } from '@/types';
 
 const props = defineProps<{
     materialOptions: string[];
-    entryTypeOptionsByMaterial: Record<string, string[]>;
+    movementTypeOptionsByMaterial: Record<string, string[]>;
     defaultUnit: string;
 }>();
 
@@ -39,14 +39,14 @@ const breadcrumbItems: BreadcrumbItem[] = [
 const form = useForm<{
     transaction_date: string;
     material_type: string;
-    entry_type: string;
+    movement_type: string;
     quantity: string;
     unit: string;
     note: string;
 }>({
     transaction_date: new Date().toISOString().split('T')[0],
     material_type: '',
-    entry_type: '',
+    movement_type: '',
     quantity: '',
     unit: props.defaultUnit,
     note: '',
@@ -56,15 +56,15 @@ function submit(): void {
     form.post(wasteManagementRoutes.faba.production.store.url());
 }
 
-const entryTypeOptions = computed(() =>
-    props.entryTypeOptionsByMaterial[form.material_type] ?? [],
+const movementTypeOptions = computed(() =>
+    props.movementTypeOptionsByMaterial[form.material_type] ?? [],
 );
 
 watch(
     () => form.material_type,
     () => {
-        if (!entryTypeOptions.value.includes(form.entry_type)) {
-            form.entry_type = '';
+        if (!movementTypeOptions.value.includes(form.movement_type)) {
+            form.movement_type = '';
         }
     },
 );
@@ -121,14 +121,14 @@ watch(
                                 />
                             </div>
                             <div class="grid gap-2">
-                                <Label>Tipe entri</Label>
-                                <Select v-model="form.entry_type">
+                                <Label>Tipe movement</Label>
+                                <Select v-model="form.movement_type">
                                     <SelectTrigger
                                         ><SelectValue placeholder="Pilih tipe"
                                     /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem
-                                            v-for="item in entryTypeOptions"
+                                            v-for="item in movementTypeOptions"
                                             :key="item"
                                             :value="item"
                                         >
@@ -136,7 +136,7 @@ watch(
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
-                                <InputError :message="form.errors.entry_type" />
+                                <InputError :message="form.errors.movement_type" />
                             </div>
                         </div>
                         <div class="grid gap-6 md:grid-cols-2">

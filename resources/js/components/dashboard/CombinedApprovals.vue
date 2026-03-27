@@ -47,16 +47,16 @@ const fabaApprovals = computed(() =>
 </script>
 
 <template>
-    <Card>
-        <CardHeader>
+    <Card class="border-slate-200/80 shadow-sm">
+        <CardHeader class="border-b border-slate-100 pb-5">
             <div
                 class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
             >
                 <div>
-                    <CardTitle>Antrian Tindakan</CardTitle>
+                    <CardTitle class="text-lg">Antrian Tindakan</CardTitle>
                     <CardDescription>
-                        Waste records dan FABA approvals yang menunggu
-                        keputusan.
+                        Prioritas review untuk catatan limbah dan approval
+                        FABA yang menunggu keputusan.
                     </CardDescription>
                 </div>
                 <Button
@@ -79,8 +79,8 @@ const fabaApprovals = computed(() =>
                 </Button>
             </div>
         </CardHeader>
-        <CardContent>
-            <div v-if="!hasApprovals" class="rounded-xl border border-dashed border-border bg-muted/30 p-6 text-center">
+        <CardContent class="p-6">
+            <div v-if="!hasApprovals" class="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center">
                 <p class="font-medium text-foreground">
                     Tidak ada antrian approval
                 </p>
@@ -89,13 +89,13 @@ const fabaApprovals = computed(() =>
                 </p>
             </div>
 
-            <div v-else class="space-y-4">
+            <div v-else class="space-y-6">
                 <!-- Waste Approvals Section -->
                 <div v-if="wasteApprovals.length > 0">
-                    <h4 class="mb-2 text-sm font-semibold text-foreground">
+                    <h4 class="mb-3 text-sm font-semibold text-foreground">
                         Catatan Limbah ({{ wasteApprovals.length }})
                     </h4>
-                    <div class="space-y-2">
+                    <div class="space-y-3">
                         <Link
                             v-for="item in wasteApprovals"
                             :key="item.id"
@@ -104,23 +104,25 @@ const fabaApprovals = computed(() =>
                                     item.id,
                                 ).url
                             "
-                            class="block rounded-lg border border-border bg-card p-3 transition-colors hover:bg-muted"
+                            class="group block rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-colors hover:bg-slate-50"
                         >
-                            <div class="flex items-start justify-between gap-2">
+                            <div class="flex items-start justify-between gap-3">
                                 <div class="flex-1">
-                                    <p class="font-medium text-foreground">
+                                    <p class="font-semibold text-foreground">
                                         {{ item.record_number }}
                                     </p>
                                     <p class="mt-1 text-sm text-muted-foreground">
                                         {{ item.waste_type }} •
                                         {{ item.category }}
                                     </p>
-                                    <p class="mt-1 text-xs text-muted-foreground">
+                                    <p class="mt-2 text-xs text-muted-foreground">
                                         {{ item.quantity ?? 0 }} {{ item.unit }} •
                                         Oleh {{ item.submitted_by }}
                                     </p>
                                 </div>
-                                <Badge variant="secondary"> Pending </Badge>
+                                <Badge variant="secondary" class="shrink-0 rounded-full px-2.5 py-1">
+                                    Pending
+                                </Badge>
                             </div>
                         </Link>
                     </div>
@@ -128,10 +130,10 @@ const fabaApprovals = computed(() =>
 
                 <!-- FABA Approvals Section -->
                 <div v-if="fabaApprovals.length > 0">
-                    <h4 class="mb-2 text-sm font-semibold text-foreground">
+                    <h4 class="mb-3 text-sm font-semibold text-foreground">
                         FABA ({{ fabaApprovals.length }})
                     </h4>
-                    <div class="space-y-2">
+                    <div class="space-y-3">
                         <Link
                             v-for="item in fabaApprovals"
                             :key="item.id"
@@ -141,15 +143,18 @@ const fabaApprovals = computed(() =>
                                     item.month ?? 0,
                                 ]).url
                             "
-                            class="block rounded-lg border border-border bg-card p-3 transition-colors hover:bg-muted"
+                            class="group block rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-colors hover:bg-slate-50"
                         >
-                            <div class="flex items-start justify-between gap-2">
+                            <div class="flex items-start justify-between gap-3">
                                 <div class="flex-1">
-                                    <p class="font-medium text-foreground">
+                                    <p class="font-semibold text-foreground">
                                         {{ item.period_label }}
                                     </p>
+                                    <p class="mt-2 text-xs text-muted-foreground">
+                                        Review periode bulanan FABA yang menunggu keputusan final.
+                                    </p>
                                 </div>
-                                <Badge variant="secondary">
+                                <Badge variant="secondary" class="shrink-0 rounded-full px-2.5 py-1">
                                     {{ formatFabaStatus(item.status) }}
                                 </Badge>
                             </div>

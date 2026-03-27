@@ -19,6 +19,12 @@ class FabaAuditLog extends Model
 
     public const MODULE_BALANCE = 'opening_balance';
 
+    public const MODULE_MOVEMENT = 'movement';
+
+    public const MODULE_ADJUSTMENT = 'adjustment';
+
+    public const MODULE_SNAPSHOT = 'closing_snapshot';
+
     protected $fillable = [
         'actor_id',
         'action',

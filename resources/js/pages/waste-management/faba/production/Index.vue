@@ -23,22 +23,22 @@ import {
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
     formatFabaDate,
-    formatFabaEntryType,
     formatFabaMaterial,
+    formatFabaMovementType,
     formatFabaStatus,
 } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
-import type { FabaProductionEntry } from '@/types/faba';
+import type { FabaProductionMovement } from '@/types/faba';
 
 const props = defineProps<{
-    entries: FabaProductionEntry[];
-    filters: { materials: string[]; entryTypes: string[] };
+    entries: FabaProductionMovement[];
+    filters: { materials: string[]; movementTypes: string[] };
 }>();
 
 const search = ref('');
 const material = ref('all');
-const entryType = ref('all');
+const movementType = ref('all');
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
@@ -53,12 +53,12 @@ const filteredEntries = computed(() =>
 
         return (
             (query.length === 0 ||
-                entry.entry_number.toLowerCase().includes(query) ||
+                entry.display_number.toLowerCase().includes(query) ||
                 entry.material_type.toLowerCase().includes(query) ||
-                entry.entry_type.toLowerCase().includes(query)) &&
+                entry.movement_type.toLowerCase().includes(query)) &&
             (material.value === 'all' ||
                 entry.material_type === material.value) &&
-            (entryType.value === 'all' || entry.entry_type === entryType.value)
+            (movementType.value === 'all' || entry.movement_type === movementType.value)
         );
     }),
 );
@@ -117,14 +117,14 @@ const filteredEntries = computed(() =>
                         </SelectItem>
                     </SelectContent>
                 </Select>
-                <Select v-model="entryType">
+                <Select v-model="movementType">
                     <SelectTrigger
                         ><SelectValue placeholder="Semua tipe"
                     /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">Semua tipe</SelectItem>
                         <SelectItem
-                            v-for="item in filters.entryTypes"
+                            v-for="item in filters.movementTypes"
                             :key="item"
                             :value="item"
                         >
@@ -155,10 +155,10 @@ const filteredEntries = computed(() =>
                 </TableHeader>
                 <TableBody>
                     <TableRow v-for="entry in filteredEntries" :key="entry.id">
-                        <TableCell>{{ entry.entry_number }}</TableCell>
+                        <TableCell>{{ entry.display_number }}</TableCell>
                         <TableCell>{{ formatFabaDate(entry.transaction_date) }}</TableCell>
                         <TableCell>{{ formatFabaMaterial(entry.material_type) }}</TableCell>
-                        <TableCell>{{ formatFabaEntryType(entry.entry_type) }}</TableCell>
+                        <TableCell>{{ formatFabaMovementType(entry.movement_type) }}</TableCell>
                         <TableCell
                             >{{ entry.quantity }} {{ entry.unit }}</TableCell
                         >

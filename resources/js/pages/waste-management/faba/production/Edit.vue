@@ -18,12 +18,12 @@ import { Textarea } from '@/components/ui/textarea';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
-import type { FabaProductionEntry } from '@/types/faba';
+import type { FabaProductionMovement } from '@/types/faba';
 
 const props = defineProps<{
-    entry: FabaProductionEntry;
+    entry: FabaProductionMovement;
     materialOptions: string[];
-    entryTypeOptionsByMaterial: Record<string, string[]>;
+    movementTypeOptionsByMaterial: Record<string, string[]>;
     defaultUnit: string;
 }>();
 
@@ -41,14 +41,14 @@ const breadcrumbItems: BreadcrumbItem[] = [
 const form = useForm<{
     transaction_date: string;
     material_type: string;
-    entry_type: string;
+    movement_type: string;
     quantity: string;
     unit: string;
     note: string;
 }>({
     transaction_date: props.entry.transaction_date,
     material_type: props.entry.material_type,
-    entry_type: props.entry.entry_type,
+    movement_type: props.entry.movement_type,
     quantity: String(props.entry.quantity),
     unit: props.entry.unit,
     note: props.entry.note ?? '',
@@ -58,15 +58,15 @@ function submit(): void {
     form.put(wasteManagementRoutes.faba.production.update(props.entry.id).url);
 }
 
-const entryTypeOptions = computed(() =>
-    props.entryTypeOptionsByMaterial[form.material_type] ?? [],
+const movementTypeOptions = computed(() =>
+    props.movementTypeOptionsByMaterial[form.material_type] ?? [],
 );
 
 watch(
     () => form.material_type,
     () => {
-        if (!entryTypeOptions.value.includes(form.entry_type)) {
-            form.entry_type = '';
+        if (!movementTypeOptions.value.includes(form.movement_type)) {
+            form.movement_type = '';
         }
     },
 );
@@ -118,14 +118,14 @@ watch(
                                 </Select>
                             </div>
                             <div class="grid gap-2">
-                                <Label>Tipe entri</Label>
-                                <Select v-model="form.entry_type">
+                                <Label>Tipe movement</Label>
+                                <Select v-model="form.movement_type">
                                     <SelectTrigger
                                         ><SelectValue
                                     /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem
-                                            v-for="item in entryTypeOptions"
+                                            v-for="item in movementTypeOptions"
                                             :key="item"
                                             :value="item"
                                         >
