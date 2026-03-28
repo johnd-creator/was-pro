@@ -27,15 +27,17 @@ const chartColors = [
 ];
 
 const segments = computed(() => {
+    const total = totalCount.value;
     let start = 0;
 
     return props.data.map((item, index) => {
         const color = chartColors[index % chartColors.length];
-        const value = Number(item.percentage.toFixed(1));
+        const value = total > 0 ? (item.count / total) * 100 : 0;
         const end = start + value;
         const segment = {
             ...item,
             color,
+            normalizedPercentage: value,
             start,
             end,
         };
@@ -155,7 +157,7 @@ function downloadCSV() {
                     </div>
                     <div class="text-right">
                         <p class="text-sm font-semibold tabular-nums text-foreground">
-                            {{ item.percentage.toFixed(1) }}%
+                            {{ item.normalizedPercentage.toFixed(1) }}%
                         </p>
                     </div>
                 </div>
@@ -182,7 +184,7 @@ function downloadCSV() {
                 <tr v-for="item in data" :key="item.category">
                     <td>{{ item.category }}</td>
                     <td>{{ item.count }}</td>
-                    <td>{{ item.percentage.toFixed(1) }}%</td>
+                    <td>{{ ((item.count / totalCount) * 100).toFixed(1) }}%</td>
                 </tr>
             </tbody>
         </table>

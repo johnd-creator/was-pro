@@ -10,19 +10,12 @@ use App\Models\WasteRecord;
 use App\Models\WasteTransportation;
 use App\Models\WasteType;
 use App\Services\TenantService;
-use Database\Seeders\PermissionsSeeder;
-use Database\Seeders\RolePermissionsSeeder;
-use Database\Seeders\RolesSeeder;
 use Illuminate\Support\Facades\Artisan;
 use Inertia\Testing\AssertableInertia;
 
 uses()->group('waste-management', 'visibility');
 
 beforeEach(function () {
-    $this->seed(RolesSeeder::class);
-    $this->seed(PermissionsSeeder::class);
-    $this->seed(RolePermissionsSeeder::class);
-
     $this->organization = Organization::factory()->create([
         'code' => 'VISIBILITY',
         'schema_name' => 'tenant_visibility',

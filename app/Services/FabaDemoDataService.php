@@ -151,12 +151,12 @@ class FabaDemoDataService
             }
 
             $organization->update([
-                'name' => 'FABA Demo',
+                'name' => 'TWMS Integrated Demo',
                 'schema_name' => $schemaName,
-                'description' => 'Tenant demo untuk simulasi modul FABA berbasis movement ledger.',
-                'address' => 'Area Demo FABA',
+                'description' => 'Tenant demo terintegrasi untuk simulasi modul limbah umum dan FABA.',
+                'address' => 'Area Demo TWMS Terpadu',
                 'phone' => '0210000000',
-                'email' => 'faba.demo@local.test',
+                'email' => 'twms.demo@local.test',
                 'is_active' => true,
             ]);
 
@@ -164,28 +164,45 @@ class FabaDemoDataService
         }
 
         return Organization::query()->create([
-            'name' => 'FABA Demo',
+            'name' => 'TWMS Integrated Demo',
             'code' => $tenantCode,
             'schema_name' => $schemaName,
-            'description' => 'Tenant demo untuk simulasi modul FABA berbasis movement ledger.',
-            'address' => 'Area Demo FABA',
+            'description' => 'Tenant demo terintegrasi untuk simulasi modul limbah umum dan FABA.',
+            'address' => 'Area Demo TWMS Terpadu',
             'phone' => '0210000000',
-            'email' => 'faba.demo@local.test',
+            'email' => 'twms.demo@local.test',
             'is_active' => true,
         ]);
     }
 
     /**
-     * @return array{operator: \App\Models\User, supervisor: \App\Models\User}
+     * @return array{
+     *     operator: \App\Models\User,
+     *     supervisor: \App\Models\User,
+     *     super_admin: \App\Models\User
+     * }
      */
     protected function upsertUsers(Organization $organization): array
     {
+        $superAdminRoleId = Role::query()->where('slug', 'super_admin')->value('id');
         $supervisorRoleId = Role::query()->where('slug', 'supervisor')->value('id');
         $operatorRoleId = Role::query()->where('slug', 'operator')->value('id');
 
-        if (! $supervisorRoleId || ! $operatorRoleId) {
-            throw new RuntimeException('Role supervisor/operator belum tersedia. Jalankan seed role terlebih dahulu.');
+        if (! $superAdminRoleId || ! $supervisorRoleId || ! $operatorRoleId) {
+            throw new RuntimeException('Role super_admin/supervisor/operator belum tersedia. Jalankan seed role terlebih dahulu.');
         }
+
+        $superAdmin = User::query()->updateOrCreate(
+            ['email' => 'john@d.co'],
+            [
+                'name' => 'John',
+                'password' => 'password',
+                'organization_id' => $organization->id,
+                'role_id' => $superAdminRoleId,
+                'is_super_admin' => true,
+            ]
+        );
+        $superAdmin->forceFill(['email_verified_at' => now()])->save();
 
         $supervisor = User::query()->updateOrCreate(
             ['email' => 'faba.supervisor.demo@local.test'],
@@ -194,10 +211,10 @@ class FabaDemoDataService
                 'password' => 'password',
                 'organization_id' => $organization->id,
                 'role_id' => $supervisorRoleId,
-                'email_verified_at' => now(),
                 'is_super_admin' => false,
             ]
         );
+        $supervisor->forceFill(['email_verified_at' => now()])->save();
 
         $operator = User::query()->updateOrCreate(
             ['email' => 'faba.operator.demo@local.test'],
@@ -206,12 +223,13 @@ class FabaDemoDataService
                 'password' => 'password',
                 'organization_id' => $organization->id,
                 'role_id' => $operatorRoleId,
-                'email_verified_at' => now(),
                 'is_super_admin' => false,
             ]
         );
+        $operator->forceFill(['email_verified_at' => now()])->save();
 
         return [
+            'super_admin' => $superAdmin,
             'operator' => $operator,
             'supervisor' => $supervisor,
         ];
@@ -235,11 +253,9 @@ class FabaDemoDataService
     {
         $startOfCurrentMonth = CarbonImmutable::now()->startOfMonth();
 
-        return [
-            $startOfCurrentMonth->subMonthsNoOverflow(3),
-            $startOfCurrentMonth->subMonthsNoOverflow(2),
-            $startOfCurrentMonth->subMonthsNoOverflow(1),
-        ];
+        return collect(range(12, 1))
+            ->map(fn (int $monthsBack): CarbonImmutable => $startOfCurrentMonth->subMonthsNoOverflow($monthsBack))
+            ->all();
     }
 
     /**
@@ -401,7 +417,7 @@ class FabaDemoDataService
         $snapshotsCount = 0;
 
         foreach ($periods as $index => $period) {
-            $dataset = $this->periodDataset($period->format('Y-m'));
+            $dataset = $this->periodDataset($period, $index, count($periods));
             $year = (int) $period->format('Y');
             $month = (int) $period->format('n');
 
@@ -492,9 +508,11 @@ class FabaDemoDataService
                 'submitted_at' => $period->endOfMonth()->setTime(15, 0),
                 'approved_by' => $dataset['approval']['status'] === FabaMonthlyApproval::STATUS_APPROVED ? $supervisor->id : null,
                 'approved_at' => $dataset['approval']['status'] === FabaMonthlyApproval::STATUS_APPROVED ? $period->endOfMonth()->setTime(17, 30) : null,
-                'rejected_by' => null,
-                'rejected_at' => null,
-                'rejection_note' => null,
+                'rejected_by' => $dataset['approval']['status'] === FabaMonthlyApproval::STATUS_REJECTED ? $supervisor->id : null,
+                'rejected_at' => $dataset['approval']['status'] === FabaMonthlyApproval::STATUS_REJECTED ? $period->endOfMonth()->setTime(16, 45) : null,
+                'rejection_note' => $dataset['approval']['status'] === FabaMonthlyApproval::STATUS_REJECTED
+                    ? ($dataset['approval']['rejection_note'] ?? 'Dokumen pendukung perlu diperbaiki.')
+                    : null,
             ]);
 
             $this->fabaAuditService->log(
@@ -526,6 +544,63 @@ class FabaDemoDataService
 
                 if ($snapshot) {
                     $snapshotsCount++;
+                }
+            }
+
+            if ($approval->status === FabaMonthlyApproval::STATUS_REJECTED) {
+                $this->fabaAuditService->log(
+                    $supervisor->id,
+                    'reject',
+                    FabaAuditLog::MODULE_APPROVAL,
+                    FabaMonthlyApproval::class,
+                    $approval->id,
+                    $year,
+                    $month,
+                    'Periode demo ditolak untuk revisi.',
+                    [
+                        'status' => $approval->status,
+                        'rejection_note' => $approval->rejection_note,
+                    ]
+                );
+            }
+
+            if ($dataset['approval']['reopened'] ?? false) {
+                $this->fabaAuditService->log(
+                    $supervisor->id,
+                    'reopen',
+                    FabaAuditLog::MODULE_APPROVAL,
+                    FabaMonthlyApproval::class,
+                    $approval->id,
+                    $year,
+                    $month,
+                    'Periode demo dibuka kembali untuk audit dokumen.',
+                    ['status' => $approval->status]
+                );
+
+                $this->fabaAuditService->log(
+                    $operator->id,
+                    'resubmit',
+                    FabaAuditLog::MODULE_APPROVAL,
+                    FabaMonthlyApproval::class,
+                    $approval->id,
+                    $year,
+                    $month,
+                    'Periode demo diajukan ulang setelah reopen.',
+                    ['status' => $approval->status]
+                );
+
+                if ($approval->status === FabaMonthlyApproval::STATUS_APPROVED) {
+                    $this->fabaAuditService->log(
+                        $supervisor->id,
+                        'reapprove',
+                        FabaAuditLog::MODULE_APPROVAL,
+                        FabaMonthlyApproval::class,
+                        $approval->id,
+                        $year,
+                        $month,
+                        'Periode demo disetujui ulang setelah verifikasi dokumen.',
+                        ['status' => $approval->status]
+                    );
                 }
             }
 
@@ -566,6 +641,13 @@ class FabaDemoDataService
 
     protected function auditModuleForMovement(string $movementType): string
     {
+        if (in_array($movementType, [
+            FabaMovement::TYPE_ADJUSTMENT_IN,
+            FabaMovement::TYPE_ADJUSTMENT_OUT,
+        ], true)) {
+            return FabaAuditLog::MODULE_ADJUSTMENT;
+        }
+
         return in_array($movementType, [
             FabaMovement::TYPE_UTILIZATION_EXTERNAL,
             FabaMovement::TYPE_UTILIZATION_INTERNAL,
@@ -601,84 +683,75 @@ class FabaDemoDataService
      *         document_number: string|null,
      *         note: string
      *     }>,
-     *     approval: array{status: string}
+     *     approval: array{
+     *         status: string,
+     *         rejection_note?: string,
+     *         reopened?: bool
+     *     }
      * }
      */
-    protected function periodDataset(string $periodKey): array
+    protected function periodDataset(CarbonImmutable $period, int $periodIndex, int $periodCount): array
     {
-        return match ($periodKey) {
-            '2025-12' => [
-                'opening_balances' => [
-                    [
-                        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
-                        'quantity' => 120.00,
-                        'note' => 'Saldo awal Fly Ash untuk simulasi Desember 2025.',
-                    ],
-                    [
-                        'material_type' => FabaMovement::MATERIAL_BOTTOM_ASH,
-                        'quantity' => 80.00,
-                        'note' => 'Saldo awal Bottom Ash untuk simulasi Desember 2025.',
-                    ],
-                ],
-                'movements' => [
-                    ['day' => 2, 'material_type' => 'fly_ash', 'movement_type' => FabaMovement::TYPE_PRODUCTION, 'vendor' => null, 'internal_destination' => null, 'purpose' => null, 'quantity' => 40.00, 'document_number' => null, 'note' => 'Produksi unit 1'],
-                    ['day' => 4, 'material_type' => 'bottom_ash', 'movement_type' => FabaMovement::TYPE_PRODUCTION, 'vendor' => null, 'internal_destination' => null, 'purpose' => null, 'quantity' => 22.00, 'document_number' => null, 'note' => 'Produksi unit 2'],
-                    ['day' => 8, 'material_type' => 'fly_ash', 'movement_type' => FabaMovement::TYPE_WORKSHOP, 'vendor' => null, 'internal_destination' => null, 'purpose' => 'internal_fill', 'quantity' => 12.00, 'document_number' => null, 'note' => 'Workshop pencampuran FA'],
-                    ['day' => 12, 'material_type' => 'fly_ash', 'movement_type' => FabaMovement::TYPE_UTILIZATION_EXTERNAL, 'vendor' => 'semen', 'internal_destination' => null, 'purpose' => 'cement', 'quantity' => 28.00, 'document_number' => 'DOC-FABA-202512-001', 'document_day' => 12, 'note' => 'Pemanfaatan ke industri semen'],
-                    ['day' => 16, 'material_type' => 'bottom_ash', 'movement_type' => FabaMovement::TYPE_UTILIZATION_INTERNAL, 'vendor' => null, 'internal_destination' => 'workshop', 'purpose' => 'internal_fill', 'quantity' => 10.00, 'document_number' => null, 'note' => 'Pemanfaatan internal workshop'],
-                    ['day' => 20, 'material_type' => 'fly_ash', 'movement_type' => FabaMovement::TYPE_DISPOSAL_POK, 'vendor' => null, 'internal_destination' => null, 'purpose' => null, 'quantity' => 4.00, 'document_number' => null, 'note' => 'Disposal POK operasional'],
-                    ['day' => 24, 'material_type' => 'bottom_ash', 'movement_type' => FabaMovement::TYPE_REJECT, 'vendor' => null, 'internal_destination' => null, 'purpose' => null, 'quantity' => 3.00, 'document_number' => null, 'note' => 'Material reject akhir bulan'],
-                ],
-                'approval' => ['status' => FabaMonthlyApproval::STATUS_APPROVED],
-            ],
-            '2026-01' => [
-                'opening_balances' => [
-                    [
-                        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
-                        'quantity' => 140.00,
-                        'note' => 'Saldo awal Fly Ash untuk simulasi Januari 2026.',
-                    ],
-                    [
-                        'material_type' => FabaMovement::MATERIAL_BOTTOM_ASH,
-                        'quantity' => 85.00,
-                        'note' => 'Saldo awal Bottom Ash untuk simulasi Januari 2026.',
-                    ],
-                ],
-                'movements' => [
-                    ['day' => 3, 'material_type' => 'fly_ash', 'movement_type' => FabaMovement::TYPE_PRODUCTION, 'vendor' => null, 'internal_destination' => null, 'purpose' => null, 'quantity' => 45.00, 'document_number' => null, 'note' => 'Produksi unit 1'],
-                    ['day' => 5, 'material_type' => 'bottom_ash', 'movement_type' => FabaMovement::TYPE_PRODUCTION, 'vendor' => null, 'internal_destination' => null, 'purpose' => null, 'quantity' => 24.00, 'document_number' => null, 'note' => 'Produksi unit 2'],
-                    ['day' => 9, 'material_type' => 'fly_ash', 'movement_type' => FabaMovement::TYPE_UTILIZATION_EXTERNAL, 'vendor' => 'konstruksi', 'internal_destination' => null, 'purpose' => 'paving', 'quantity' => 30.00, 'document_number' => 'DOC-FABA-202601-001', 'document_day' => 9, 'note' => 'Pemanfaatan ke konstruksi hijau'],
-                    ['day' => 13, 'material_type' => 'bottom_ash', 'movement_type' => FabaMovement::TYPE_UTILIZATION_EXTERNAL, 'vendor' => 'paving', 'internal_destination' => null, 'purpose' => 'paving', 'quantity' => 14.00, 'document_number' => 'DOC-FABA-202601-002', 'document_day' => 13, 'note' => 'Pemanfaatan ke paving sentosa'],
-                    ['day' => 18, 'material_type' => 'fly_ash', 'movement_type' => FabaMovement::TYPE_UTILIZATION_INTERNAL, 'vendor' => null, 'internal_destination' => 'roadbase', 'purpose' => 'internal_fill', 'quantity' => 8.00, 'document_number' => null, 'note' => 'Roadbase internal area operasi'],
-                    ['day' => 22, 'material_type' => 'bottom_ash', 'movement_type' => FabaMovement::TYPE_WORKSHOP, 'vendor' => null, 'internal_destination' => null, 'purpose' => null, 'quantity' => 6.00, 'document_number' => null, 'note' => 'Workshop bottom ash'],
-                    ['day' => 26, 'material_type' => 'fly_ash', 'movement_type' => FabaMovement::TYPE_REJECT, 'vendor' => null, 'internal_destination' => null, 'purpose' => null, 'quantity' => 5.00, 'document_number' => null, 'note' => 'Material reject bulanan'],
-                ],
-                'approval' => ['status' => FabaMonthlyApproval::STATUS_APPROVED],
-            ],
-            default => [
-                'opening_balances' => [
-                    [
-                        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
-                        'quantity' => 150.00,
-                        'note' => 'Saldo awal Fly Ash untuk simulasi Februari 2026.',
-                    ],
-                    [
-                        'material_type' => FabaMovement::MATERIAL_BOTTOM_ASH,
-                        'quantity' => 90.00,
-                        'note' => 'Saldo awal Bottom Ash untuk simulasi Februari 2026.',
-                    ],
-                ],
-                'movements' => [
-                    ['day' => 2, 'material_type' => 'fly_ash', 'movement_type' => FabaMovement::TYPE_PRODUCTION, 'vendor' => null, 'internal_destination' => null, 'purpose' => null, 'quantity' => 38.00, 'document_number' => null, 'note' => 'Produksi shift pagi'],
-                    ['day' => 6, 'material_type' => 'bottom_ash', 'movement_type' => FabaMovement::TYPE_PRODUCTION, 'vendor' => null, 'internal_destination' => null, 'purpose' => null, 'quantity' => 20.00, 'document_number' => null, 'note' => 'Produksi shift malam'],
-                    ['day' => 10, 'material_type' => 'fly_ash', 'movement_type' => FabaMovement::TYPE_UTILIZATION_EXTERNAL, 'vendor' => 'semen', 'internal_destination' => null, 'purpose' => 'cement', 'quantity' => 24.00, 'document_number' => 'DOC-FABA-202602-001', 'document_day' => 10, 'note' => 'Pengiriman ke PT Semen Nusantara'],
-                    ['day' => 14, 'material_type' => 'bottom_ash', 'movement_type' => FabaMovement::TYPE_UTILIZATION_INTERNAL, 'vendor' => null, 'internal_destination' => 'workshop', 'purpose' => 'internal_fill', 'quantity' => 12.00, 'document_number' => null, 'note' => 'Kebutuhan internal workshop'],
-                    ['day' => 18, 'material_type' => 'fly_ash', 'movement_type' => FabaMovement::TYPE_DISPOSAL_POK, 'vendor' => null, 'internal_destination' => null, 'purpose' => null, 'quantity' => 6.00, 'document_number' => null, 'note' => 'POK operasional Februari'],
-                    ['day' => 22, 'material_type' => 'bottom_ash', 'movement_type' => FabaMovement::TYPE_WORKSHOP, 'vendor' => null, 'internal_destination' => null, 'purpose' => null, 'quantity' => 5.00, 'document_number' => null, 'note' => 'Workshop BA untuk internal'],
-                    ['day' => 25, 'material_type' => 'fly_ash', 'movement_type' => FabaMovement::TYPE_UTILIZATION_EXTERNAL, 'vendor' => 'paving', 'internal_destination' => null, 'purpose' => 'paving', 'quantity' => 10.00, 'document_number' => 'DOC-FABA-202602-002', 'document_day' => 25, 'note' => 'Pemanfaatan ke paving block'],
-                ],
-                'approval' => ['status' => FabaMonthlyApproval::STATUS_SUBMITTED],
-            ],
+        $periodKey = $period->format('Ym');
+        $flyOpeningBalance = 120 + ($periodIndex * 9);
+        $bottomOpeningBalance = 80 + ($periodIndex * 5);
+        $vendorKeys = ['semen', 'konstruksi', 'paving'];
+        $purposeKeys = ['cement', 'paving', 'internal_fill'];
+        $internalDestinationKeys = ['workshop', 'roadbase'];
+        $externalVendor = $vendorKeys[$periodIndex % count($vendorKeys)];
+        $secondaryVendor = $vendorKeys[($periodIndex + 1) % count($vendorKeys)];
+        $purpose = $purposeKeys[$periodIndex % count($purposeKeys)];
+        $secondaryPurpose = $purposeKeys[($periodIndex + 1) % count($purposeKeys)];
+        $internalDestination = $internalDestinationKeys[$periodIndex % count($internalDestinationKeys)];
+        $secondaryInternalDestination = $internalDestinationKeys[($periodIndex + 1) % count($internalDestinationKeys)];
+        $specialOutflowType = match ($periodIndex % 3) {
+            0 => FabaMovement::TYPE_DISPOSAL_POK,
+            1 => FabaMovement::TYPE_REJECT,
+            default => FabaMovement::TYPE_UTILIZATION_EXTERNAL,
         };
+        $specialOutflowVendor = $specialOutflowType === FabaMovement::TYPE_UTILIZATION_EXTERNAL ? $secondaryVendor : null;
+        $specialOutflowPurpose = $specialOutflowType === FabaMovement::TYPE_UTILIZATION_EXTERNAL ? $secondaryPurpose : null;
+        $specialOutflowDocument = $specialOutflowType === FabaMovement::TYPE_UTILIZATION_EXTERNAL
+            ? sprintf('DOC-FABA-%s-ALT', $periodKey)
+            : null;
+        $adjustmentType = $periodIndex % 2 === 0 ? FabaMovement::TYPE_ADJUSTMENT_IN : FabaMovement::TYPE_ADJUSTMENT_OUT;
+        $approvalStatus = match (true) {
+            $periodIndex === 4 => FabaMonthlyApproval::STATUS_REJECTED,
+            $periodIndex === $periodCount - 1 => FabaMonthlyApproval::STATUS_SUBMITTED,
+            default => FabaMonthlyApproval::STATUS_APPROVED,
+        };
+
+        return [
+            'opening_balances' => [
+                [
+                    'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+                    'quantity' => (float) $flyOpeningBalance,
+                    'note' => 'Saldo awal Fly Ash untuk simulasi '.$period->translatedFormat('F Y').'.',
+                ],
+                [
+                    'material_type' => FabaMovement::MATERIAL_BOTTOM_ASH,
+                    'quantity' => (float) $bottomOpeningBalance,
+                    'note' => 'Saldo awal Bottom Ash untuk simulasi '.$period->translatedFormat('F Y').'.',
+                ],
+            ],
+            'movements' => [
+                ['day' => 2, 'material_type' => FabaMovement::MATERIAL_FLY_ASH, 'movement_type' => FabaMovement::TYPE_PRODUCTION, 'vendor' => null, 'internal_destination' => null, 'purpose' => null, 'quantity' => 40.0 + ($periodIndex * 2), 'document_number' => null, 'note' => 'Produksi Fly Ash periodik'],
+                ['day' => 4, 'material_type' => FabaMovement::MATERIAL_BOTTOM_ASH, 'movement_type' => FabaMovement::TYPE_PRODUCTION, 'vendor' => null, 'internal_destination' => null, 'purpose' => null, 'quantity' => 24.0 + $periodIndex, 'document_number' => null, 'note' => 'Produksi Bottom Ash periodik'],
+                ['day' => 7, 'material_type' => $periodIndex % 2 === 0 ? FabaMovement::MATERIAL_FLY_ASH : FabaMovement::MATERIAL_BOTTOM_ASH, 'movement_type' => FabaMovement::TYPE_WORKSHOP, 'vendor' => null, 'internal_destination' => null, 'purpose' => null, 'quantity' => 6.0 + ($periodIndex % 4), 'document_number' => null, 'note' => 'Pemanfaatan workshop internal'],
+                ['day' => 10, 'material_type' => FabaMovement::MATERIAL_FLY_ASH, 'movement_type' => FabaMovement::TYPE_UTILIZATION_EXTERNAL, 'vendor' => $externalVendor, 'internal_destination' => null, 'purpose' => $purpose, 'quantity' => 18.0 + $periodIndex, 'document_number' => sprintf('DOC-FABA-%s-001', $periodKey), 'document_day' => 10, 'note' => 'Pemanfaatan external utama'],
+                ['day' => 14, 'material_type' => FabaMovement::MATERIAL_BOTTOM_ASH, 'movement_type' => FabaMovement::TYPE_UTILIZATION_INTERNAL, 'vendor' => null, 'internal_destination' => $internalDestination, 'purpose' => 'internal_fill', 'quantity' => 9.0 + ($periodIndex % 3), 'document_number' => null, 'note' => 'Pemanfaatan internal area operasi'],
+                ['day' => 18, 'material_type' => FabaMovement::MATERIAL_FLY_ASH, 'movement_type' => $specialOutflowType, 'vendor' => $specialOutflowVendor, 'internal_destination' => null, 'purpose' => $specialOutflowPurpose, 'quantity' => 5.0 + ($periodIndex % 5), 'document_number' => $specialOutflowDocument, 'document_day' => 18, 'note' => 'Outflow operasional khusus'],
+                ['day' => 21, 'material_type' => $adjustmentType === FabaMovement::TYPE_ADJUSTMENT_IN ? FabaMovement::MATERIAL_BOTTOM_ASH : FabaMovement::MATERIAL_FLY_ASH, 'movement_type' => $adjustmentType, 'vendor' => null, 'internal_destination' => null, 'purpose' => null, 'quantity' => 3.0 + ($periodIndex % 4), 'document_number' => null, 'note' => 'Penyesuaian stok periodik'],
+                ['day' => 24, 'material_type' => FabaMovement::MATERIAL_BOTTOM_ASH, 'movement_type' => FabaMovement::TYPE_UTILIZATION_EXTERNAL, 'vendor' => $secondaryVendor, 'internal_destination' => null, 'purpose' => $secondaryPurpose, 'quantity' => 7.0 + ($periodIndex % 4), 'document_number' => sprintf('DOC-FABA-%s-002', $periodKey), 'document_day' => 24, 'note' => 'Pemanfaatan external lanjutan'],
+                ['day' => 26, 'material_type' => FabaMovement::MATERIAL_FLY_ASH, 'movement_type' => FabaMovement::TYPE_UTILIZATION_INTERNAL, 'vendor' => null, 'internal_destination' => $secondaryInternalDestination, 'purpose' => 'internal_fill', 'quantity' => 4.0 + ($periodIndex % 3), 'document_number' => null, 'note' => 'Distribusi internal lanjutan'],
+            ],
+            'approval' => [
+                'status' => $approvalStatus,
+                'rejection_note' => $approvalStatus === FabaMonthlyApproval::STATUS_REJECTED
+                    ? 'Perlu koreksi dokumen manifest dan angka penyesuaian stok.'
+                    : null,
+                'reopened' => $periodIndex === 8,
+            ],
+        ];
     }
 }

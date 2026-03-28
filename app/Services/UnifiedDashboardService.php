@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\FabaMonthlyApproval;
+use App\Models\FabaMovement;
+use App\Models\Organization;
 use App\Models\WasteRecord;
 use App\Models\WasteTransportation;
 use Carbon\CarbonImmutable;
@@ -9,50 +12,82 @@ use Illuminate\Support\Facades\Auth;
 
 class UnifiedDashboardService
 {
+    private int $selectedYear;
+
+    private int $selectedMonth;
+
+    /**
+     * @var array<int, array{value: string, label: string, year: int, month: int}>
+     */
+    private array $availableMonths = [];
+
     public function __construct(
-        private FabaRecapService $fabaRecapService
+        private FabaRecapService $fabaRecapService,
+        private TenantService $tenantService
     ) {}
 
-    public function getUnifiedData(): array
+    public function getUnifiedData(Organization $organization, ?string $requestedMonth = null): array
     {
-        return [
-            // Existing waste management data
-            'waste_stats' => $this->getWasteStats(),
-            'pending_approvals' => $this->getPendingApprovals(),
-            'waste_by_category' => $this->getWasteByCategory(),
-            'transportation_stats' => $this->getTransportationStats(),
-            'recent_activities' => $this->getRecentActivities(),
+        return $this->withinOrganizationSchema($organization, function () use ($organization, $requestedMonth): array {
+            $this->availableMonths = $this->getAvailableMonthOptions();
 
-            // FABA data (no year dependency)
-            'faba_stats' => $this->getFabaStats(),
-            'faba_balance' => $this->fabaRecapService->getCurrentBalance(),
-            'faba_chart' => $this->getFabaChartData(),
-            'faba_pending' => $this->getFabaPendingApprovals(),
-            'faba_warnings' => $this->getFabaWarnings(),
-            'faba_latest' => $this->getLatestFabaPeriod(),
-            'top_vendors' => $this->getTopVendors(),
+            $resolvedMonth = $this->resolveRequestedMonth($requestedMonth);
+            [$this->selectedYear, $this->selectedMonth] = array_map('intval', explode('-', $resolvedMonth));
 
-            // New chart data
-            'waste_chart' => $this->getWasteChartData(),
-
-            // Notifications
-            'notification_summary' => $this->getNotificationSummary(),
-
-            // Header metadata
-            'header' => $this->getHeaderMetadata(),
-        ];
+            return [
+                'waste_stats' => $this->getWasteStats(),
+                'pending_approvals' => $this->getPendingApprovals(),
+                'waste_by_category' => $this->getWasteByCategory(),
+                'transportation_stats' => $this->getTransportationStats(),
+                'recent_activities' => $this->getRecentActivities(),
+                'faba_stats' => $this->getFabaStats(),
+                'faba_balance' => $this->getFabaStats()['current_balance'],
+                'faba_chart' => $this->getFabaChartData(),
+                'faba_pending' => $this->getFabaPendingApprovals(),
+                'faba_warnings' => $this->getFabaWarnings(),
+                'faba_latest' => $this->getLatestFabaPeriod(),
+                'top_vendors' => $this->getTopVendors(),
+                'waste_chart' => $this->getWasteChartData(),
+                'faba_production_material_distribution' => $this->getFabaProductionMaterialDistribution(),
+                'notification_summary' => $this->getNotificationSummary(),
+                'header' => $this->getHeaderMetadata($organization),
+                'filters' => [
+                    'month' => $resolvedMonth,
+                    'organization_id' => $organization->id,
+                ],
+                'available_months' => collect($this->availableMonths)
+                    ->map(fn (array $month): array => [
+                        'value' => $month['value'],
+                        'label' => $month['label'],
+                    ])
+                    ->values()
+                    ->all(),
+            ];
+        });
     }
 
     private function getWasteStats(): array
     {
+        $snapshotDate = $this->snapshotDate();
+        $monthStart = $snapshotDate->startOfMonth();
+
         return [
-            'total_waste_records' => WasteRecord::count(),
-            'approved_records' => WasteRecord::approved()->count(),
-            'pending_records' => WasteRecord::pendingApproval()->count(),
-            'total_transportations' => WasteTransportation::count(),
-            'in_transit_transportations' => WasteTransportation::inTransit()->count(),
-            'expired_waste' => WasteRecord::approved()->expired()->count(),
-            'expiring_soon_waste' => WasteRecord::approved()->expiringSoon(7)->count(),
+            'total_waste_records' => $this->wasteRecordsForSelectedMonth()->count(),
+            'approved_records' => $this->wasteRecordsForSelectedMonth()->approved()->count(),
+            'pending_records' => $this->wasteRecordsForSelectedMonth()->pendingApproval()->count(),
+            'total_transportations' => $this->wasteTransportationsForSelectedMonth()->count(),
+            'in_transit_transportations' => $this->wasteTransportationsForSelectedMonth()->inTransit()->count(),
+            'expired_waste' => WasteRecord::query()
+                ->approved()
+                ->whereBetween('expiry_date', [$monthStart->toDateString(), $snapshotDate->toDateString()])
+                ->count(),
+            'expiring_soon_waste' => WasteRecord::query()
+                ->approved()
+                ->whereBetween('expiry_date', [
+                    $snapshotDate->toDateString(),
+                    $snapshotDate->addDays(7)->toDateString(),
+                ])
+                ->count(),
         ];
     }
 
@@ -63,6 +98,8 @@ class UnifiedDashboardService
         }
 
         return WasteRecord::pendingApproval()
+            ->whereYear('date', $this->selectedYear)
+            ->whereMonth('date', $this->selectedMonth)
             ->with(['wasteType', 'wasteType.category', 'submittedByUser'])
             ->orderBy('submitted_at', 'desc')
             ->limit(5)
@@ -84,21 +121,24 @@ class UnifiedDashboardService
 
     private function getWasteByCategory(): array
     {
-        $stats = $this->getWasteStats();
+        $totalApprovedQuantity = (float) $this->wasteRecordsForSelectedMonth()
+            ->approved()
+            ->sum('quantity');
 
-        return WasteRecord::approved()
+        return $this->wasteRecordsForSelectedMonth()
+            ->approved()
             ->join('waste_types', 'waste_records.waste_type_id', '=', 'waste_types.id')
             ->join('waste_categories', 'waste_types.category_id', '=', 'waste_categories.id')
-            ->selectRaw('waste_categories.name as category, COUNT(*) as count')
+            ->selectRaw('waste_categories.name as category, SUM(waste_records.quantity) as total_quantity')
             ->groupBy('waste_categories.name')
-            ->orderByDesc('count')
+            ->orderByDesc('total_quantity')
             ->get()
-            ->map(function ($item) use ($stats) {
+            ->map(function ($item) use ($totalApprovedQuantity) {
                 return [
-                    'category' => $item->category,
-                    'count' => $item->count,
-                    'percentage' => $stats['total_waste_records'] > 0
-                        ? ($item->count / $stats['total_waste_records']) * 100
+                    'label' => $item->category,
+                    'value' => round((float) $item->total_quantity, 2),
+                    'percentage' => $totalApprovedQuantity > 0
+                        ? round((((float) $item->total_quantity) / $totalApprovedQuantity) * 100, 2)
                         : 0,
                 ];
             })->all();
@@ -106,40 +146,40 @@ class UnifiedDashboardService
 
     private function getTransportationStats(): array
     {
-        $stats = $this->getWasteStats();
-        $total = $stats['total_transportations'];
+        $baseQuery = $this->wasteTransportationsForSelectedMonth();
+        $total = (clone $baseQuery)->count();
 
         return [
             [
                 'status' => 'pending',
-                'count' => WasteTransportation::pending()->count(),
+                'count' => (clone $baseQuery)->pending()->count(),
                 'color' => 'bg-yellow-500',
                 'percentage' => $total > 0
-                    ? (WasteTransportation::pending()->count() / $total) * 100
+                    ? ((clone $baseQuery)->pending()->count() / $total) * 100
                     : 0,
             ],
             [
                 'status' => 'in_transit',
-                'count' => WasteTransportation::inTransit()->count(),
+                'count' => (clone $baseQuery)->inTransit()->count(),
                 'color' => 'bg-blue-500',
                 'percentage' => $total > 0
-                    ? (WasteTransportation::inTransit()->count() / $total) * 100
+                    ? ((clone $baseQuery)->inTransit()->count() / $total) * 100
                     : 0,
             ],
             [
                 'status' => 'delivered',
-                'count' => WasteTransportation::delivered()->count(),
+                'count' => (clone $baseQuery)->delivered()->count(),
                 'color' => 'bg-green-500',
                 'percentage' => $total > 0
-                    ? (WasteTransportation::delivered()->count() / $total) * 100
+                    ? ((clone $baseQuery)->delivered()->count() / $total) * 100
                     : 0,
             ],
             [
                 'status' => 'cancelled',
-                'count' => WasteTransportation::cancelled()->count(),
+                'count' => (clone $baseQuery)->cancelled()->count(),
                 'color' => 'bg-red-500',
                 'percentage' => $total > 0
-                    ? (WasteTransportation::cancelled()->count() / $total) * 100
+                    ? ((clone $baseQuery)->cancelled()->count() / $total) * 100
                     : 0,
             ],
         ];
@@ -151,6 +191,8 @@ class UnifiedDashboardService
 
         // Recent waste records
         $recentRecords = WasteRecord::with(['wasteType', 'createdBy'])
+            ->whereYear('date', $this->selectedYear)
+            ->whereMonth('date', $this->selectedMonth)
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get();
@@ -169,6 +211,8 @@ class UnifiedDashboardService
 
         // Recent transportations
         $recentTransportations = WasteTransportation::with(['wasteRecord.wasteType', 'createdBy'])
+            ->whereYear('transportation_date', $this->selectedYear)
+            ->whereMonth('transportation_date', $this->selectedMonth)
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get();
@@ -202,29 +246,21 @@ class UnifiedDashboardService
 
     private function getFabaStats(): array
     {
-        $period = $this->fabaRecapService->getLatestAvailablePeriod();
-        $year = $period['year'] ?? now()->year;
-        $yearlyRecap = $this->fabaRecapService->getYearlyRecap($year);
+        $monthlyRecap = $this->fabaRecapService->getMonthlyRecap($this->selectedYear, $this->selectedMonth);
 
         return [
-            'total_production' => $yearlyRecap['totals']['total_production'],
-            'total_utilization' => $yearlyRecap['totals']['total_utilization'],
-            'current_balance' => $this->fabaRecapService->getCurrentBalance(),
-            'negative_periods' => collect($yearlyRecap['months'])
-                ->filter(fn (array $month): bool => (bool) $month['warning_negative_balance'])
-                ->count(),
+            'total_production' => $monthlyRecap['total_production'],
+            'total_utilization' => $monthlyRecap['total_utilization'],
+            'current_balance' => $monthlyRecap['closing_balance'],
+            'negative_periods' => $monthlyRecap['warning_negative_balance'] ? 1 : 0,
         ];
     }
 
     private function getFabaChartData(): array
     {
-        $latestPeriod = $this->fabaRecapService->getLatestAvailablePeriod();
-        $anchorDate = $latestPeriod
-            ? CarbonImmutable::create($latestPeriod['year'], $latestPeriod['month'], 1)
-            : CarbonImmutable::now()->startOfMonth();
+        $anchorDate = CarbonImmutable::create($this->selectedYear, $this->selectedMonth, 1);
 
         return collect(range(5, 0))
-            ->reverse()
             ->map(function (int $offset) use ($anchorDate): array {
                 $date = $anchorDate->subMonths($offset);
                 $monthlyRecap = $this->fabaRecapService->getMonthlyRecap($date->year, $date->month);
@@ -244,12 +280,14 @@ class UnifiedDashboardService
 
     private function getFabaPendingApprovals(): array
     {
-        return \App\Models\FabaMonthlyApproval::query()
-            ->where('status', \App\Models\FabaMonthlyApproval::STATUS_SUBMITTED)
+        return FabaMonthlyApproval::query()
+            ->where('status', FabaMonthlyApproval::STATUS_SUBMITTED)
+            ->where('year', $this->selectedYear)
+            ->where('month', $this->selectedMonth)
             ->orderBy('year')
             ->orderBy('month')
             ->get()
-            ->map(fn (\App\Models\FabaMonthlyApproval $approval): array => [
+            ->map(fn (FabaMonthlyApproval $approval): array => [
                 'id' => $approval->id,
                 'year' => $approval->year,
                 'month' => $approval->month,
@@ -261,38 +299,32 @@ class UnifiedDashboardService
 
     private function getFabaWarnings(): array
     {
-        $period = $this->fabaRecapService->getLatestAvailablePeriod();
-        $year = $period['year'] ?? now()->year;
-        $yearlyRecap = $this->fabaRecapService->getYearlyRecap($year);
+        $monthlyRecap = $this->fabaRecapService->getMonthlyRecap($this->selectedYear, $this->selectedMonth);
 
-        return collect($yearlyRecap['months'])
-            ->flatMap(fn (array $month): array => collect($month['warnings'])
-                ->map(fn (array $warning): array => [
-                    'month' => $month['month'],
-                    'period_label' => $month['period_label'],
-                    'code' => $warning['code'],
-                    'message' => $warning['message'],
-                    'closing_balance' => $month['closing_balance'],
-                ])->all())
+        return collect($monthlyRecap['warnings'])
+            ->map(fn (array $warning): array => [
+                'month' => $monthlyRecap['month'],
+                'period_label' => $monthlyRecap['period_label'],
+                'code' => $warning['code'],
+                'message' => $warning['message'],
+                'closing_balance' => $monthlyRecap['closing_balance'],
+            ])
             ->values()
             ->all();
     }
 
     private function getTopVendors(): array
     {
-        $period = $this->fabaRecapService->getLatestAvailablePeriod();
-        $year = $period['year'] ?? now()->year;
-        $vendorRecap = $this->fabaRecapService->getVendorRecap($year);
+        $vendorRecap = $this->fabaRecapService->getVendorRecap($this->selectedYear);
 
         return collect($vendorRecap['vendors'])->values()->all();
     }
 
     private function getWasteChartData(): array
     {
-        $anchorDate = $this->resolveWasteChartAnchorDate();
+        $anchorDate = CarbonImmutable::create($this->selectedYear, $this->selectedMonth, 1);
 
         return collect(range(5, 0))
-            ->reverse()
             ->map(function (int $offset) use ($anchorDate): array {
                 $date = $anchorDate->subMonths($offset);
                 $year = $date->year;
@@ -319,6 +351,8 @@ class UnifiedDashboardService
                     'label' => $date->translatedFormat('M y'),
                     'month' => $month,
                     'year' => $year,
+                    'input_count' => $recordsCreatedCount,
+                    'transported_count' => $transportDeliveredCount,
                     'records_count' => $recordsCreatedCount,
                     'approved_count' => $approvedCount,
                     'transport_delivered_count' => $transportDeliveredCount,
@@ -328,18 +362,25 @@ class UnifiedDashboardService
             ->all();
     }
 
-    private function resolveWasteChartAnchorDate(): CarbonImmutable
+    private function getFabaProductionMaterialDistribution(): array
     {
-        $latestWasteRecordDate = WasteRecord::query()->max('date');
-        $latestTransportationDate = WasteTransportation::query()->max('transportation_date');
+        $monthlyRecap = $this->fabaRecapService->getMonthlyRecap($this->selectedYear, $this->selectedMonth);
+        $flyAshTotal = round((float) $monthlyRecap['production_fly_ash'], 2);
+        $bottomAshTotal = round((float) $monthlyRecap['production_bottom_ash'], 2);
+        $total = round($flyAshTotal + $bottomAshTotal, 2);
 
-        $dates = collect([$latestWasteRecordDate, $latestTransportationDate])
-            ->filter()
-            ->map(fn (string $date): CarbonImmutable => CarbonImmutable::parse($date)->startOfMonth())
-            ->sort()
-            ->values();
-
-        return $dates->last() ?? CarbonImmutable::now()->startOfMonth();
+        return [
+            [
+                'label' => 'Fly Ash',
+                'value' => $flyAshTotal,
+                'percentage' => $total > 0 ? round(($flyAshTotal / $total) * 100, 2) : 0,
+            ],
+            [
+                'label' => 'Bottom Ash',
+                'value' => $bottomAshTotal,
+                'percentage' => $total > 0 ? round(($bottomAshTotal / $total) * 100, 2) : 0,
+            ],
+        ];
     }
 
     private function getNotificationSummary(): array
@@ -362,12 +403,9 @@ class UnifiedDashboardService
         ];
     }
 
-    private function getHeaderMetadata(): array
+    private function getHeaderMetadata(Organization $organization): array
     {
         $user = Auth::user();
-        $organization = $user?->organization;
-
-        // Determine risk status based on notification summary
         $notificationSummary = $this->getNotificationSummary();
         $riskStatus = 'normal';
 
@@ -392,10 +430,12 @@ class UnifiedDashboardService
         };
 
         return [
-            'organization_name' => $organization?->name ?? 'Unknown Organization',
+            'organization_name' => $organization->name,
             'timezone' => 'WIB',
             'current_date' => now()->format('l, j F Y'),
             'current_time' => now()->format('H:i'),
+            'snapshot_month' => sprintf('%04d-%02d', $this->selectedYear, $this->selectedMonth),
+            'snapshot_month_label' => $this->formatMonthOptionLabel($this->selectedYear, $this->selectedMonth),
             'risk_status' => $riskStatus,
             'risk_label' => $riskLabel,
             'risk_tone' => $riskTone,
@@ -409,8 +449,8 @@ class UnifiedDashboardService
 
     private function getLatestFabaPeriod(): ?array
     {
-        $latestApprovedPeriod = \App\Models\FabaMonthlyApproval::query()
-            ->where('status', \App\Models\FabaMonthlyApproval::STATUS_APPROVED)
+        $latestApprovedPeriod = FabaMonthlyApproval::query()
+            ->where('status', FabaMonthlyApproval::STATUS_APPROVED)
             ->orderByDesc('year')
             ->orderByDesc('month')
             ->first();
@@ -436,5 +476,119 @@ class UnifiedDashboardService
     private function canViewAllWasteRecords(): bool
     {
         return Auth::user()?->hasPermission('waste_records.view_all') ?? false;
+    }
+
+    private function wasteRecordsForSelectedMonth()
+    {
+        return WasteRecord::query()
+            ->whereYear('date', $this->selectedYear)
+            ->whereMonth('date', $this->selectedMonth);
+    }
+
+    private function wasteTransportationsForSelectedMonth()
+    {
+        return WasteTransportation::query()
+            ->whereYear('transportation_date', $this->selectedYear)
+            ->whereMonth('transportation_date', $this->selectedMonth);
+    }
+
+    /**
+     * @return array<int, array{value: string, label: string, year: int, month: int}>
+     */
+    private function getAvailableMonthOptions(): array
+    {
+        $periods = collect([
+            ...WasteRecord::query()
+                ->selectRaw("to_char(date, 'YYYY-MM') as period")
+                ->whereNotNull('date')
+                ->groupByRaw("to_char(date, 'YYYY-MM')")
+                ->pluck('period')
+                ->all(),
+            ...WasteTransportation::query()
+                ->selectRaw("to_char(transportation_date, 'YYYY-MM') as period")
+                ->whereNotNull('transportation_date')
+                ->groupByRaw("to_char(transportation_date, 'YYYY-MM')")
+                ->pluck('period')
+                ->all(),
+            ...FabaMovement::query()
+                ->selectRaw("format('%s-%02s', period_year, period_month) as period")
+                ->groupBy('period_year', 'period_month')
+                ->pluck('period')
+                ->all(),
+        ])->filter()->unique()->sortDesc()->values();
+
+        if ($periods->isEmpty()) {
+            $currentDate = CarbonImmutable::now()->startOfMonth();
+
+            return [[
+                'value' => $currentDate->format('Y-m'),
+                'label' => $this->formatMonthOptionLabel($currentDate->year, $currentDate->month),
+                'year' => $currentDate->year,
+                'month' => $currentDate->month,
+            ]];
+        }
+
+        return $periods
+            ->map(function (string $period): array {
+                [$year, $month] = array_map('intval', explode('-', $period));
+
+                return [
+                    'value' => sprintf('%04d-%02d', $year, $month),
+                    'label' => $this->formatMonthOptionLabel($year, $month),
+                    'year' => $year,
+                    'month' => $month,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function resolveRequestedMonth(?string $requestedMonth): string
+    {
+        $selectedMonth = collect($this->availableMonths)->firstWhere('value', $requestedMonth);
+
+        if ($selectedMonth) {
+            return $selectedMonth['value'];
+        }
+
+        return $this->availableMonths[0]['value'];
+    }
+
+    private function snapshotDate(): CarbonImmutable
+    {
+        $selectedDate = CarbonImmutable::create($this->selectedYear, $this->selectedMonth, 1);
+        $currentMonth = CarbonImmutable::now()->startOfMonth();
+
+        if ($selectedDate->equalTo($currentMonth)) {
+            return CarbonImmutable::now();
+        }
+
+        return $selectedDate->endOfMonth();
+    }
+
+    private function formatMonthOptionLabel(int $year, int $month): string
+    {
+        return CarbonImmutable::create($year, $month, 1)->translatedFormat('F Y');
+    }
+
+    private function withinOrganizationSchema(Organization $organization, callable $callback): array
+    {
+        $originalSchema = $this->tenantService->getCurrentSchema();
+
+        if (! $this->tenantService->schemaExists($organization->schema_name)) {
+            abort(403);
+        }
+
+        try {
+            $this->tenantService->switchToSchema($organization->schema_name);
+
+            return $callback();
+        } finally {
+            if ($originalSchema && $originalSchema !== 'public') {
+                $this->tenantService->switchToSchema($originalSchema);
+            } else {
+                $this->tenantService->switchToPublic();
+            }
+        }
     }
 }

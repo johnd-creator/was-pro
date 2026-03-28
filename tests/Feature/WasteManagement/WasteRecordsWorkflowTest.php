@@ -34,6 +34,13 @@ beforeEach(function () {
         $tenantService->createSchema($this->org->schema_name);
     }
 
+    $tenantService->switchToSchema($this->org->schema_name);
+    \Illuminate\Support\Facades\Artisan::call('migrate', [
+        '--path' => 'database/migrations/tenant',
+        '--force' => true,
+    ]);
+    $tenantService->switchToPublic();
+
     // Get roles (note: slugs use underscores, not hyphens)
     // Create roles if they don't exist (tests run in transactions)
     $this->supervisorRole = Role::firstOrCreate(
@@ -741,7 +748,9 @@ test('record number is auto-generated correctly', function () {
     ]);
 });
 
-test('waste management demo command seeds deterministic data for three previous months', function () {
+test('waste management demo command seeds deterministic data for twelve previous months', function () {
+    \Carbon\CarbonImmutable::setTestNow('2026-03-19 10:00:00');
+
     $tenantCode = 'TWMSWMDEMO';
     $schemaName = 'tenant_twms_wm_demo';
 
@@ -755,6 +764,7 @@ test('waste management demo command seeds deterministic data for three previous 
 
     expect($organization)->not->toBeNull()
         ->and($organization?->schema_name)->toBe($schemaName);
+    expect(User::query()->where('email', 'john@d.co')->where('organization_id', $organization?->id)->where('is_super_admin', true)->exists())->toBeTrue();
 
     $tenantService = app(\App\Services\TenantService::class);
     $tenantService->switchToSchema($schemaName);
@@ -763,14 +773,11 @@ test('waste management demo command seeds deterministic data for three previous 
         ->and(\App\Models\WasteCharacteristic::query()->count())->toBe(3)
         ->and(WasteType::query()->count())->toBe(4)
         ->and(Vendor::query()->count())->toBe(3)
-        ->and(WasteRecord::query()->count())->toBe(36)
-        ->and(WasteTransportation::query()->count())->toBe(15);
+        ->and(WasteRecord::query()->count())->toBe(144)
+        ->and(WasteTransportation::query()->count())->toBe(60);
 
-    $periods = [
-        now()->startOfMonth()->subMonthsNoOverflow(3),
-        now()->startOfMonth()->subMonthsNoOverflow(2),
-        now()->startOfMonth()->subMonthsNoOverflow(1),
-    ];
+    $periods = collect(range(12, 1))
+        ->map(fn (int $monthsBack) => now()->startOfMonth()->subMonthsNoOverflow($monthsBack));
 
     foreach ($periods as $period) {
         expect(
@@ -781,18 +788,22 @@ test('waste management demo command seeds deterministic data for three previous 
         )->toBe(12);
     }
 
-    expect(WasteRecord::query()->where('status', 'pending_review')->count())->toBe(9)
-        ->and(WasteRecord::query()->where('status', 'approved')->count())->toBe(12)
-        ->and(WasteTransportation::query()->where('status', 'pending')->count())->toBe(3)
-        ->and(WasteTransportation::query()->where('status', 'in_transit')->count())->toBe(3)
-        ->and(WasteTransportation::query()->where('status', 'delivered')->count())->toBe(6)
-        ->and(WasteTransportation::query()->where('status', 'cancelled')->count())->toBe(3);
+    expect(WasteRecord::query()->where('status', 'draft')->count())->toBe(36)
+        ->and(WasteRecord::query()->where('status', 'pending_review')->count())->toBe(36)
+        ->and(WasteRecord::query()->where('status', 'approved')->count())->toBe(48)
+        ->and(WasteRecord::query()->where('status', 'rejected')->count())->toBe(24)
+        ->and(WasteTransportation::query()->where('status', 'pending')->count())->toBe(12)
+        ->and(WasteTransportation::query()->where('status', 'in_transit')->count())->toBe(12)
+        ->and(WasteTransportation::query()->where('status', 'delivered')->count())->toBe(24)
+        ->and(WasteTransportation::query()->where('status', 'cancelled')->count())->toBe(12);
 
     $hasOverflowTransportation = WasteTransportation::query()
         ->get()
         ->contains(fn (WasteTransportation $transportation): bool => $transportation->quantityExceedsRecord());
 
     expect($hasOverflowTransportation)->toBeFalse();
+
+    \Carbon\CarbonImmutable::setTestNow();
 });
 
 test('waste management demo seed can populate an existing tenant without overwriting organization metadata', function () {

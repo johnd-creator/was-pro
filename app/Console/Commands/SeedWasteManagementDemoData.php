@@ -13,7 +13,7 @@ class SeedWasteManagementDemoData extends Command
         {--schema= : Nama schema tenant demo}
         {--fresh-tenant : Hapus schema tenant demo dan isi ulang dari awal}';
 
-    protected $description = 'Siapkan tenant demo limbah umum dengan data dummy 3 bulan terakhir';
+    protected $description = 'Siapkan tenant demo limbah umum dengan data dummy 12 bulan penuh terakhir';
 
     public function __construct(protected WasteManagementDemoDataService $wasteManagementDemoDataService)
     {

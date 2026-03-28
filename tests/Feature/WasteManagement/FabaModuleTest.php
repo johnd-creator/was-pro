@@ -12,9 +12,6 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Services\TenantService;
 use Carbon\CarbonImmutable;
-use Database\Seeders\PermissionsSeeder;
-use Database\Seeders\RolePermissionsSeeder;
-use Database\Seeders\RolesSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
@@ -38,10 +35,6 @@ function spreadsheetRows(TestResponse $response): array
 
 beforeEach(function () {
     Storage::fake();
-
-    $this->seed(RolesSeeder::class);
-    $this->seed(PermissionsSeeder::class);
-    $this->seed(RolePermissionsSeeder::class);
 
     $this->organization = Organization::factory()->create([
         'code' => 'FABA',
@@ -857,17 +850,39 @@ test('faba demo seed command creates deterministic tenant data', function () {
     expect(Vendor::query()->count())->toBe(3);
     expect(FabaInternalDestination::query()->count())->toBe(2);
     expect(FabaPurpose::query()->count())->toBe(3);
-    expect(FabaOpeningBalance::query()->count())->toBe(6);
-    expect(FabaMovement::query()->count())->toBe(27);
-    expect(FabaMonthlyApproval::query()->count())->toBe(3);
-    expect(FabaMonthlyClosingSnapshot::query()->count())->toBe(2);
+    expect(FabaOpeningBalance::query()->count())->toBe(24);
+    expect(FabaMovement::query()->count())->toBe(132);
+    expect(FabaMonthlyApproval::query()->count())->toBe(12);
+    expect(FabaMonthlyClosingSnapshot::query()->count())->toBe(10);
     expect(
         FabaMonthlyApproval::query()->orderBy('year')->orderBy('month')->pluck('status')->all()
     )->toBe([
         FabaMonthlyApproval::STATUS_APPROVED,
         FabaMonthlyApproval::STATUS_APPROVED,
+        FabaMonthlyApproval::STATUS_APPROVED,
+        FabaMonthlyApproval::STATUS_APPROVED,
+        FabaMonthlyApproval::STATUS_REJECTED,
+        FabaMonthlyApproval::STATUS_APPROVED,
+        FabaMonthlyApproval::STATUS_APPROVED,
+        FabaMonthlyApproval::STATUS_APPROVED,
+        FabaMonthlyApproval::STATUS_APPROVED,
+        FabaMonthlyApproval::STATUS_APPROVED,
+        FabaMonthlyApproval::STATUS_APPROVED,
         FabaMonthlyApproval::STATUS_SUBMITTED,
     ]);
+
+    expect(FabaMovement::query()->distinct()->pluck('movement_type')->sort()->values()->all())
+        ->toBe([
+            FabaMovement::TYPE_ADJUSTMENT_IN,
+            FabaMovement::TYPE_ADJUSTMENT_OUT,
+            FabaMovement::TYPE_DISPOSAL_POK,
+            FabaMovement::TYPE_OPENING_BALANCE,
+            FabaMovement::TYPE_PRODUCTION,
+            FabaMovement::TYPE_REJECT,
+            FabaMovement::TYPE_UTILIZATION_EXTERNAL,
+            FabaMovement::TYPE_UTILIZATION_INTERNAL,
+            FabaMovement::TYPE_WORKSHOP,
+        ]);
 
     expect(
         FabaMovement::query()
@@ -880,23 +895,24 @@ test('faba demo seed command creates deterministic tenant data', function () {
     )->toBeFalse();
 
     $recapService = app(\App\Services\FabaRecapService::class);
-    $decemberRecap = $recapService->getMonthlyRecap(2025, 12);
-    $januaryRecap = $recapService->getMonthlyRecap(2026, 1);
-    $februaryRecap = $recapService->getMonthlyRecap(2026, 2);
+    $firstRecap = $recapService->getMonthlyRecap(2025, 3);
+    $rejectedRecap = $recapService->getMonthlyRecap(2025, 7);
+    $latestClosedRecap = $recapService->getMonthlyRecap(2026, 2);
 
-    expect($decemberRecap['opening_balance'])->toBe(200.0);
-    expect($januaryRecap['opening_balance'])->toBe(225.0);
-    expect($februaryRecap['opening_balance'])->toBe(240.0);
-    expect(collect($februaryRecap['warnings'])->pluck('code')->contains('missing_opening_balance'))->toBeFalse();
+    expect($firstRecap['opening_balance'])->toBe(200.0);
+    expect($rejectedRecap['opening_balance'])->toBe(256.0);
+    expect($latestClosedRecap['opening_balance'])->toBe(354.0);
+    expect(collect($latestClosedRecap['warnings'])->pluck('code')->contains('missing_opening_balance'))->toBeFalse();
 
     $this->tenantService->switchToPublic();
 
     expect(
         User::query()->whereIn('email', [
+            'john@d.co',
             'faba.supervisor.demo@local.test',
             'faba.operator.demo@local.test',
         ])->count()
-    )->toBe(2);
+    )->toBe(3);
     CarbonImmutable::setTestNow();
 });
 
@@ -976,9 +992,9 @@ test('faba demo seed can populate an existing tenant without overwriting organiz
     expect(User::query()->find($john->id))->not->toBeNull();
 
     $this->tenantService->switchToSchema($existingOrganization->schema_name);
-    expect(FabaMovement::query()->count())->toBe(27);
-    expect(FabaMonthlyApproval::query()->count())->toBe(3);
-    expect(FabaMonthlyClosingSnapshot::query()->count())->toBe(2);
+    expect(FabaMovement::query()->count())->toBe(132);
+    expect(FabaMonthlyApproval::query()->count())->toBe(12);
+    expect(FabaMonthlyClosingSnapshot::query()->count())->toBe(10);
     $this->tenantService->switchToPublic();
 
     CarbonImmutable::setTestNow();
@@ -1011,9 +1027,9 @@ test('faba demo seed can run while current search path is a tenant schema', func
     expect($response)->toBe(0);
 
     $this->tenantService->switchToSchema($existingOrganization->schema_name);
-    expect(FabaMovement::query()->count())->toBe(27);
-    expect(FabaMonthlyApproval::query()->count())->toBe(3);
-    expect(FabaMonthlyClosingSnapshot::query()->count())->toBe(2);
+    expect(FabaMovement::query()->count())->toBe(132);
+    expect(FabaMonthlyApproval::query()->count())->toBe(12);
+    expect(FabaMonthlyClosingSnapshot::query()->count())->toBe(10);
     $this->tenantService->switchToPublic();
 
     CarbonImmutable::setTestNow();

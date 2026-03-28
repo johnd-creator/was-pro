@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { usePage } from '@inertiajs/vue3';
-import { Bell, ChevronDown, AlertTriangle } from 'lucide-vue-next';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
+import { Bell, ChevronDown, AlertTriangle, Shield } from 'lucide-vue-next';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -12,9 +12,17 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import UserMenuContent from '@/components/UserMenuContent.vue';
 import { getInitials } from '@/composables/useInitials';
+import { dashboard as dashboardRoute } from '@/routes';
 import type { BreadcrumbItem, User } from '@/types';
 
 const page = usePage();
@@ -88,17 +96,108 @@ const notificationSummary = computed(() => props?.notificationSummary as {
 // Get user from page props
 const user = computed(() => props?.auth?.user as User | undefined);
 
+const isDashboardPage = computed(() => page.component === 'Dashboard');
+const isSuperAdmin = computed(() => user.value?.is_super_admin === true);
+
+const dashboardFilters = computed(() => props?.filters as {
+    month: string | null;
+    organization_id: string | null;
+} | undefined);
+
+const availableMonths = computed(() => (props?.availableMonths as Array<{
+    value: string;
+    label: string;
+}> | undefined) ?? []);
+
+const availableOrganizations = computed(() => (props?.availableOrganizations as Array<{
+    id: string;
+    name: string;
+    code: string;
+}> | undefined) ?? []);
+
+const snapshotForm = reactive({
+    month: '',
+    organization_id: '',
+});
+
+watch(
+    dashboardFilters,
+    (filters) => {
+        snapshotForm.month = filters?.month ?? '';
+        snapshotForm.organization_id = filters?.organization_id ?? '';
+    },
+    { immediate: true },
+);
+
+function applyDashboardFilters(): void {
+    const payload: Record<string, string> = {};
+
+    if (snapshotForm.month) {
+        payload.month = snapshotForm.month;
+    }
+
+    if (isSuperAdmin.value && snapshotForm.organization_id) {
+        payload.organization_id = snapshotForm.organization_id;
+    }
+
+    router.get(dashboardRoute(), payload, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
+}
 </script>
 
 <template>
     <header
-        class="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-sidebar-border/70 bg-white px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-5"
+        class="flex min-h-16 shrink-0 items-center justify-between gap-4 border-b border-sidebar-border/70 bg-white px-6 py-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-5"
     >
-        <div class="flex min-w-0 items-center gap-2">
-            <SidebarTrigger class="-ml-1" />
-            <template v-if="breadcrumbs && breadcrumbs.length > 0">
-                <Breadcrumbs :breadcrumbs="breadcrumbs" />
-            </template>
+        <div class="flex min-w-0 flex-1 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex min-w-0 flex-1 items-center gap-2">
+                <SidebarTrigger class="-ml-1" />
+                <template v-if="breadcrumbs && breadcrumbs.length > 0">
+                    <Breadcrumbs :breadcrumbs="breadcrumbs" />
+                </template>
+            </div>
+
+            <div
+                v-if="isDashboardPage"
+                class="flex min-w-0 flex-wrap items-center gap-2 lg:ml-6 lg:justify-end"
+            >
+                <Select v-model="snapshotForm.month">
+                    <SelectTrigger class="h-9 w-[180px]">
+                        <SelectValue placeholder="Pilih bulan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem
+                            v-for="month in availableMonths"
+                            :key="month.value"
+                            :value="month.value"
+                        >
+                            {{ month.label }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+
+                <Select v-if="isSuperAdmin" v-model="snapshotForm.organization_id">
+                    <SelectTrigger class="h-9 w-[220px]">
+                        <SelectValue placeholder="Pilih organisasi" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem
+                            v-for="organization in availableOrganizations"
+                            :key="organization.id"
+                            :value="organization.id"
+                        >
+                            {{ organization.name }} ({{ organization.code }})
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+
+                <Button size="sm" class="h-9" @click="applyDashboardFilters">
+                    Terapkan
+                </Button>
+            </div>
         </div>
 
         <div class="flex items-center gap-3">

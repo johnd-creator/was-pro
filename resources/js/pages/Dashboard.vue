@@ -3,11 +3,12 @@ import { Head } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 
 // New compact components
-import CategoryChart from '@/components/dashboard/CategoryChart.vue';
 import CombinedApprovals from '@/components/dashboard/CombinedApprovals.vue';
 import CompactStat from '@/components/dashboard/CompactStat.vue';
 import ComplianceHero from '@/components/dashboard/ComplianceHero.vue';
+import DistributionDonut from '@/components/dashboard/DistributionDonut.vue';
 import FabaTrendChart from '@/components/dashboard/FabaTrendChart.vue';
+import WasteFlowChart from '@/components/dashboard/WasteFlowChart.vue';
 import Heading from '@/components/Heading.vue';
 
 import {
@@ -64,8 +65,8 @@ interface ApprovalItem {
 }
 
 interface CategoryData {
-    category: string;
-    count: number;
+    label: string;
+    value: number;
     percentage: number;
 }
 
@@ -78,9 +79,28 @@ interface StatusData {
 
 interface Props {
     organizationName: string;
+    header: {
+        current_date: string;
+        current_time: string;
+        snapshot_month_label?: string;
+    };
+    filters: {
+        month: string | null;
+        organization_id: string | null;
+    };
+    availableMonths: Array<{
+        value: string;
+        label: string;
+    }>;
+    availableOrganizations: Array<{
+        id: string;
+        name: string;
+        code: string;
+    }>;
     stats: Stats;
     pendingApprovals: ApprovalItem[];
     wasteByCategory: CategoryData[];
+    fabaProductionMaterialDistribution: CategoryData[];
     fabaStats: FabaStats;
     fabaChart: Array<{
         label: string;
@@ -92,6 +112,13 @@ interface Props {
     }>;
     fabaPendingApprovals: ApprovalItem[];
     fabaWarnings: Array<{ month: number; period_label: string; message: string; closing_balance: number }>;
+    wasteChart: Array<{
+        label: string;
+        month: number;
+        year: number;
+        input_count: number;
+        transported_count: number;
+    }>;
 }
 
 const props = defineProps<Props>();
@@ -112,7 +139,7 @@ const combinedApprovals = computed(() => {
 
 const pageDescription = computed(() =>
     props.organizationName
-        ? `Pantau risiko kepatuhan, operasional limbah, dan data FABA untuk ${props.organizationName} dalam satu tampilan terpadu.`
+        ? `Pantau risiko kepatuhan, operasional limbah, dan data FABA untuk ${props.organizationName} pada snapshot ${props.header.snapshot_month_label ?? 'periode aktif'}.`
         : 'Pantau risiko kepatuhan, operasional limbah, dan data FABA dalam satu tampilan terpadu.',
 );
 
@@ -194,22 +221,47 @@ const entranceAnimationClass = computed(() =>
                 </div>
             </section>
 
-            <!-- Row 3: Trend Charts (2 columns) -->
-            <section class="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.95fr)]">
+            <section class="grid gap-6 xl:grid-cols-2">
+                <WasteFlowChart :data="wasteChart" />
                 <FabaTrendChart :data="fabaChart" />
+            </section>
 
+            <section class="grid gap-6 xl:grid-cols-2">
                 <Card class="border-slate-200/80 shadow-sm">
                     <CardHeader class="space-y-2">
                         <CardTitle class="text-lg">
                             Distribusi Kategori Limbah
                         </CardTitle>
                         <CardDescription>
-                            Komposisi kategori limbah yang paling dominan untuk
-                            membantu prioritas operasional saat ini.
+                            Komposisi volume limbah approved per kategori pada
+                            snapshot bulan aktif.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <CategoryChart :data="wasteByCategory" />
+                        <DistributionDonut
+                            :data="wasteByCategory"
+                            total-label="Total"
+                            value-suffix="kg"
+                        />
+                    </CardContent>
+                </Card>
+
+                <Card class="border-slate-200/80 shadow-sm">
+                    <CardHeader class="space-y-2">
+                        <CardTitle class="text-lg">
+                            Distribusi Material Produksi FABA
+                        </CardTitle>
+                        <CardDescription>
+                            Komposisi material produksi Fly Ash dan Bottom Ash
+                            pada tahun aktif dashboard.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <DistributionDonut
+                            :data="fabaProductionMaterialDistribution"
+                            total-label="Total"
+                            value-suffix="ton"
+                        />
                     </CardContent>
                 </Card>
             </section>

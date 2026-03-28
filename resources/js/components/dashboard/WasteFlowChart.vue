@@ -1,19 +1,26 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import type { FabaChartData } from '@/types';
+
+interface WasteFlowData {
+    label: string;
+    month: number;
+    year: number;
+    input_count: number;
+    transported_count: number;
+}
 
 interface Props {
-    data: FabaChartData[];
+    data: WasteFlowData[];
 }
 
 const props = defineProps<Props>();
 
 const maxValue = computed(() => {
-    const maxProduction = Math.max(...props.data.map((d) => d.production), 0);
-    const maxUtilization = Math.max(...props.data.map((d) => d.utilization), 0);
+    const maxInput = Math.max(...props.data.map((d) => d.input_count), 0);
+    const maxTransported = Math.max(...props.data.map((d) => d.transported_count), 0);
 
-    return Math.max(maxProduction, maxUtilization, 1);
+    return Math.max(maxInput, maxTransported, 1);
 });
 
 const chartTicks = computed(() => {
@@ -29,18 +36,16 @@ const chartTicks = computed(() => {
     });
 });
 
-const productionBarColor = 'rgb(0 90 179)';
-const utilizationBarColor = 'rgb(217 119 6)';
+const inputColor = 'rgb(15 118 110)';
+const transportedColor = 'rgb(234 88 12)';
 
-const totalProduction = computed(() =>
-    props.data.reduce((sum, item) => sum + item.production, 0),
+const totalInput = computed(() =>
+    props.data.reduce((sum, item) => sum + item.input_count, 0),
 );
 
-const totalUtilization = computed(() =>
-    props.data.reduce((sum, item) => sum + item.utilization, 0),
+const totalTransported = computed(() =>
+    props.data.reduce((sum, item) => sum + item.transported_count, 0),
 );
-
-const latestBalance = computed(() => props.data.at(-1)?.closing_balance ?? 0);
 
 function barHeight(value: number): string {
     const chartBodyHeight = 224;
@@ -55,70 +60,52 @@ function barHeight(value: number): string {
             <div class="flex items-start justify-between gap-4">
                 <div>
                     <CardTitle class="text-base sm:text-lg">
-                        Produksi vs Pemanfaatan FABA
+                        Input vs Limbah Diangkut
                     </CardTitle>
                     <CardDescription>
-                        Ringkasan 6 bulan terakhir untuk membaca keseimbangan
-                        suplai, pemanfaatan, dan saldo akhir TPS.
+                        Tren 6 bulan terakhir untuk memantau keseimbangan pencatatan
+                        limbah masuk dengan limbah yang sudah terkirim.
                     </CardDescription>
                 </div>
-                <div
-                    class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-right"
-                >
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-right">
                     <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        Saldo akhir terbaru
+                        Rasio angkut
                     </p>
                     <p class="text-2xl font-semibold text-slate-900">
-                        {{ latestBalance.toLocaleString('id-ID') }}
+                        {{ totalInput > 0 ? ((totalTransported / totalInput) * 100).toFixed(0) : '0' }}%
                     </p>
-                    <p class="text-xs text-slate-500">ton</p>
+                    <p class="text-xs text-slate-500">6 bulan terakhir</p>
                 </div>
             </div>
 
             <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="grid flex-1 gap-3 sm:grid-cols-3">
-                    <div class="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
-                            Produksi
+                <div class="grid flex-1 gap-3 sm:grid-cols-2">
+                    <div class="rounded-xl border border-teal-100 bg-teal-50/70 p-3">
+                        <p class="text-[11px] font-semibold uppercase tracking-wide text-teal-700">
+                            Input limbah
                         </p>
-                        <p class="mt-1 text-lg font-semibold text-blue-900">
-                            {{ totalProduction.toLocaleString('id-ID') }} ton
-                        </p>
-                    </div>
-                    <div class="rounded-xl border border-indigo-100 bg-indigo-50/70 p-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
-                            Pemanfaatan
-                        </p>
-                        <p class="mt-1 text-lg font-semibold text-amber-900">
-                            {{ totalUtilization.toLocaleString('id-ID') }} ton
+                        <p class="mt-1 text-lg font-semibold text-teal-900">
+                            {{ totalInput.toLocaleString('id-ID') }} catatan
                         </p>
                     </div>
-                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                            Periode
+                    <div class="rounded-xl border border-orange-100 bg-orange-50/70 p-3">
+                        <p class="text-[11px] font-semibold uppercase tracking-wide text-orange-700">
+                            Limbah diangkut
                         </p>
-                        <p class="mt-1 text-lg font-semibold text-slate-900">
-                            {{ props.data.length }} bulan
+                        <p class="mt-1 text-lg font-semibold text-orange-900">
+                            {{ totalTransported.toLocaleString('id-ID') }} pengangkutan
                         </p>
                     </div>
                 </div>
 
                 <div class="flex items-center gap-4 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs shadow-sm">
                     <div class="flex items-center gap-2">
-                        <span
-                            class="h-2.5 w-2.5 rounded-full"
-                            :style="{ backgroundColor: productionBarColor }"
-                        />
-                        <span class="font-medium text-slate-600">Produksi</span>
+                        <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: inputColor }" />
+                        <span class="font-medium text-slate-600">Input</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <span
-                            class="h-2.5 w-2.5 rounded-full"
-                            :style="{ backgroundColor: utilizationBarColor }"
-                        />
-                        <span class="font-medium text-slate-600">
-                            Pemanfaatan
-                        </span>
+                        <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: transportedColor }" />
+                        <span class="font-medium text-slate-600">Diangkut</span>
                     </div>
                 </div>
             </div>
@@ -157,8 +144,8 @@ function barHeight(value: number): string {
                                         <div
                                             class="w-6 rounded-t-lg shadow-sm transition-all duration-500 sm:w-8"
                                             :style="{
-                                                height: barHeight(item.production),
-                                                backgroundColor: productionBarColor,
+                                                height: barHeight(item.input_count),
+                                                backgroundColor: inputColor,
                                             }"
                                         ></div>
                                     </div>
@@ -167,8 +154,8 @@ function barHeight(value: number): string {
                                         <div
                                             class="w-6 rounded-t-lg shadow-sm transition-all duration-500 sm:w-8"
                                             :style="{
-                                                height: barHeight(item.utilization),
-                                                backgroundColor: utilizationBarColor,
+                                                height: barHeight(item.transported_count),
+                                                backgroundColor: transportedColor,
                                             }"
                                         ></div>
                                     </div>
@@ -178,16 +165,14 @@ function barHeight(value: number): string {
                                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-700">
                                         {{ item.label }}
                                     </p>
-                                    <p class="mt-1 text-[10px] font-semibold text-blue-700">
-                                        Produksi {{ item.production.toLocaleString('id-ID') }}
+                                    <p class="mt-1 text-[10px] font-semibold text-teal-700">
+                                        Input {{ item.input_count.toLocaleString('id-ID') }}
                                     </p>
-                                    <p class="mt-1 text-[10px] font-semibold text-amber-700">
-                                        Pemanfaatan {{ item.utilization.toLocaleString('id-ID') }}
+                                    <p class="mt-1 text-[10px] font-semibold text-orange-700">
+                                        Diangkut {{ item.transported_count.toLocaleString('id-ID') }}
                                     </p>
                                     <p class="mt-1 text-[11px] text-slate-500">
-                                        Saldo
-                                        {{ item.closing_balance.toLocaleString('id-ID') }}
-                                        ton
+                                        Selisih {{ (item.input_count - item.transported_count).toLocaleString('id-ID') }}
                                     </p>
                                 </div>
                             </div>

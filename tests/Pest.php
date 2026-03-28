@@ -15,6 +15,8 @@
 pest()->extend(Tests\TestCase::class)
     ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
     ->beforeEach(function () {
+        $this->seed(\Database\Seeders\TestingBaselineSeeder::class);
+
         // Create tenant schemas before each test
         $tenantService = app(\App\Services\TenantService::class);
 

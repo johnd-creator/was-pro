@@ -8,8 +8,8 @@ export type User = {
     updated_at: string;
     is_super_admin?: boolean;
     permissions?: string[];
-    organization_id?: number;
-    role_id?: number;
+    organization_id?: string | number;
+    role_id?: string | number;
     [key: string]: unknown;
 };
 

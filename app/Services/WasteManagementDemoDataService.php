@@ -66,7 +66,7 @@ class WasteManagementDemoDataService
             $this->tenantService->switchToSchema($schemaName);
 
             if (! $freshTenant && $this->datasetAlreadyExists($periods)) {
-                throw new RuntimeException('Dataset demo limbah umum untuk 3 bulan terakhir sudah ada pada tenant target. Gunakan --fresh-tenant untuk mengulang dari awal.');
+                throw new RuntimeException('Dataset demo limbah umum untuk 12 bulan penuh terakhir sudah ada pada tenant target. Gunakan --fresh-tenant untuk mengulang dari awal.');
             }
 
             $master = $this->seedMasterData($users['supervisor']);
@@ -117,12 +117,12 @@ class WasteManagementDemoDataService
             }
 
             $organization->update([
-                'name' => 'Waste Management Demo',
+                'name' => 'TWMS Integrated Demo',
                 'schema_name' => $schemaName,
-                'description' => 'Tenant demo terintegrasi untuk modul limbah umum.',
-                'address' => 'Area Demo Waste Management',
+                'description' => 'Tenant demo terintegrasi untuk modul limbah umum dan FABA.',
+                'address' => 'Area Demo TWMS Terpadu',
                 'phone' => '0219999999',
-                'email' => 'waste.demo@local.test',
+                'email' => 'twms.demo@local.test',
                 'is_active' => true,
             ]);
 
@@ -130,28 +130,45 @@ class WasteManagementDemoDataService
         }
 
         return Organization::query()->create([
-            'name' => 'Waste Management Demo',
+            'name' => 'TWMS Integrated Demo',
             'code' => $tenantCode,
             'schema_name' => $schemaName,
-            'description' => 'Tenant demo terintegrasi untuk modul limbah umum.',
-            'address' => 'Area Demo Waste Management',
+            'description' => 'Tenant demo terintegrasi untuk modul limbah umum dan FABA.',
+            'address' => 'Area Demo TWMS Terpadu',
             'phone' => '0219999999',
-            'email' => 'waste.demo@local.test',
+            'email' => 'twms.demo@local.test',
             'is_active' => true,
         ]);
     }
 
     /**
-     * @return array{supervisor: \App\Models\User, operator: \App\Models\User}
+     * @return array{
+     *     supervisor: \App\Models\User,
+     *     operator: \App\Models\User,
+     *     super_admin: \App\Models\User
+     * }
      */
     protected function upsertUsers(Organization $organization): array
     {
+        $superAdminRoleId = Role::query()->where('slug', 'super_admin')->value('id');
         $supervisorRoleId = Role::query()->where('slug', 'supervisor')->value('id');
         $operatorRoleId = Role::query()->where('slug', 'operator')->value('id');
 
-        if (! $supervisorRoleId || ! $operatorRoleId) {
-            throw new RuntimeException('Role supervisor/operator belum tersedia.');
+        if (! $superAdminRoleId || ! $supervisorRoleId || ! $operatorRoleId) {
+            throw new RuntimeException('Role super_admin/supervisor/operator belum tersedia.');
         }
+
+        $superAdmin = User::query()->updateOrCreate(
+            ['email' => 'john@d.co'],
+            [
+                'name' => 'John',
+                'password' => 'password',
+                'organization_id' => $organization->id,
+                'role_id' => $superAdminRoleId,
+                'is_super_admin' => true,
+            ]
+        );
+        $superAdmin->forceFill(['email_verified_at' => now()])->save();
 
         $supervisor = User::query()->updateOrCreate(
             ['email' => 'wm.supervisor.demo@local.test'],
@@ -160,10 +177,10 @@ class WasteManagementDemoDataService
                 'password' => 'password',
                 'organization_id' => $organization->id,
                 'role_id' => $supervisorRoleId,
-                'email_verified_at' => now(),
                 'is_super_admin' => false,
             ]
         );
+        $supervisor->forceFill(['email_verified_at' => now()])->save();
 
         $operator = User::query()->updateOrCreate(
             ['email' => 'wm.operator.demo@local.test'],
@@ -172,12 +189,13 @@ class WasteManagementDemoDataService
                 'password' => 'password',
                 'organization_id' => $organization->id,
                 'role_id' => $operatorRoleId,
-                'email_verified_at' => now(),
                 'is_super_admin' => false,
             ]
         );
+        $operator->forceFill(['email_verified_at' => now()])->save();
 
         return [
+            'super_admin' => $superAdmin,
             'supervisor' => $supervisor,
             'operator' => $operator,
         ];
@@ -201,11 +219,9 @@ class WasteManagementDemoDataService
     {
         $startOfCurrentMonth = CarbonImmutable::now()->startOfMonth();
 
-        return [
-            $startOfCurrentMonth->subMonthsNoOverflow(3),
-            $startOfCurrentMonth->subMonthsNoOverflow(2),
-            $startOfCurrentMonth->subMonthsNoOverflow(1),
-        ];
+        return collect(range(12, 1))
+            ->map(fn (int $monthsBack): CarbonImmutable => $startOfCurrentMonth->subMonthsNoOverflow($monthsBack))
+            ->all();
     }
 
     /**

@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\DashboardFilterRequest;
+use App\Models\Organization;
 use App\Services\UnifiedDashboardService;
-use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -12,9 +14,19 @@ class DashboardController extends Controller
     /**
      * Display the unified application dashboard.
      */
-    public function __invoke(Request $request, UnifiedDashboardService $dashboardService): Response
+    public function __invoke(DashboardFilterRequest $request, UnifiedDashboardService $dashboardService): Response|RedirectResponse
     {
-        $data = $dashboardService->getUnifiedData();
+        $user = $request->user();
+        $selectedOrganization = $this->resolveSelectedOrganization($request);
+
+        if (! $user->canAccessOrganization($selectedOrganization->id)) {
+            abort(403);
+        }
+
+        $data = $dashboardService->getUnifiedData(
+            $selectedOrganization,
+            $request->validated('month')
+        );
 
         return Inertia::render('Dashboard', [
             // Waste Management Data
@@ -22,6 +34,7 @@ class DashboardController extends Controller
             'recentActivities' => $data['recent_activities'],
             'pendingApprovals' => $data['pending_approvals'],
             'wasteByCategory' => $data['waste_by_category'],
+            'fabaProductionMaterialDistribution' => $data['faba_production_material_distribution'],
             'transportationByStatus' => $data['transportation_stats'],
 
             // FABA Data
@@ -45,6 +58,47 @@ class DashboardController extends Controller
             'headerRiskTone' => $data['header']['risk_tone'],
             'notificationSummary' => $data['notification_summary'],
             'header' => $data['header'],
+            'filters' => $data['filters'],
+            'availableMonths' => $data['available_months'],
+            'availableOrganizations' => $user->isSuperAdmin()
+                ? Organization::query()
+                    ->active()
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'code'])
+                    ->map(fn (Organization $organization): array => [
+                        'id' => $organization->id,
+                        'name' => $organization->name,
+                        'code' => $organization->code,
+                    ])
+                    ->values()
+                    ->all()
+                : [],
         ]);
+    }
+
+    private function resolveSelectedOrganization(DashboardFilterRequest $request): Organization
+    {
+        $user = $request->user();
+        $requestedOrganizationId = $request->validated('organization_id');
+
+        if (! $user->isSuperAdmin()) {
+            return $user->organization ?? abort(403);
+        }
+
+        if ($requestedOrganizationId) {
+            return Organization::query()
+                ->active()
+                ->whereKey($requestedOrganizationId)
+                ->first() ?? abort(403);
+        }
+
+        if ($user->organization && $user->organization->is_active) {
+            return $user->organization;
+        }
+
+        return Organization::query()
+            ->active()
+            ->orderBy('name')
+            ->first() ?? abort(403);
     }
 }
