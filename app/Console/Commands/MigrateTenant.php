@@ -76,14 +76,7 @@ class MigrateTenant extends Command
             $this->tenantService->createSchema($organization->schema_name);
         }
 
-        // Switch to tenant schema
-        $this->tenantService->switchToSchema($organization->schema_name);
-
-        // Run migrations
-        $this->call('migrate', [
-            '--path' => 'database/migrations/tenant',
-            '--force' => $this->option('force'),
-        ]);
+        $this->tenantService->runMigrationsForTenant($organization->schema_name, 'database/migrations/tenant');
 
         $this->info("Tenant schema {$organization->schema_name} migrated successfully.");
 
@@ -116,14 +109,7 @@ class MigrateTenant extends Command
                 $this->tenantService->createSchema($organization->schema_name);
             }
 
-            // Switch to tenant schema
-            $this->tenantService->switchToSchema($organization->schema_name);
-
-            // Run migrations
-            $this->call('migrate', [
-                '--path' => 'database/migrations/tenant',
-                '--force' => $this->option('force'),
-            ]);
+            $this->tenantService->runMigrationsForTenant($organization->schema_name, 'database/migrations/tenant');
         }
 
         $this->info('All tenant schemas migrated successfully.');

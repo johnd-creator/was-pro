@@ -7,6 +7,9 @@ use App\Models\Vendor;
 use App\Models\WasteRecord;
 use App\Models\WasteTransportation;
 use App\Models\WasteType;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia;
 
 uses()->group('waste-management', 'workflow')
@@ -797,6 +800,31 @@ test('waste management demo command seeds deterministic data for twelve previous
         ->and(WasteTransportation::query()->where('status', 'delivered')->count())->toBe(24)
         ->and(WasteTransportation::query()->where('status', 'cancelled')->count())->toBe(12);
 
+    $firstThreePeriods = $periods->take(3)->values();
+    $categoryDistributionForPeriod = function (\Carbon\CarbonImmutable $period): array {
+        return WasteRecord::query()
+            ->approved()
+            ->whereYear('date', $period->year)
+            ->whereMonth('date', $period->month)
+            ->join('waste_types', 'waste_records.waste_type_id', '=', 'waste_types.id')
+            ->join('waste_categories', 'waste_types.category_id', '=', 'waste_categories.id')
+            ->selectRaw('waste_categories.code as category_code, SUM(waste_records.quantity) as total_quantity')
+            ->groupBy('waste_categories.code')
+            ->pluck('total_quantity', 'category_code')
+            ->map(fn ($value): float => round((float) $value, 2))
+            ->all();
+    };
+
+    $firstDistribution = $categoryDistributionForPeriod($firstThreePeriods[0]);
+    $secondDistribution = $categoryDistributionForPeriod($firstThreePeriods[1]);
+    $thirdDistribution = $categoryDistributionForPeriod($firstThreePeriods[2]);
+
+    expect($firstDistribution)->not->toBe($secondDistribution)
+        ->and($secondDistribution)->not->toBe($thirdDistribution)
+        ->and(collect($firstDistribution)->sortDesc()->keys()->first())->toBe('B3')
+        ->and(collect($secondDistribution)->sortDesc()->keys()->first())->toBe('REC')
+        ->and(collect($thirdDistribution)->sortDesc()->keys()->first())->toBe('GEN');
+
     $hasOverflowTransportation = WasteTransportation::query()
         ->get()
         ->contains(fn (WasteTransportation $transportation): bool => $transportation->quantityExceedsRecord());
@@ -842,6 +870,48 @@ test('waste management demo seed can populate an existing tenant without overwri
     $existingOrganization->refresh();
     expect($existingOrganization->name)->toBe('Tenant Produksi Waste')
         ->and(User::query()->find($john->id))->not->toBeNull();
+});
+
+test('tenant migrations stay inside the tenant schema even when public has tables with the same name', function () {
+    $schemaName = 'tenant_twms_schema_lock';
+    $tenantService = app(\App\Services\TenantService::class);
+
+    if (! $tenantService->schemaExists($schemaName)) {
+        $tenantService->createSchema($schemaName);
+    }
+
+    $tenantService->switchToPublic();
+
+    if (Schema::hasTable('waste_categories')) {
+        Schema::drop('waste_categories');
+    }
+
+    Schema::create('waste_categories', function (Blueprint $table): void {
+        $table->id();
+        $table->string('legacy_name')->nullable();
+        $table->timestamps();
+    });
+
+    expect(fn () => $tenantService->runMigrationsForTenant($schemaName, 'database/migrations/tenant'))->not->toThrow(\Throwable::class);
+
+    $tenantService->switchToSchema($schemaName);
+
+    expect(Schema::hasTable('migrations'))->toBeTrue()
+        ->and(Schema::hasTable('waste_categories'))->toBeTrue();
+
+    $tenantColumns = collect(DB::select(
+        'SELECT column_name FROM information_schema.columns WHERE table_schema = ? AND table_name = ?',
+        [$schemaName, 'waste_categories'],
+    ))->pluck('column_name');
+
+    expect($tenantColumns)->toContain('code')
+        ->and($tenantColumns)->toContain('name')
+        ->and($tenantColumns)->not->toContain('legacy_name');
+
+    $tenantService->switchToPublic();
+
+    expect(Schema::hasColumn('waste_categories', 'legacy_name'))->toBeTrue()
+        ->and(Schema::hasColumn('waste_categories', 'code'))->toBeFalse();
 });
 
 test('waste management demo seed rejects fresh mode for an existing non-demo tenant', function () {

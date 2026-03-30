@@ -120,11 +120,58 @@ const snapshotForm = reactive({
     organization_id: '',
 });
 
+const monthPickerOpen = ref(false);
+const activePickerYear = ref<number>(new Date().getFullYear());
+
+const availableYearMonths = computed(() => {
+    return availableMonths.value.reduce<Record<number, Set<number>>>((accumulator, month) => {
+        const [year, monthNumber] = month.value.split('-').map(Number);
+
+        if (! accumulator[year]) {
+            accumulator[year] = new Set<number>();
+        }
+
+        accumulator[year].add(monthNumber);
+
+        return accumulator;
+    }, {});
+});
+
+const availableYears = computed(() =>
+    Object.keys(availableYearMonths.value)
+        .map(Number)
+        .sort((left, right) => right - left),
+);
+
+const monthGrid = computed(() => {
+    const formatter = new Intl.DateTimeFormat('id-ID', { month: 'short' });
+
+    return Array.from({ length: 12 }, (_, index) => {
+        const monthNumber = index + 1;
+        const isAvailable = availableYearMonths.value[activePickerYear.value]?.has(monthNumber) ?? false;
+        const value = `${activePickerYear.value}-${String(monthNumber).padStart(2, '0')}`;
+
+        return {
+            value,
+            monthNumber,
+            label: formatter.format(new Date(activePickerYear.value, index, 1)),
+            isAvailable,
+            isSelected: snapshotForm.month === value,
+        };
+    });
+});
+
 watch(
     dashboardFilters,
     (filters) => {
         snapshotForm.month = filters?.month ?? '';
         snapshotForm.organization_id = filters?.organization_id ?? '';
+
+        if (filters?.month) {
+            activePickerYear.value = Number(filters.month.split('-')[0]);
+        } else if (availableYears.value.length > 0) {
+            activePickerYear.value = availableYears.value[0];
+        }
     },
     { immediate: true },
 );
@@ -146,6 +193,37 @@ function applyDashboardFilters(): void {
         replace: true,
     });
 }
+
+function selectMonth(value: string): void {
+    snapshotForm.month = value;
+    monthPickerOpen.value = false;
+    applyDashboardFilters();
+}
+
+function selectOrganization(value: unknown): void {
+    snapshotForm.organization_id = value == null ? '' : String(value);
+    applyDashboardFilters();
+}
+
+function showPreviousYear(): void {
+    const currentYearIndex = availableYears.value.indexOf(activePickerYear.value);
+
+    if (currentYearIndex === -1 || currentYearIndex === availableYears.value.length - 1) {
+        return;
+    }
+
+    activePickerYear.value = availableYears.value[currentYearIndex + 1];
+}
+
+function showNextYear(): void {
+    const currentYearIndex = availableYears.value.indexOf(activePickerYear.value);
+
+    if (currentYearIndex <= 0) {
+        return;
+    }
+
+    activePickerYear.value = availableYears.value[currentYearIndex - 1];
+}
 </script>
 
 <template>
@@ -164,22 +242,77 @@ function applyDashboardFilters(): void {
                 v-if="isDashboardPage"
                 class="flex min-w-0 flex-wrap items-center gap-2 lg:ml-6 lg:justify-end"
             >
-                <Select v-model="snapshotForm.month">
-                    <SelectTrigger class="h-9 w-[180px]">
-                        <SelectValue placeholder="Pilih bulan" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem
-                            v-for="month in availableMonths"
-                            :key="month.value"
-                            :value="month.value"
+                <DropdownMenu v-model:open="monthPickerOpen">
+                    <DropdownMenuTrigger as-child>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            class="h-9 min-w-[170px] justify-between"
                         >
-                            {{ month.label }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
+                            <span class="truncate">
+                                {{
+                                    availableMonths.find((month) => month.value === snapshotForm.month)?.label
+                                    ?? 'Pilih bulan'
+                                }}
+                            </span>
+                            <ChevronDown class="h-4 w-4 text-slate-500" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                        align="end"
+                        class="w-[280px] rounded-xl border border-slate-200 p-3"
+                    >
+                        <div class="flex items-center justify-between gap-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                class="h-8 px-2"
+                                :disabled="availableYears.indexOf(activePickerYear) === availableYears.length - 1"
+                                @click="showPreviousYear"
+                            >
+                                Tahun -
+                            </Button>
+                            <div class="text-sm font-semibold text-slate-900">
+                                {{ activePickerYear }}
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                class="h-8 px-2"
+                                :disabled="availableYears.indexOf(activePickerYear) <= 0"
+                                @click="showNextYear"
+                            >
+                                Tahun +
+                            </Button>
+                        </div>
 
-                <Select v-if="isSuperAdmin" v-model="snapshotForm.organization_id">
+                        <div class="mt-3 grid grid-cols-3 gap-2">
+                            <button
+                                v-for="month in monthGrid"
+                                :key="month.value"
+                                type="button"
+                                class="rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                                :class="[
+                                    month.isSelected
+                                        ? 'bg-slate-900 text-white'
+                                        : month.isAvailable
+                                            ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                            : 'cursor-not-allowed bg-slate-50 text-slate-300',
+                                ]"
+                                :disabled="!month.isAvailable"
+                                @click="selectMonth(month.value)"
+                            >
+                                {{ month.label }}
+                            </button>
+                        </div>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Select
+                    v-if="isSuperAdmin"
+                    :model-value="snapshotForm.organization_id"
+                    @update:model-value="selectOrganization"
+                >
                     <SelectTrigger class="h-9 w-[220px]">
                         <SelectValue placeholder="Pilih organisasi" />
                     </SelectTrigger>
@@ -193,10 +326,6 @@ function applyDashboardFilters(): void {
                         </SelectItem>
                     </SelectContent>
                 </Select>
-
-                <Button size="sm" class="h-9" @click="applyDashboardFilters">
-                    Terapkan
-                </Button>
             </div>
         </div>
 

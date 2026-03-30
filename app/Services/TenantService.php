@@ -94,6 +94,8 @@ class TenantService
      */
     public function schemaExists(string $schemaName): bool
     {
+        $originalSchema = $this->currentSchema;
+
         try {
             // Reset to public schema first to avoid transaction issues
             DB::statement('SET search_path TO public');
@@ -106,6 +108,12 @@ class TenantService
             \Log::warning("Failed to check schema existence: {$schemaName}", ['error' => $e->getMessage()]);
 
             return false;
+        } finally {
+            if ($originalSchema && $originalSchema !== 'public') {
+                DB::statement("SET search_path TO \"{$originalSchema}\", public");
+            } else {
+                DB::statement('SET search_path TO public');
+            }
         }
     }
 
@@ -125,21 +133,50 @@ class TenantService
     public function runMigrationsForTenant(string $schemaName, string $migrationPath): void
     {
         $originalSchema = $this->getCurrentSchema();
+        $connectionName = config('database.default');
+        $originalSearchPath = config("database.connections.{$connectionName}.search_path");
+        $originalConnectionSchema = config("database.connections.{$connectionName}.schema");
 
         try {
-            $this->switchToSchema($schemaName);
+            $this->setConnectionSearchPath($connectionName, "\"{$schemaName}\", public", $schemaName);
 
             // Run migrations using the artisan command
             \Artisan::call('migrate', [
                 '--path' => $migrationPath,
                 '--force' => true,
+                '--database' => $connectionName,
             ]);
         } finally {
+            $this->setConnectionSearchPath(
+                $connectionName,
+                is_string($originalSearchPath) ? $originalSearchPath : 'public',
+                is_string($originalConnectionSchema) ? $originalConnectionSchema : 'public',
+            );
+
             if ($originalSchema) {
                 $this->switchToSchema($originalSchema);
             } else {
                 $this->switchToPublic();
             }
         }
+    }
+
+    protected function setConnectionSearchPath(string $connectionName, string $searchPath, string $schema): void
+    {
+        $connection = DB::connection($connectionName);
+
+        config([
+            "database.connections.{$connectionName}.search_path" => $searchPath,
+            "database.connections.{$connectionName}.schema" => $schema,
+        ]);
+
+        if ($connection->transactionLevel() === 0) {
+            DB::purge($connectionName);
+            DB::reconnect($connectionName);
+        }
+
+        DB::statement("SET search_path TO {$searchPath}");
+
+        $this->currentSchema = $schema;
     }
 }

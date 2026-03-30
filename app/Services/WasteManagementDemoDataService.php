@@ -571,10 +571,34 @@ class WasteManagementDemoDataService
      */
     protected function baseQuantitiesForMonth(int $periodIndex): array
     {
-        return match ($periodIndex) {
-            0 => [180, 160, 150, 140, 130, 120, 220, 210, 205, 190, 115, 100],
-            1 => [200, 185, 170, 160, 150, 140, 240, 225, 215, 205, 120, 110],
-            default => [175, 165, 155, 145, 135, 125, 215, 205, 195, 185, 118, 108],
+        $progressiveOffset = (int) floor($periodIndex / 3) * 8;
+        $baseline = [175, 165, 155, 145, 135, 125, 0, 0, 0, 0, 118, 108];
+
+        return match ($periodIndex % 3) {
+            0 => [
+                ...array_slice($baseline, 0, 6),
+                220 + $progressiveOffset,
+                150 + $progressiveOffset,
+                260 + $progressiveOffset,
+                240 + $progressiveOffset,
+                ...array_slice($baseline, 10),
+            ],
+            1 => [
+                ...array_slice($baseline, 0, 6),
+                380 + $progressiveOffset,
+                160 + $progressiveOffset,
+                180 + $progressiveOffset,
+                170 + $progressiveOffset,
+                ...array_slice($baseline, 10),
+            ],
+            default => [
+                ...array_slice($baseline, 0, 6),
+                180 + $progressiveOffset,
+                390 + $progressiveOffset,
+                170 + $progressiveOffset,
+                160 + $progressiveOffset,
+                ...array_slice($baseline, 10),
+            ],
         };
     }
 
