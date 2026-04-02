@@ -1050,3 +1050,49 @@ test('faba demo seed rejects fresh mode for an existing non-demo tenant', functi
 
     expect($response)->toBe(1);
 });
+
+test('integrated demo seed command prepares waste and faba data in one tenant', function () {
+    CarbonImmutable::setTestNow('2026-03-19 10:00:00');
+
+    $response = Artisan::call('demo:seed', [
+        '--tenant' => 'TWMSALLDEMO',
+        '--schema' => 'tenant_twms_all_demo',
+        '--fresh-tenant' => true,
+    ]);
+
+    expect($response)->toBe(0);
+
+    $organization = Organization::query()->where('code', 'TWMSALLDEMO')->first();
+
+    expect($organization)->not->toBeNull()
+        ->and($organization?->schema_name)->toBe('tenant_twms_all_demo');
+    expect($this->tenantService->schemaExists('tenant_twms_all_demo'))->toBeTrue();
+
+    $this->tenantService->switchToSchema('tenant_twms_all_demo');
+
+    expect(\App\Models\WasteCategory::query()->count())->toBe(3)
+        ->and(\App\Models\WasteType::query()->count())->toBe(4)
+        ->and(\App\Models\WasteRecord::query()->count())->toBe(144)
+        ->and(\App\Models\WasteTransportation::query()->count())->toBe(60)
+        ->and(Vendor::query()->count())->toBe(6)
+        ->and(FabaInternalDestination::query()->count())->toBe(2)
+        ->and(FabaPurpose::query()->count())->toBe(3)
+        ->and(FabaOpeningBalance::query()->count())->toBe(24)
+        ->and(FabaMovement::query()->count())->toBe(132)
+        ->and(FabaMonthlyApproval::query()->count())->toBe(12)
+        ->and(FabaMonthlyClosingSnapshot::query()->count())->toBe(10);
+
+    $this->tenantService->switchToPublic();
+
+    expect(
+        User::query()->whereIn('email', [
+            'john@d.co',
+            'wm.supervisor.demo@local.test',
+            'wm.operator.demo@local.test',
+            'faba.supervisor.demo@local.test',
+            'faba.operator.demo@local.test',
+        ])->where('organization_id', $organization?->id)->count()
+    )->toBe(5);
+
+    CarbonImmutable::setTestNow();
+});

@@ -872,6 +872,41 @@ test('waste management demo seed can populate an existing tenant without overwri
         ->and(User::query()->find($john->id))->not->toBeNull();
 });
 
+test('waste management demo seed can run while current search path is a tenant schema', function () {
+    \Carbon\CarbonImmutable::setTestNow('2026-03-19 10:00:00');
+
+    $existingOrganization = Organization::factory()->create([
+        'code' => 'TWMSWMSEARCH',
+        'name' => 'Tenant Waste Search Path',
+        'schema_name' => 'tenant_twms_wm_search_path',
+    ]);
+
+    $tenantService = app(\App\Services\TenantService::class);
+
+    if (! $tenantService->schemaExists($existingOrganization->schema_name)) {
+        $tenantService->createSchema($existingOrganization->schema_name);
+    }
+
+    $tenantService->switchToSchema($existingOrganization->schema_name);
+    \Illuminate\Support\Facades\Artisan::call('migrate', [
+        '--path' => 'database/migrations/tenant',
+        '--force' => true,
+    ]);
+
+    $this->artisan('waste-management:seed-demo', [
+        '--tenant' => 'TWMSWMSEARCH',
+        '--schema' => $existingOrganization->schema_name,
+    ])->assertSuccessful();
+
+    $tenantService->switchToSchema($existingOrganization->schema_name);
+
+    expect(WasteRecord::query()->count())->toBe(144)
+        ->and(WasteTransportation::query()->count())->toBe(60);
+
+    $tenantService->switchToPublic();
+    \Carbon\CarbonImmutable::setTestNow();
+});
+
 test('tenant migrations stay inside the tenant schema even when public has tables with the same name', function () {
     $schemaName = 'tenant_twms_schema_lock';
     $tenantService = app(\App\Services\TenantService::class);

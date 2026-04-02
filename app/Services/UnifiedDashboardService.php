@@ -70,8 +70,16 @@ class UnifiedDashboardService
     {
         $snapshotDate = $this->snapshotDate();
         $monthStart = $snapshotDate->startOfMonth();
+        $wasteRecordsUntilSnapshot = $this->wasteRecordsUntilSnapshot();
+        $wasteTransportationsUntilSnapshot = $this->wasteTransportationsUntilSnapshot();
 
         return [
+            'waste_total_records_snapshot' => (clone $wasteRecordsUntilSnapshot)->count(),
+            'waste_transported_records_snapshot' => (clone $wasteTransportationsUntilSnapshot)
+                ->where('status', '!=', 'cancelled')
+                ->distinct('waste_record_id')
+                ->count('waste_record_id'),
+            'waste_untransported_records_snapshot' => $this->approvedWasteRecordsAwaitingTransportationCount(),
             'total_waste_records' => $this->wasteRecordsForSelectedMonth()->count(),
             'approved_records' => $this->wasteRecordsForSelectedMonth()->approved()->count(),
             'pending_records' => $this->wasteRecordsForSelectedMonth()->pendingApproval()->count(),
@@ -485,11 +493,42 @@ class UnifiedDashboardService
             ->whereMonth('date', $this->selectedMonth);
     }
 
+    private function wasteRecordsUntilSnapshot()
+    {
+        return WasteRecord::query()
+            ->whereDate('date', '<=', $this->snapshotDate()->toDateString());
+    }
+
     private function wasteTransportationsForSelectedMonth()
     {
         return WasteTransportation::query()
             ->whereYear('transportation_date', $this->selectedYear)
             ->whereMonth('transportation_date', $this->selectedMonth);
+    }
+
+    private function wasteTransportationsUntilSnapshot()
+    {
+        return WasteTransportation::query()
+            ->whereDate('transportation_date', '<=', $this->snapshotDate()->toDateString());
+    }
+
+    private function approvedWasteRecordsAwaitingTransportationCount(): int
+    {
+        $snapshotDate = $this->snapshotDate()->toDateString();
+
+        return $this->wasteRecordsUntilSnapshot()
+            ->approved()
+            ->whereRaw(
+                'COALESCE((
+                    SELECT SUM(waste_transportations.quantity)
+                    FROM waste_transportations
+                    WHERE waste_transportations.waste_record_id = waste_records.id
+                        AND waste_transportations.status != ?
+                        AND waste_transportations.transportation_date <= ?
+                ), 0) < waste_records.quantity',
+                ['cancelled', $snapshotDate],
+            )
+            ->count();
     }
 
     /**

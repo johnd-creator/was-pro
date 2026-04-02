@@ -89,9 +89,21 @@ class WasteManagementDemoDataService
 
     protected function seedRolesAndPermissions(): void
     {
-        Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\RolesSeeder', '--no-interaction' => true]);
-        Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\PermissionsSeeder', '--no-interaction' => true]);
-        Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\RolePermissionsSeeder', '--no-interaction' => true]);
+        $originalSchema = $this->tenantService->getCurrentSchema();
+
+        try {
+            $this->tenantService->switchToPublic();
+
+            Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\RolesSeeder', '--no-interaction' => true]);
+            Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\PermissionsSeeder', '--no-interaction' => true]);
+            Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\RolePermissionsSeeder', '--no-interaction' => true]);
+        } finally {
+            if ($originalSchema && $originalSchema !== 'public') {
+                $this->tenantService->switchToSchema($originalSchema);
+            } else {
+                $this->tenantService->switchToPublic();
+            }
+        }
     }
 
     protected function deriveSchemaName(string $tenantCode): string

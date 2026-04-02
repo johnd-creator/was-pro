@@ -32,6 +32,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 // Interfaces
 interface Stats {
+    waste_total_records_snapshot: number;
+    waste_transported_records_snapshot: number;
+    waste_untransported_records_snapshot: number;
     total_waste_records: number;
     approved_records: number;
     pending_records: number;
@@ -83,6 +86,9 @@ interface Props {
         current_date: string;
         current_time: string;
         snapshot_month_label?: string;
+        risk_status: 'normal' | 'warning' | 'critical';
+        risk_label: string;
+        risk_tone: 'green' | 'orange' | 'red';
     };
     filters: {
         month: string | null;
@@ -122,6 +128,20 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+const wasteStatsContext = computed(() => {
+    const snapshotLabel = props.header.snapshot_month_label ?? 'periode aktif';
+    const snapshotDate = props.filters.month ? new Date(`${props.filters.month}-01`) : null;
+    const yearLabel = snapshotDate?.getFullYear() ?? new Date().getFullYear();
+
+    return {
+        label: 's.d. Snapshot',
+        totalHint: `Seluruh catatan limbah yang sudah tercatat sampai ${snapshotLabel}.`,
+        transportedHint: `Catatan yang sudah memiliki pengangkutan valid sampai ${snapshotLabel}.`,
+        backlogHint: `Catatan approved yang masih punya sisa pengangkutan pada ${snapshotLabel}, termasuk carry-over tahun sebelumnya.`,
+        yearHint: `Tahun ${yearLabel}`,
+    };
+});
 
 // Computed properties
 const combinedApprovals = computed(() => {
@@ -179,6 +199,9 @@ const entranceAnimationClass = computed(() =>
                     :pending-waste-approvals="pendingApprovals.length"
                     :pending-faba-approvals="fabaPendingApprovals.length"
                     :faba-warnings="fabaWarnings.length"
+                    :risk-status="header.risk_status"
+                    :risk-label="header.risk_label"
+                    :risk-tone="header.risk_tone"
                 />
             </section>
 
@@ -187,35 +210,44 @@ const entranceAnimationClass = computed(() =>
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                     <CompactStat
                         title="Total Limbah"
-                        :value="stats.total_waste_records"
+                        :value="stats.waste_total_records_snapshot"
+                        :context-label="wasteStatsContext.label"
+                        :hint="wasteStatsContext.totalHint"
                         color="blue"
                     />
                     <CompactStat
-                        title="Disetujui"
-                        :value="stats.approved_records"
+                        title="Limbah Terangkut"
+                        :value="stats.waste_transported_records_snapshot"
+                        :context-label="wasteStatsContext.label"
+                        :hint="wasteStatsContext.transportedHint"
                         color="emerald"
                     />
                     <CompactStat
-                        title="Pending"
-                        :value="stats.pending_records"
-                        :color="stats.pending_records > 0 ? 'orange' : 'blue'"
+                        title="Belum Terangkut"
+                        :value="stats.waste_untransported_records_snapshot"
+                        :context-label="wasteStatsContext.label"
+                        :hint="wasteStatsContext.backlogHint"
+                        :color="stats.waste_untransported_records_snapshot > 0 ? 'orange' : 'blue'"
                     />
                     <CompactStat
                         title="FABA Produksi"
                         :value="fabaStats.total_production"
                         unit="ton"
+                        :context-label="props.header.snapshot_month_label ?? wasteStatsContext.yearHint"
                         color="blue"
                     />
                     <CompactStat
                         title="FABA Pemanfaatan"
                         :value="fabaStats.total_utilization"
                         unit="ton"
+                        :context-label="props.header.snapshot_month_label ?? wasteStatsContext.yearHint"
                         color="emerald"
                     />
                     <CompactStat
                         title="Saldo FABA"
                         :value="fabaStats.current_balance"
                         unit="ton"
+                        :context-label="props.header.snapshot_month_label ?? wasteStatsContext.yearHint"
                         :color="fabaStats.current_balance < 0 ? 'red' : 'emerald'"
                     />
                 </div>

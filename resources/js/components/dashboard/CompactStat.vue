@@ -7,6 +7,8 @@ interface Props {
     value: string | number;
     unit?: string;
     href?: string;
+    contextLabel?: string;
+    hint?: string;
     color?: 'blue' | 'emerald' | 'orange' | 'red';
 }
 
@@ -57,7 +59,7 @@ const accentClasses = computed(() => {
                         accentClasses.chip,
                     ]"
                 >
-                    {{ unit || 'Status' }}
+                    {{ contextLabel || unit || 'Status' }}
                 </span>
             </div>
 
@@ -69,6 +71,12 @@ const accentClasses = computed(() => {
                 <span v-if="unit" class="ml-1 text-sm font-medium text-slate-400">
                     {{ unit }}
                 </span>
+            </p>
+            <p
+                v-if="hint"
+                class="mt-2 text-xs leading-5 text-slate-500"
+            >
+                {{ hint }}
             </p>
         </CardContent>
     </Card>

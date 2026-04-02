@@ -10,6 +10,7 @@ use App\Models\WasteRecord;
 use App\Models\WasteTransportation;
 use App\Models\WasteType;
 use App\Services\TenantService;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Artisan;
 use Inertia\Testing\AssertableInertia;
 
@@ -27,6 +28,13 @@ function migrateTenantSchema(Organization $organization): void
         '--force' => true,
     ]);
     $tenantService->switchToPublic();
+}
+
+function createDashboardWasteType(int $storagePeriodDays): WasteType
+{
+    return WasteType::factory()->create([
+        'storage_period_days' => $storagePeriodDays,
+    ]);
 }
 
 test('guests are redirected to the login page', function () {
@@ -69,6 +77,9 @@ test('authenticated users can visit the dashboard', function () {
             ->has('filters')
             ->has('availableMonths')
             ->has('availableOrganizations')
+            ->has('stats.waste_total_records_snapshot')
+            ->has('stats.waste_transported_records_snapshot')
+            ->has('stats.waste_untransported_records_snapshot')
         );
 });
 
@@ -364,11 +375,190 @@ test('dashboard filters metrics by selected month', function () {
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->where('filters.month', '2026-01')
             ->where('organizationName', $organization->name)
+            ->where('stats.waste_total_records_snapshot', 1)
             ->where('stats.total_waste_records', 1)
             ->where('fabaStats.total_production', 15)
             ->where('wasteByCategory.0.value', 15)
             ->where('fabaChart.5.month', 1)
             ->where('fabaChart.5.year', 2026)
+        );
+});
+
+test('dashboard exposes waste snapshot stats and untransported backlog up to the selected snapshot', function () {
+    $organization = Organization::factory()->create([
+        'code' => 'DASHSNAP',
+        'schema_name' => 'tenant_dashboard_snapshot',
+    ]);
+
+    migrateTenantSchema($organization);
+    $tenantService = app(TenantService::class);
+    $tenantService->switchToSchema($organization->schema_name);
+
+    $category = WasteCategory::factory()->create(['name' => 'B3']);
+    $characteristic = WasteCharacteristic::factory()->create();
+    $type = WasteType::factory()->create([
+        'category_id' => $category->id,
+        'characteristic_id' => $characteristic->id,
+    ]);
+
+    $januaryRecord = WasteRecord::factory()->approved()->create([
+        'waste_type_id' => $type->id,
+        'quantity' => 10,
+        'unit' => 'kg',
+        'date' => '2026-01-10',
+    ]);
+
+    $februaryRecord = WasteRecord::factory()->approved()->create([
+        'waste_type_id' => $type->id,
+        'quantity' => 20,
+        'unit' => 'kg',
+        'date' => '2026-02-14',
+    ]);
+
+    WasteRecord::factory()->pendingReview()->create([
+        'waste_type_id' => $type->id,
+        'quantity' => 15,
+        'unit' => 'kg',
+        'date' => '2026-03-18',
+    ]);
+
+    $vendor = Vendor::factory()->create();
+
+    WasteTransportation::query()->create([
+        'waste_record_id' => $januaryRecord->id,
+        'vendor_id' => $vendor->id,
+        'transportation_date' => '2026-01-18',
+        'quantity' => 10,
+        'unit' => 'kg',
+        'vehicle_number' => 'B 4567 YTD',
+        'driver_name' => 'Driver Januari',
+        'driver_phone' => '0812000101',
+        'status' => 'delivered',
+        'dispatched_at' => now()->subDays(10),
+        'delivered_at' => now()->subDays(9),
+    ]);
+
+    WasteTransportation::query()->create([
+        'waste_record_id' => $februaryRecord->id,
+        'vendor_id' => $vendor->id,
+        'transportation_date' => '2026-02-20',
+        'quantity' => 5,
+        'unit' => 'kg',
+        'vehicle_number' => 'B 4568 YTD',
+        'driver_name' => 'Driver Februari',
+        'driver_phone' => '0812000102',
+        'status' => 'cancelled',
+        'dispatched_at' => null,
+        'delivered_at' => null,
+    ]);
+
+    $tenantService->switchToPublic();
+
+    $user = User::factory()->create([
+        'organization_id' => $organization->id,
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard', [
+        'month' => '2026-03',
+    ]));
+
+    $response
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('stats.waste_total_records_snapshot', 3)
+            ->where('stats.waste_transported_records_snapshot', 1)
+            ->where('stats.waste_untransported_records_snapshot', 1)
+            ->where('stats.total_waste_records', 1)
+        );
+});
+
+test('dashboard waste backlog carries over across years until transportation is complete', function () {
+    $organization = Organization::factory()->create([
+        'code' => 'DASHCARRY',
+        'schema_name' => 'tenant_dashboard_carry',
+    ]);
+
+    migrateTenantSchema($organization);
+    $tenantService = app(TenantService::class);
+    $tenantService->switchToSchema($organization->schema_name);
+
+    $category = WasteCategory::factory()->create(['name' => 'B3']);
+    $characteristic = WasteCharacteristic::factory()->create();
+    $type = WasteType::factory()->create([
+        'category_id' => $category->id,
+        'characteristic_id' => $characteristic->id,
+    ]);
+
+    $novemberRecord = WasteRecord::factory()->approved()->create([
+        'waste_type_id' => $type->id,
+        'quantity' => 10,
+        'unit' => 'kg',
+        'date' => '2025-11-12',
+    ]);
+
+    $decemberRecord = WasteRecord::factory()->approved()->create([
+        'waste_type_id' => $type->id,
+        'quantity' => 18,
+        'unit' => 'kg',
+        'date' => '2025-12-15',
+    ]);
+
+    WasteRecord::factory()->approved()->create([
+        'waste_type_id' => $type->id,
+        'quantity' => 12,
+        'unit' => 'kg',
+        'date' => '2026-01-20',
+    ]);
+
+    $vendor = Vendor::factory()->create();
+
+    WasteTransportation::query()->create([
+        'waste_record_id' => $novemberRecord->id,
+        'vendor_id' => $vendor->id,
+        'transportation_date' => '2025-11-20',
+        'quantity' => 10,
+        'unit' => 'kg',
+        'vehicle_number' => 'B 5567 CAR',
+        'driver_name' => 'Driver November',
+        'driver_phone' => '0812000201',
+        'status' => 'delivered',
+        'dispatched_at' => now()->subDays(12),
+        'delivered_at' => now()->subDays(11),
+    ]);
+
+    WasteTransportation::query()->create([
+        'waste_record_id' => $decemberRecord->id,
+        'vendor_id' => $vendor->id,
+        'transportation_date' => '2025-12-22',
+        'quantity' => 6,
+        'unit' => 'kg',
+        'vehicle_number' => 'B 5568 CAR',
+        'driver_name' => 'Driver Desember',
+        'driver_phone' => '0812000202',
+        'status' => 'delivered',
+        'dispatched_at' => now()->subDays(8),
+        'delivered_at' => now()->subDays(7),
+    ]);
+
+    $tenantService->switchToPublic();
+
+    $user = User::factory()->create([
+        'organization_id' => $organization->id,
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard', [
+        'month' => '2026-01',
+    ]));
+
+    $response
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('stats.waste_total_records_snapshot', 3)
+            ->where('stats.waste_transported_records_snapshot', 2)
+            ->where('stats.waste_untransported_records_snapshot', 2)
+            ->where('stats.total_waste_records', 1)
         );
 });
 
@@ -448,4 +638,135 @@ test('superadmin can switch dashboard organization and tenant schema', function 
                     && $organizations->pluck('id')->contains($organizationB->id);
             })
         );
+});
+
+test('dashboard exposes critical risk metadata when expired waste exists', function () {
+    CarbonImmutable::setTestNow('2026-04-02 09:00:00');
+
+    $organization = Organization::factory()->create([
+        'code' => 'DASHRISKCRIT',
+        'schema_name' => 'tenant_dashboard_risk_critical',
+    ]);
+
+    migrateTenantSchema($organization);
+    $tenantService = app(TenantService::class);
+    $tenantService->switchToSchema($organization->schema_name);
+
+    $wasteType = createDashboardWasteType(1);
+
+    WasteRecord::factory()->approved()->create([
+        'waste_type_id' => $wasteType->id,
+        'date' => '2026-04-01',
+    ]);
+
+    $tenantService->switchToPublic();
+
+    $user = User::factory()->create([
+        'organization_id' => $organization->id,
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard', [
+        'month' => '2026-04',
+    ]));
+
+    $response
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('header.risk_status', 'critical')
+            ->where('header.risk_tone', 'red')
+            ->where('header.risk_label', 'Kritis')
+            ->where('notificationSummary.expired_waste_count', 1)
+            ->where('notificationSummary.faba_warnings_count', 0)
+        );
+
+    CarbonImmutable::setTestNow();
+});
+
+test('dashboard exposes warning risk metadata when waste is expiring soon', function () {
+    CarbonImmutable::setTestNow('2026-04-02 09:00:00');
+
+    $organization = Organization::factory()->create([
+        'code' => 'DASHRISKWARN',
+        'schema_name' => 'tenant_dashboard_risk_warning',
+    ]);
+
+    migrateTenantSchema($organization);
+    $tenantService = app(TenantService::class);
+    $tenantService->switchToSchema($organization->schema_name);
+
+    $wasteType = createDashboardWasteType(4);
+
+    WasteRecord::factory()->approved()->create([
+        'waste_type_id' => $wasteType->id,
+        'date' => '2026-04-01',
+    ]);
+
+    $tenantService->switchToPublic();
+
+    $user = User::factory()->create([
+        'organization_id' => $organization->id,
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard', [
+        'month' => '2026-04',
+    ]));
+
+    $response
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('header.risk_status', 'warning')
+            ->where('header.risk_tone', 'orange')
+            ->where('header.risk_label', 'Perlu Perhatian')
+            ->where('notificationSummary.expired_waste_count', 0)
+            ->where('notificationSummary.expiring_soon_waste_count', 1)
+            ->where('notificationSummary.faba_warnings_count', 0)
+        );
+
+    CarbonImmutable::setTestNow();
+});
+
+test('dashboard exposes normal risk metadata when no active compliance issues exist', function () {
+    CarbonImmutable::setTestNow('2026-04-02 09:00:00');
+
+    $organization = Organization::factory()->create([
+        'code' => 'DASHRISKNORM',
+        'schema_name' => 'tenant_dashboard_risk_normal',
+    ]);
+
+    migrateTenantSchema($organization);
+    $tenantService = app(TenantService::class);
+    $tenantService->switchToSchema($organization->schema_name);
+
+    $wasteType = createDashboardWasteType(20);
+
+    WasteRecord::factory()->approved()->create([
+        'waste_type_id' => $wasteType->id,
+        'date' => '2026-04-01',
+    ]);
+
+    $tenantService->switchToPublic();
+
+    $user = User::factory()->create([
+        'organization_id' => $organization->id,
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard', [
+        'month' => '2026-04',
+    ]));
+
+    $response
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('header.risk_status', 'normal')
+            ->where('header.risk_tone', 'green')
+            ->where('header.risk_label', 'Normal')
+            ->where('notificationSummary.expired_waste_count', 0)
+            ->where('notificationSummary.expiring_soon_waste_count', 0)
+            ->where('notificationSummary.faba_warnings_count', 0)
+        );
+
+    CarbonImmutable::setTestNow();
 });
