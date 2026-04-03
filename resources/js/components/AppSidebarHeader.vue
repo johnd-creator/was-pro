@@ -70,28 +70,38 @@ onUnmounted(() => {
 });
 
 // Get header metadata from page props
-const header = computed(() => props?.header as {
-    organization_name: string;
-    timezone: string;
-    current_date: string;
-    current_time: string;
-    risk_status: 'normal' | 'warning' | 'critical';
-    user: {
-        name: string;
-        email: string;
-        role: string;
-    };
-} | undefined);
+const header = computed(
+    () =>
+        props?.header as
+            | {
+                  organization_name: string;
+                  timezone: string;
+                  current_date: string;
+                  current_time: string;
+                  risk_status: 'normal' | 'warning' | 'critical';
+                  user: {
+                      name: string;
+                      email: string;
+                      role: string;
+                  };
+              }
+            | undefined,
+);
 
 // Get notification summary
-const notificationSummary = computed(() => props?.notificationSummary as {
-    total_count: number;
-    expired_waste_count: number;
-    expiring_soon_waste_count: number;
-    pending_waste_approvals_count: number;
-    pending_faba_approvals_count: number;
-    faba_warnings_count: number;
-} | undefined);
+const notificationSummary = computed(
+    () =>
+        props?.notificationSummary as
+            | {
+                  total_count: number;
+                  expired_waste_count: number;
+                  expiring_soon_waste_count: number;
+                  pending_waste_approvals_count: number;
+                  pending_faba_approvals_count: number;
+                  faba_warnings_count: number;
+              }
+            | undefined,
+);
 
 // Get user from page props
 const user = computed(() => props?.auth?.user as User | undefined);
@@ -99,21 +109,36 @@ const user = computed(() => props?.auth?.user as User | undefined);
 const isDashboardPage = computed(() => page.component === 'Dashboard');
 const isSuperAdmin = computed(() => user.value?.is_super_admin === true);
 
-const dashboardFilters = computed(() => props?.filters as {
-    month: string | null;
-    organization_id: string | null;
-} | undefined);
+const dashboardFilters = computed(
+    () =>
+        props?.filters as
+            | {
+                  month: string | null;
+                  organization_id: string | null;
+              }
+            | undefined,
+);
 
-const availableMonths = computed(() => (props?.availableMonths as Array<{
-    value: string;
-    label: string;
-}> | undefined) ?? []);
+const availableMonths = computed(
+    () =>
+        (props?.availableMonths as
+            | Array<{
+                  value: string;
+                  label: string;
+              }>
+            | undefined) ?? [],
+);
 
-const availableOrganizations = computed(() => (props?.availableOrganizations as Array<{
-    id: string;
-    name: string;
-    code: string;
-}> | undefined) ?? []);
+const availableOrganizations = computed(
+    () =>
+        (props?.availableOrganizations as
+            | Array<{
+                  id: string;
+                  name: string;
+                  code: string;
+              }>
+            | undefined) ?? [],
+);
 
 const snapshotForm = reactive({
     month: '',
@@ -124,17 +149,20 @@ const monthPickerOpen = ref(false);
 const activePickerYear = ref<number>(new Date().getFullYear());
 
 const availableYearMonths = computed(() => {
-    return availableMonths.value.reduce<Record<number, Set<number>>>((accumulator, month) => {
-        const [year, monthNumber] = month.value.split('-').map(Number);
+    return availableMonths.value.reduce<Record<number, Set<number>>>(
+        (accumulator, month) => {
+            const [year, monthNumber] = month.value.split('-').map(Number);
 
-        if (! accumulator[year]) {
-            accumulator[year] = new Set<number>();
-        }
+            if (!accumulator[year]) {
+                accumulator[year] = new Set<number>();
+            }
 
-        accumulator[year].add(monthNumber);
+            accumulator[year].add(monthNumber);
 
-        return accumulator;
-    }, {});
+            return accumulator;
+        },
+        {},
+    );
 });
 
 const availableYears = computed(() =>
@@ -148,7 +176,10 @@ const monthGrid = computed(() => {
 
     return Array.from({ length: 12 }, (_, index) => {
         const monthNumber = index + 1;
-        const isAvailable = availableYearMonths.value[activePickerYear.value]?.has(monthNumber) ?? false;
+        const isAvailable =
+            availableYearMonths.value[activePickerYear.value]?.has(
+                monthNumber,
+            ) ?? false;
         const value = `${activePickerYear.value}-${String(monthNumber).padStart(2, '0')}`;
 
         return {
@@ -168,7 +199,19 @@ watch(
         snapshotForm.organization_id = filters?.organization_id ?? '';
 
         if (filters?.month) {
-            activePickerYear.value = Number(filters.month.split('-')[0]);
+            // Handle both string format (YYYY-MM) and numeric month values
+            const monthValue = String(filters.month);
+            const yearMatch = monthValue.match(/^(\d{4})-/);
+            if (yearMatch) {
+                // String format: YYYY-MM
+                activePickerYear.value = Number(yearMatch[1]);
+            } else if (!isNaN(Number(monthValue))) {
+                // Numeric month format - use current year or first available year
+                activePickerYear.value =
+                    availableYears.value.length > 0
+                        ? availableYears.value[0]
+                        : new Date().getFullYear();
+            }
         } else if (availableYears.value.length > 0) {
             activePickerYear.value = availableYears.value[0];
         }
@@ -206,9 +249,14 @@ function selectOrganization(value: unknown): void {
 }
 
 function showPreviousYear(): void {
-    const currentYearIndex = availableYears.value.indexOf(activePickerYear.value);
+    const currentYearIndex = availableYears.value.indexOf(
+        activePickerYear.value,
+    );
 
-    if (currentYearIndex === -1 || currentYearIndex === availableYears.value.length - 1) {
+    if (
+        currentYearIndex === -1 ||
+        currentYearIndex === availableYears.value.length - 1
+    ) {
         return;
     }
 
@@ -216,7 +264,9 @@ function showPreviousYear(): void {
 }
 
 function showNextYear(): void {
-    const currentYearIndex = availableYears.value.indexOf(activePickerYear.value);
+    const currentYearIndex = availableYears.value.indexOf(
+        activePickerYear.value,
+    );
 
     if (currentYearIndex <= 0) {
         return;
@@ -224,14 +274,30 @@ function showNextYear(): void {
 
     activePickerYear.value = availableYears.value[currentYearIndex - 1];
 }
+
+function monthButtonClass(isSelected: boolean, isAvailable: boolean): string {
+    if (isSelected) {
+        return 'bg-slate-900 text-white shadow-sm shadow-slate-300/60 dark:bg-slate-100 dark:text-slate-950 dark:shadow-slate-950/20';
+    }
+
+    if (isAvailable) {
+        return 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800';
+    }
+
+    return 'cursor-not-allowed bg-slate-50 text-slate-300 dark:bg-slate-950 dark:text-slate-700';
+}
 </script>
 
 <template>
     <header
-        class="flex min-h-16 shrink-0 items-center justify-between gap-4 border-b border-sidebar-border/70 bg-white px-6 py-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-5"
+        class="flex min-h-16 shrink-0 items-center justify-between gap-4 border-b border-sidebar-border/70 bg-white px-6 py-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-5 dark:bg-slate-950"
     >
-        <div class="flex min-w-0 flex-1 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div class="flex min-w-0 flex-1 items-center gap-2">
+        <div
+            class="flex min-w-0 flex-1 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between"
+        >
+            <div
+                class="flex min-w-0 flex-1 items-center gap-2 text-slate-500 dark:text-slate-300"
+            >
                 <SidebarTrigger class="-ml-1" />
                 <template v-if="breadcrumbs && breadcrumbs.length > 0">
                     <Breadcrumbs :breadcrumbs="breadcrumbs" />
@@ -251,8 +317,10 @@ function showNextYear(): void {
                         >
                             <span class="truncate">
                                 {{
-                                    availableMonths.find((month) => month.value === snapshotForm.month)?.label
-                                    ?? 'Pilih bulan'
+                                    availableMonths.find(
+                                        (month) =>
+                                            month.value === snapshotForm.month,
+                                    )?.label ?? 'Pilih bulan'
                                 }}
                             </span>
                             <ChevronDown class="h-4 w-4 text-slate-500" />
@@ -260,26 +328,34 @@ function showNextYear(): void {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
                         align="end"
-                        class="w-[280px] rounded-xl border border-slate-200 p-3"
+                        class="wm-dropdown-surface w-[280px] rounded-xl p-3"
                     >
                         <div class="flex items-center justify-between gap-2">
                             <Button
                                 variant="ghost"
                                 size="sm"
                                 class="h-8 px-2"
-                                :disabled="availableYears.indexOf(activePickerYear) === availableYears.length - 1"
+                                :disabled="
+                                    availableYears.indexOf(activePickerYear) ===
+                                    availableYears.length - 1
+                                "
                                 @click="showPreviousYear"
                             >
                                 Tahun -
                             </Button>
-                            <div class="text-sm font-semibold text-slate-900">
+                            <div
+                                class="text-sm font-semibold text-slate-900 dark:text-slate-100"
+                            >
                                 {{ activePickerYear }}
                             </div>
                             <Button
                                 variant="ghost"
                                 size="sm"
                                 class="h-8 px-2"
-                                :disabled="availableYears.indexOf(activePickerYear) <= 0"
+                                :disabled="
+                                    availableYears.indexOf(activePickerYear) <=
+                                    0
+                                "
                                 @click="showNextYear"
                             >
                                 Tahun +
@@ -292,13 +368,12 @@ function showNextYear(): void {
                                 :key="month.value"
                                 type="button"
                                 class="rounded-lg px-3 py-2 text-sm font-medium transition-colors"
-                                :class="[
-                                    month.isSelected
-                                        ? 'bg-slate-900 text-white'
-                                        : month.isAvailable
-                                            ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                                            : 'cursor-not-allowed bg-slate-50 text-slate-300',
-                                ]"
+                                :class="
+                                    monthButtonClass(
+                                        month.isSelected,
+                                        month.isAvailable,
+                                    )
+                                "
                                 :disabled="!month.isAvailable"
                                 @click="selectMonth(month.value)"
                             >
@@ -331,32 +406,51 @@ function showNextYear(): void {
 
         <div class="flex items-center gap-3">
             <div class="hidden flex-col items-end text-xs md:flex">
-                <div class="font-semibold tabular-nums text-slate-900">
+                <div
+                    class="font-semibold text-slate-900 tabular-nums dark:text-slate-100"
+                >
                     {{ currentTime }}
                 </div>
-                <div class="text-[10px] text-slate-500">
+                <div class="text-[10px] text-slate-500 dark:text-slate-400">
                     {{ currentDate }} · {{ header?.timezone ?? 'WIB' }}
                 </div>
             </div>
 
             <DropdownMenu>
                 <DropdownMenuTrigger as-child>
-                    <Button variant="ghost" size="icon" class="relative rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        class="wm-trigger-ghost relative rounded-full"
+                    >
                         <Bell class="h-4 w-4" />
                         <span
-                            v-if="notificationSummary && notificationSummary.total_count > 0"
+                            v-if="
+                                notificationSummary &&
+                                notificationSummary.total_count > 0
+                            "
                             class="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white"
                         >
-                            {{ notificationSummary.total_count > 99 ? '99+' : notificationSummary.total_count }}
+                            {{
+                                notificationSummary.total_count > 99
+                                    ? '99+'
+                                    : notificationSummary.total_count
+                            }}
                         </span>
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" class="w-80">
+                <DropdownMenuContent
+                    align="end"
+                    class="wm-dropdown-surface w-80"
+                >
                     <DropdownMenuLabel class="font-normal">
                         <div class="flex items-center justify-between">
                             <span>Notifikasi</span>
                             <span
-                                v-if="notificationSummary && notificationSummary.total_count > 0"
+                                v-if="
+                                    notificationSummary &&
+                                    notificationSummary.total_count > 0
+                                "
                                 class="text-xs text-muted-foreground"
                             >
                                 {{ notificationSummary.total_count }} aktif
@@ -365,59 +459,112 @@ function showNextYear(): void {
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
 
-                    <div v-if="notificationSummary" class="max-h-80 overflow-y-auto">
+                    <div
+                        v-if="notificationSummary"
+                        class="max-h-80 overflow-y-auto"
+                    >
                         <!-- Expired waste -->
-                        <div v-if="notificationSummary.expired_waste_count > 0" class="px-3 py-2">
+                        <div
+                            v-if="notificationSummary.expired_waste_count > 0"
+                            class="px-3 py-2"
+                        >
                             <div class="flex items-start gap-2 text-sm">
-                                <AlertTriangle class="h-4 w-4 text-red-500 mt-0.5" />
+                                <AlertTriangle
+                                    class="mt-0.5 h-4 w-4 text-red-500"
+                                />
                                 <div>
-                                    <p class="font-medium text-red-600 dark:text-red-400">
-                                        {{ notificationSummary.expired_waste_count }} limbah melewati batas simpan
+                                    <p
+                                        class="font-medium text-red-600 dark:text-red-400"
+                                    >
+                                        {{
+                                            notificationSummary.expired_waste_count
+                                        }}
+                                        limbah melewati batas simpan
                                     </p>
                                     <p class="text-xs text-muted-foreground">
-                                        Segera tindak lanjuti catatan yang sudah melewati masa simpan aman.
+                                        Segera tindak lanjuti catatan yang sudah
+                                        melewati masa simpan aman.
                                     </p>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Expiring soon -->
-                        <div v-if="notificationSummary.expiring_soon_waste_count > 0" class="px-3 py-2">
+                        <div
+                            v-if="
+                                notificationSummary.expiring_soon_waste_count >
+                                0
+                            "
+                            class="px-3 py-2"
+                        >
                             <div class="flex items-start gap-2 text-sm">
-                                <AlertTriangle class="h-4 w-4 text-orange-500 mt-0.5" />
+                                <AlertTriangle
+                                    class="mt-0.5 h-4 w-4 text-orange-500"
+                                />
                                 <div>
-                                    <p class="font-medium text-orange-600 dark:text-orange-400">
-                                        {{ notificationSummary.expiring_soon_waste_count }} limbah mendekati batas simpan
+                                    <p
+                                        class="font-medium text-orange-600 dark:text-orange-400"
+                                    >
+                                        {{
+                                            notificationSummary.expiring_soon_waste_count
+                                        }}
+                                        limbah mendekati batas simpan
                                     </p>
                                     <p class="text-xs text-muted-foreground">
-                                        Catatan limbah akan mencapai batas simpan dalam 7 hari.
+                                        Catatan limbah akan mencapai batas
+                                        simpan dalam 7 hari.
                                     </p>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Pending approvals -->
-                        <div v-if="notificationSummary.pending_waste_approvals_count > 0" class="px-3 py-2">
+                        <div
+                            v-if="
+                                notificationSummary.pending_waste_approvals_count >
+                                0
+                            "
+                            class="px-3 py-2"
+                        >
                             <div class="flex items-start gap-2 text-sm">
-                                <Shield class="h-4 w-4 text-blue-500 mt-0.5" />
+                                <Shield class="mt-0.5 h-4 w-4 text-blue-500" />
                                 <div>
-                                    <p class="font-medium text-blue-600 dark:text-blue-400">
-                                        {{ notificationSummary.pending_waste_approvals_count }} approval limbah menunggu
+                                    <p
+                                        class="font-medium text-blue-600 dark:text-blue-400"
+                                    >
+                                        {{
+                                            notificationSummary.pending_waste_approvals_count
+                                        }}
+                                        approval limbah menunggu
                                     </p>
                                     <p class="text-xs text-muted-foreground">
-                                        Terdapat catatan limbah yang belum direview.
+                                        Terdapat catatan limbah yang belum
+                                        direview.
                                     </p>
                                 </div>
                             </div>
                         </div>
 
                         <!-- FABA approvals -->
-                        <div v-if="notificationSummary.pending_faba_approvals_count > 0" class="px-3 py-2">
+                        <div
+                            v-if="
+                                notificationSummary.pending_faba_approvals_count >
+                                0
+                            "
+                            class="px-3 py-2"
+                        >
                             <div class="flex items-start gap-2 text-sm">
-                                <Shield class="h-4 w-4 text-purple-500 mt-0.5" />
+                                <Shield
+                                    class="mt-0.5 h-4 w-4 text-purple-500"
+                                />
                                 <div>
-                                    <p class="font-medium text-purple-600 dark:text-purple-400">
-                                        {{ notificationSummary.pending_faba_approvals_count }} approval FABA menunggu
+                                    <p
+                                        class="font-medium text-purple-600 dark:text-purple-400"
+                                    >
+                                        {{
+                                            notificationSummary.pending_faba_approvals_count
+                                        }}
+                                        approval FABA menunggu
                                     </p>
                                     <p class="text-xs text-muted-foreground">
                                         Rekap bulanan FABA menunggu keputusan.
@@ -427,22 +574,39 @@ function showNextYear(): void {
                         </div>
 
                         <!-- FABA warnings -->
-                        <div v-if="notificationSummary.faba_warnings_count > 0" class="px-3 py-2">
+                        <div
+                            v-if="notificationSummary.faba_warnings_count > 0"
+                            class="px-3 py-2"
+                        >
                             <div class="flex items-start gap-2 text-sm">
-                                <AlertTriangle class="h-4 w-4 text-red-500 mt-0.5" />
+                                <AlertTriangle
+                                    class="mt-0.5 h-4 w-4 text-red-500"
+                                />
                                 <div>
-                                    <p class="font-medium text-red-600 dark:text-red-400">
-                                        {{ notificationSummary.faba_warnings_count }} peringatan FABA
+                                    <p
+                                        class="font-medium text-red-600 dark:text-red-400"
+                                    >
+                                        {{
+                                            notificationSummary.faba_warnings_count
+                                        }}
+                                        peringatan FABA
                                     </p>
                                     <p class="text-xs text-muted-foreground">
-                                        Terdeteksi anomali seperti saldo negatif atau data belum konsisten.
+                                        Terdeteksi anomali seperti saldo negatif
+                                        atau data belum konsisten.
                                     </p>
                                 </div>
                             </div>
                         </div>
 
                         <!-- No notifications -->
-                        <div v-if="notificationSummary && notificationSummary.total_count === 0" class="px-3 py-4 text-center text-sm text-muted-foreground">
+                        <div
+                            v-if="
+                                notificationSummary &&
+                                notificationSummary.total_count === 0
+                            "
+                            class="px-3 py-4 text-center text-sm text-muted-foreground"
+                        >
                             <p>Tidak ada notifikasi aktif</p>
                         </div>
                     </div>
@@ -452,22 +616,43 @@ function showNextYear(): void {
             <!-- User menu -->
             <DropdownMenu v-if="user">
                 <DropdownMenuTrigger as-child>
-                    <Button variant="ghost" class="flex items-center gap-3 rounded-full px-2 hover:bg-slate-100">
-                        <div class="hidden md:flex flex-col items-end text-xs text-left">
-                            <span class="font-semibold text-slate-900">{{ user.name }}</span>
-                            <span class="text-[10px] text-slate-500">
-                                {{ header?.organization_name ?? (header?.user?.role ?? 'User') }}
+                    <Button
+                        variant="ghost"
+                        class="wm-trigger-ghost flex items-center gap-3 rounded-full px-2"
+                    >
+                        <div
+                            class="hidden flex-col items-end text-left text-xs md:flex"
+                        >
+                            <span
+                                class="font-semibold text-slate-900 dark:text-slate-100"
+                                >{{ user.name }}</span
+                            >
+                            <span
+                                class="text-[10px] text-slate-500 dark:text-slate-400"
+                            >
+                                {{
+                                    header?.organization_name ??
+                                    header?.user?.role ??
+                                    'User'
+                                }}
                             </span>
                         </div>
-                        <Avatar class="size-9 border border-blue-200 bg-blue-50">
-                            <AvatarFallback class="bg-blue-50 text-xs font-semibold text-blue-700">
+                        <Avatar
+                            class="size-9 border border-blue-200 bg-blue-50 dark:border-blue-900/70 dark:bg-blue-950/60"
+                        >
+                            <AvatarFallback
+                                class="bg-blue-50 text-xs font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-200"
+                            >
                                 {{ getInitials(user.name) }}
                             </AvatarFallback>
                         </Avatar>
                         <ChevronDown class="h-4 w-4 text-muted-foreground" />
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent class="w-56" align="end">
+                <DropdownMenuContent
+                    class="wm-dropdown-surface w-56"
+                    align="end"
+                >
                     <UserMenuContent :user="user" />
                 </DropdownMenuContent>
             </DropdownMenu>

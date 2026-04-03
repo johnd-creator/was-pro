@@ -39,7 +39,7 @@ onMounted(async () => {
 </script>
 
 <template>
-    <Card class="w-full">
+    <Card class="w-full rounded-[24px] border-slate-200/80 bg-slate-50/60 shadow-none">
         <CardHeader>
             <CardTitle class="flex gap-3">
                 <LockKeyhole class="size-4" />Kode pemulihan 2FA

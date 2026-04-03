@@ -396,7 +396,7 @@ function isMobileSectionExpanded(title: string): boolean {
             class="flex w-full border-b border-sidebar-border/70"
         >
             <div
-                class="mx-auto flex h-12 w-full items-center justify-start px-4 text-neutral-500 md:max-w-7xl"
+                class="mx-auto flex h-12 w-full items-center justify-start px-4 text-neutral-500 md:max-w-7xl dark:text-slate-300"
             >
                 <Breadcrumbs :breadcrumbs="breadcrumbs" />
             </div>

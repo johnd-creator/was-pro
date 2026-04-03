@@ -82,6 +82,7 @@ class WasteTransportationsController extends Controller
                 return (float) ($record->transported_quantity ?? 0) < (float) $record->quantity;
             })
             ->map(function ($record) {
+                $totalQuantity = (float) $record->quantity;
                 $transported = (float) ($record->transported_quantity ?? 0);
 
                 return [
@@ -90,10 +91,10 @@ class WasteTransportationsController extends Controller
                     'date' => $record->date->format('Y-m-d'),
                     'waste_type' => $record->wasteType->name,
                     'category' => $record->wasteType->category->name ?? 'N/A',
-                    'total_quantity' => $record->quantity,
+                    'total_quantity' => $totalQuantity,
                     'unit' => $record->unit,
                     'transported_quantity' => $transported,
-                    'remaining_quantity' => $record->quantity - $transported,
+                    'remaining_quantity' => $totalQuantity - $transported,
                     'is_expired' => $record->isExpired(),
                     'is_expiring_soon' => $record->isExpiringSoon(),
                 ];
@@ -106,6 +107,7 @@ class WasteTransportationsController extends Controller
         if ($wasteRecordId) {
             $wasteRecord = WasteRecord::with(['wasteType', 'wasteType.category'])->find($wasteRecordId);
             if ($wasteRecord) {
+                $totalQuantity = (float) $wasteRecord->quantity;
                 $transported = WasteTransportation::where('waste_record_id', $wasteRecord->id)
                     ->where('status', '!=', 'cancelled')
                     ->sum('quantity');
@@ -116,9 +118,9 @@ class WasteTransportationsController extends Controller
                     'waste_type' => $wasteRecord->wasteType->name,
                     'category' => $wasteRecord->wasteType->category->name ?? 'N/A',
                     'unit' => $wasteRecord->unit,
-                    'total_quantity' => $wasteRecord->quantity,
-                    'transported_quantity' => $transported,
-                    'remaining_quantity' => $wasteRecord->quantity - $transported,
+                    'total_quantity' => $totalQuantity,
+                    'transported_quantity' => (float) $transported,
+                    'remaining_quantity' => $totalQuantity - (float) $transported,
                     'is_expired' => $wasteRecord->isExpired(),
                     'is_expiring_soon' => $wasteRecord->isExpiringSoon(),
                     'expiry_date' => $wasteRecord->expiry_date?->format('Y-m-d'),

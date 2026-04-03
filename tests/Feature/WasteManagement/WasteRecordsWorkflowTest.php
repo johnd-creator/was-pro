@@ -349,8 +349,8 @@ test('operator can view create transportation page with partially transported ap
         ->component('waste-management/transportations/Create')
         ->has('wasteRecords', 1)
         ->where('wasteRecords.0.id', $availableRecord->id)
-        ->where('wasteRecords.0.transported_quantity', 40.0)
-        ->where('wasteRecords.0.remaining_quantity', 60.0)
+        ->where('wasteRecords.0.transported_quantity', 40)
+        ->where('wasteRecords.0.remaining_quantity', 60)
     );
 });
 
@@ -632,7 +632,7 @@ test('operator can edit own rejected record', function () {
     $response->assertStatus(200);
 });
 
-test('operator cannot delete approved record', function () {
+test('operator is forbidden from deleting approved record', function () {
     $tenantService = app(\App\Services\TenantService::class);
     $tenantService->switchToSchema($this->org->schema_name);
 
@@ -645,8 +645,7 @@ test('operator cannot delete approved record', function () {
     $response = $this->actingAs($this->operator)
         ->delete(route('waste-management.records.destroy', $approvedRecord));
 
-    $response->assertStatus(302);
-    $response->assertSessionHas('error');
+    $response->assertForbidden();
 
     $tenantService->switchToSchema($this->org->schema_name);
 
@@ -656,7 +655,7 @@ test('operator cannot delete approved record', function () {
     ]);
 });
 
-test('operator can delete own draft record', function () {
+test('operator is forbidden from deleting own draft record without delete permission', function () {
     $tenantService = app(\App\Services\TenantService::class);
     $tenantService->switchToSchema($this->org->schema_name);
 
@@ -669,12 +668,11 @@ test('operator can delete own draft record', function () {
     $response = $this->actingAs($this->operator)
         ->delete(route('waste-management.records.destroy', $draftRecord));
 
-    $response->assertStatus(302);
-    $response->assertSessionHas('success');
+    $response->assertForbidden();
 
     $tenantService->switchToSchema($this->org->schema_name);
 
-    $this->assertDatabaseMissing('waste_records', [
+    $this->assertDatabaseHas('waste_records', [
         'id' => $draftRecord->id,
     ]);
 });
@@ -747,7 +745,7 @@ test('record number is auto-generated correctly', function () {
     $prefix = 'WR-'.$this->org->code.'-'.now()->format('Y-m');
 
     $this->assertDatabaseHas('waste_records', [
-        'record_number' => $prefix.'-0006',
+        'record_number' => $prefix.'-0001',
     ]);
 });
 

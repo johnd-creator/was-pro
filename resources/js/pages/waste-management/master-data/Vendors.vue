@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { format } from 'date-fns';
+import { Plus } from 'lucide-vue-next';
 import { ref } from 'vue';
 import VendorsController from '@/actions/App/Http/Controllers/WasteManagement/MasterData/VendorsController';
 import Heading from '@/components/Heading.vue';
@@ -51,7 +52,7 @@ type Props = {
     vendors: Vendor[];
 };
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
@@ -59,7 +60,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
         href: '/waste-management/master-data',
     },
     {
-        title: 'Vendors',
+        title: 'Vendor',
         href: '/waste-management/master-data/vendors',
     },
 ];
@@ -152,7 +153,7 @@ function getLicenseStatusBadge(licenseExpiryDate: string | null) {
     if (!licenseExpiryDate) {
         return {
             class: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
-            text: 'No License',
+            text: 'Tidak ada lisensi',
         };
     }
 
@@ -165,12 +166,12 @@ function getLicenseStatusBadge(licenseExpiryDate: string | null) {
     if (daysUntilExpiry < 0) {
         return {
             class: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-            text: 'Expired',
+            text: 'Kedaluwarsa',
         };
     } else if (daysUntilExpiry <= 30) {
         return {
             class: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-            text: `Expiring Soon (${daysUntilExpiry}d)`,
+            text: `Segera berakhir (${daysUntilExpiry}h)`,
         };
     } else {
         return {
@@ -182,252 +183,397 @@ function getLicenseStatusBadge(licenseExpiryDate: string | null) {
 </script>
 
 <template>
-    <WasteManagementLayout :breadcrumbs="breadcrumbItems" title="Vendors">
-        <Head title="Vendors - Waste Management" />
+    <WasteManagementLayout :breadcrumbs="breadcrumbItems" title="Vendor">
+        <Head title="Vendor - Waste Management" />
 
-        <div class="space-y-6 p-6">
-            <div class="flex items-center justify-between">
-                <Heading
-                    title="Vendors"
-                    description="Manage waste transportation vendors"
-                />
-                <Dialog v-model:open="dialogOpen">
-                    <DialogTrigger as-child>
-                        <Button @click="openCreateDialog">Add Vendor</Button>
-                    </DialogTrigger>
-                    <DialogContent class="sm:max-w-[600px]">
-                        <DialogHeader>
-                            <DialogTitle>
-                                {{
-                                    editingVendor
-                                        ? 'Edit Vendor'
-                                        : 'Create Vendor'
-                                }}
-                            </DialogTitle>
-                            <DialogDescription>
-                                {{
-                                    editingVendor
-                                        ? 'Update vendor details.'
-                                        : 'Add a new vendor to the system.'
-                                }}
-                            </DialogDescription>
-                        </DialogHeader>
-                        <form
-                            @submit.prevent="submit"
-                            class="max-h-[600px] space-y-4 overflow-y-auto"
+        <div
+            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
+        >
+            <div
+                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px]"
+            />
+            <div
+                class="pointer-events-none absolute -top-10 left-1/4 -z-10 h-56 w-56 rounded-full bg-emerald-200/18 blur-3xl"
+            />
+
+            <div class="space-y-8">
+                <section
+                    class="wm-surface-hero overflow-hidden rounded-[30px] to-emerald-50/20 dark:to-emerald-950/18"
+                >
+                    <div
+                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:p-6"
+                    >
+                        <div class="space-y-5">
+                            <div class="space-y-3">
+                                <p
+                                    class="text-[11px] font-semibold tracking-[0.16em] text-emerald-700/70 uppercase"
+                                >
+                                    Vendor Registry
+                                </p>
+                                <Heading
+                                    title="Vendor Angkutan"
+                                    description="Kelola vendor transportasi limbah, status lisensi, dan data kontak dari satu registry operasional."
+                                />
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <div
+                                    class="wm-hero-stat-card wm-hero-stat-neutral"
+                                >
+                                    <p
+                                        class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
+                                    >
+                                        Vendor
+                                    </p>
+                                    <p
+                                        class="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                                    >
+                                        {{ props.vendors.length }}
+                                    </p>
+                                </div>
+                                <div
+                                    class="wm-hero-stat-card wm-hero-stat-emerald"
+                                >
+                                    <p
+                                        class="text-[11px] font-semibold tracking-[0.14em] text-emerald-700/80 uppercase"
+                                    >
+                                        Aktif
+                                    </p>
+                                    <p
+                                        class="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                                    >
+                                        {{
+                                            props.vendors.filter(
+                                                (vendor) => vendor.is_active,
+                                            ).length
+                                        }}
+                                    </p>
+                                </div>
+                                <div
+                                    class="wm-hero-stat-card wm-hero-stat-amber"
+                                >
+                                    <p
+                                        class="text-[11px] font-semibold tracking-[0.14em] text-amber-700/80 uppercase"
+                                    >
+                                        Transportasi
+                                    </p>
+                                    <p
+                                        class="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                                    >
+                                        {{
+                                            props.vendors.reduce(
+                                                (total, vendor) =>
+                                                    total +
+                                                    vendor.transportations_count,
+                                                0,
+                                            )
+                                        }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            class="wm-surface-panel space-y-3 rounded-[28px] p-5"
                         >
-                            <div class="grid gap-2">
-                                <Label for="name">Company Name *</Label>
-                                <Input
-                                    id="name"
-                                    v-model="formData.name"
-                                    required
-                                    placeholder="Vendor company name"
-                                />
-                            </div>
-
-                            <div class="grid gap-2">
-                                <Label for="code">Code *</Label>
-                                <Input
-                                    id="code"
-                                    v-model="formData.code"
-                                    required
-                                    placeholder="VENDOR_CODE"
-                                    :disabled="!!editingVendor"
-                                />
-                            </div>
-
-                            <div class="grid gap-2">
-                                <Label for="description">Description</Label>
-                                <Textarea
-                                    id="description"
-                                    v-model="formData.description"
-                                    placeholder="Vendor description"
-                                    rows="2"
-                                />
-                            </div>
-
-                            <div class="grid grid-cols-2 gap-4">
-                                <div class="grid gap-2">
-                                    <Label for="contact_person"
-                                        >Contact Person</Label
-                                    >
-                                    <Input
-                                        id="contact_person"
-                                        v-model="formData.contact_person"
-                                        placeholder="Full name"
-                                    />
-                                </div>
-
-                                <div class="grid gap-2">
-                                    <Label for="phone">Phone</Label>
-                                    <Input
-                                        id="phone"
-                                        v-model="formData.phone"
-                                        type="tel"
-                                        placeholder="Phone number"
-                                    />
-                                </div>
-                            </div>
-
-                            <div class="grid gap-2">
-                                <Label for="email">Email</Label>
-                                <Input
-                                    id="email"
-                                    v-model="formData.email"
-                                    type="email"
-                                    placeholder="Email address"
-                                />
-                            </div>
-
-                            <div class="grid gap-2">
-                                <Label for="address">Address</Label>
-                                <Textarea
-                                    id="address"
-                                    v-model="formData.address"
-                                    placeholder="Complete address"
-                                    rows="2"
-                                />
-                            </div>
-
-                            <div class="grid grid-cols-2 gap-4">
-                                <div class="grid gap-2">
-                                    <Label for="license_number"
-                                        >License Number</Label
-                                    >
-                                    <Input
-                                        id="license_number"
-                                        v-model="formData.license_number"
-                                        placeholder="License number"
-                                    />
-                                </div>
-
-                                <div class="grid gap-2">
-                                    <Label for="license_expiry_date"
-                                        >License Expiry Date</Label
-                                    >
-                                    <Input
-                                        id="license_expiry_date"
-                                        v-model="formData.license_expiry_date"
-                                        type="date"
-                                    />
-                                </div>
-                            </div>
-
-                            <div class="flex items-center space-x-2">
-                                <Switch
-                                    id="is_active"
-                                    v-model:checked="formData.is_active"
-                                />
-                                <Label for="is_active">Active</Label>
-                            </div>
-
-                            <DialogFooter>
-                                <Button type="submit">
-                                    {{ editingVendor ? 'Update' : 'Create' }}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
-            </div>
-
-            <div class="rounded-md border">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Company</TableHead>
-                            <TableHead>Code</TableHead>
-                            <TableHead>Contact</TableHead>
-                            <TableHead>Phone</TableHead>
-                            <TableHead>License</TableHead>
-                            <TableHead>License Status</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead class="text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        <TableRow v-if="vendors.length === 0">
-                            <TableCell
-                                :colspan="8"
-                                class="text-center text-muted-foreground"
+                            <Button
+                                class="w-full justify-between"
+                                @click="openCreateDialog"
                             >
-                                No vendors found.
-                            </TableCell>
-                        </TableRow>
-                        <TableRow v-for="vendor in vendors" :key="vendor.id">
-                            <TableCell class="font-medium">{{
-                                vendor.name
-                            }}</TableCell>
-                            <TableCell class="font-mono text-xs">{{
-                                vendor.code
-                            }}</TableCell>
-                            <TableCell>
-                                <div class="text-sm">
-                                    <div class="font-medium">
-                                        {{ vendor.contact_person || '-' }}
+                                Tambah vendor
+                                <Plus class="h-4 w-4" />
+                            </Button>
+                            <div
+                                class="wm-surface-subtle rounded-[22px] p-4 text-sm leading-6 text-slate-600 dark:text-slate-300"
+                            >
+                                Audit vendor aktif dan status lisensi sebelum
+                                dipakai untuk pengangkutan.
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section
+                    class="wm-surface-elevated overflow-hidden rounded-[28px]"
+                >
+                    <div
+                        class="flex items-center justify-between border-b border-slate-200/80 bg-slate-50/90 px-5 py-4 dark:bg-slate-900/80"
+                    >
+                        <div>
+                            <p
+                                class="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400"
+                            >
+                                Daftar Vendor
+                            </p>
+                            <p
+                                class="text-sm text-slate-600 dark:text-slate-300"
+                            >
+                                Perusahaan, kontak, lisensi, dan status vendor
+                                transportasi.
+                            </p>
+                        </div>
+                        <div
+                            class="rounded-full border border-slate-200/80 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300"
+                        >
+                            {{ props.vendors.length }} vendor
+                        </div>
+                    </div>
+                    <Dialog v-model:open="dialogOpen">
+                        <DialogTrigger as-child>
+                            <span class="hidden" />
+                        </DialogTrigger>
+                        <DialogContent class="sm:max-w-[600px]">
+                            <DialogHeader>
+                                <DialogTitle>
+                                    {{
+                                        editingVendor
+                                            ? 'Ubah vendor'
+                                            : 'Buat vendor'
+                                    }}
+                                </DialogTitle>
+                                <DialogDescription>
+                                    {{
+                                        editingVendor
+                                            ? 'Perbarui detail vendor.'
+                                            : 'Tambahkan vendor baru ke sistem.'
+                                    }}
+                                </DialogDescription>
+                            </DialogHeader>
+                            <form
+                                @submit.prevent="submit"
+                                class="max-h-[600px] space-y-4 overflow-y-auto"
+                            >
+                                <div class="grid gap-2">
+                                    <Label for="name">Nama Perusahaan *</Label>
+                                    <Input
+                                        id="name"
+                                        v-model="formData.name"
+                                        required
+                                        placeholder="Nama perusahaan vendor"
+                                    />
+                                </div>
+
+                                <div class="grid gap-2">
+                                    <Label for="code">Kode *</Label>
+                                    <Input
+                                        id="code"
+                                        v-model="formData.code"
+                                        required
+                                        placeholder="VENDOR_CODE"
+                                        :disabled="!!editingVendor"
+                                    />
+                                </div>
+
+                                <div class="grid gap-2">
+                                    <Label for="description">Deskripsi</Label>
+                                    <Textarea
+                                        id="description"
+                                        v-model="formData.description"
+                                        placeholder="Deskripsi vendor"
+                                        rows="2"
+                                    />
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="grid gap-2">
+                                        <Label for="contact_person">PIC</Label>
+                                        <Input
+                                            id="contact_person"
+                                            v-model="formData.contact_person"
+                                            placeholder="Nama lengkap"
+                                        />
+                                    </div>
+
+                                    <div class="grid gap-2">
+                                        <Label for="phone">Telepon</Label>
+                                        <Input
+                                            id="phone"
+                                            v-model="formData.phone"
+                                            type="tel"
+                                            placeholder="Nomor telepon"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="grid gap-2">
+                                    <Label for="email">Email</Label>
+                                    <Input
+                                        id="email"
+                                        v-model="formData.email"
+                                        type="email"
+                                        placeholder="Email address"
+                                    />
+                                </div>
+
+                                <div class="grid gap-2">
+                                    <Label for="address">Alamat</Label>
+                                    <Textarea
+                                        id="address"
+                                        v-model="formData.address"
+                                        placeholder="Alamat lengkap"
+                                        rows="2"
+                                    />
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="grid gap-2">
+                                        <Label for="license_number"
+                                            >Nomor Lisensi</Label
+                                        >
+                                        <Input
+                                            id="license_number"
+                                            v-model="formData.license_number"
+                                            placeholder="Nomor lisensi"
+                                        />
+                                    </div>
+
+                                    <div class="grid gap-2">
+                                        <Label for="license_expiry_date"
+                                            >Tanggal Berakhir Lisensi</Label
+                                        >
+                                        <Input
+                                            id="license_expiry_date"
+                                            v-model="
+                                                formData.license_expiry_date
+                                            "
+                                            type="date"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center space-x-2">
+                                    <Switch
+                                        id="is_active"
+                                        v-model:checked="formData.is_active"
+                                    />
+                                    <Label for="is_active">Aktif</Label>
+                                </div>
+
+                                <DialogFooter>
+                                    <Button type="submit">
+                                        {{
+                                            editingVendor
+                                                ? 'Simpan perubahan'
+                                                : 'Buat vendor'
+                                        }}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                    <Table>
+                        <TableHeader
+                            class="bg-slate-50/90 dark:bg-slate-900/80"
+                        >
+                            <TableRow
+                                class="border-slate-200/80 dark:border-slate-800/80"
+                            >
+                                <TableHead>Perusahaan</TableHead>
+                                <TableHead>Kode</TableHead>
+                                <TableHead>Kontak</TableHead>
+                                <TableHead>Telepon</TableHead>
+                                <TableHead>Lisensi</TableHead>
+                                <TableHead>Status Lisensi</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead class="text-right">Aksi</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow v-if="vendors.length === 0">
+                                <TableCell
+                                    :colspan="8"
+                                    class="text-center text-muted-foreground"
+                                >
+                                    Belum ada vendor.
+                                </TableCell>
+                            </TableRow>
+                            <TableRow
+                                v-for="vendor in vendors"
+                                :key="vendor.id"
+                                class="border-slate-200/70 dark:border-slate-800/70"
+                            >
+                                <TableCell class="font-medium">{{
+                                    vendor.name
+                                }}</TableCell>
+                                <TableCell class="font-mono text-xs">{{
+                                    vendor.code
+                                }}</TableCell>
+                                <TableCell>
+                                    <div class="text-sm">
+                                        <div class="font-medium">
+                                            {{ vendor.contact_person || '-' }}
+                                        </div>
+                                        <div
+                                            class="text-xs text-muted-foreground"
+                                        >
+                                            {{ vendor.email || '-' }}
+                                        </div>
+                                    </div>
+                                </TableCell>
+                                <TableCell>{{ vendor.phone || '-' }}</TableCell>
+                                <TableCell class="text-sm">
+                                    <div>
+                                        {{ vendor.license_number || '-' }}
                                     </div>
                                     <div class="text-xs text-muted-foreground">
-                                        {{ vendor.email || '-' }}
+                                        {{
+                                            formatDate(
+                                                vendor.license_expiry_date,
+                                            )
+                                        }}
                                     </div>
-                                </div>
-                            </TableCell>
-                            <TableCell>{{ vendor.phone || '-' }}</TableCell>
-                            <TableCell class="text-sm">
-                                <div>{{ vendor.license_number || '-' }}</div>
-                                <div class="text-xs text-muted-foreground">
-                                    {{ formatDate(vendor.license_expiry_date) }}
-                                </div>
-                            </TableCell>
-                            <TableCell>
-                                <Badge
-                                    :class="
-                                        getLicenseStatusBadge(
-                                            vendor.license_expiry_date,
-                                        ).class
-                                    "
-                                >
-                                    {{
-                                        getLicenseStatusBadge(
-                                            vendor.license_expiry_date,
-                                        ).text
-                                    }}
-                                </Badge>
-                            </TableCell>
-                            <TableCell>
-                                <span
-                                    class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium"
-                                    :class="
-                                        vendor.is_active
-                                            ? 'bg-green-100 text-green-800'
-                                            : 'bg-red-100 text-red-800'
-                                    "
-                                >
-                                    {{
-                                        vendor.is_active ? 'Active' : 'Inactive'
-                                    }}
-                                </span>
-                            </TableCell>
-                            <TableCell class="text-right">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    @click="openEditDialog(vendor)"
-                                >
-                                    Edit
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    class="text-destructive"
-                                    @click="deleteVendor(vendor)"
-                                >
-                                    Delete
-                                </Button>
-                            </TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge
+                                        :class="
+                                            getLicenseStatusBadge(
+                                                vendor.license_expiry_date,
+                                            ).class
+                                        "
+                                    >
+                                        {{
+                                            getLicenseStatusBadge(
+                                                vendor.license_expiry_date,
+                                            ).text
+                                        }}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <span
+                                        class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium"
+                                        :class="
+                                            vendor.is_active
+                                                ? 'bg-green-100 text-green-800'
+                                                : 'bg-red-100 text-red-800'
+                                        "
+                                    >
+                                        {{
+                                            vendor.is_active
+                                                ? 'Aktif'
+                                                : 'Nonaktif'
+                                        }}
+                                    </span>
+                                </TableCell>
+                                <TableCell class="text-right">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        @click="openEditDialog(vendor)"
+                                    >
+                                        Ubah
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        class="text-destructive"
+                                        @click="deleteVendor(vendor)"
+                                    >
+                                        Hapus
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </section>
             </div>
         </div>
     </WasteManagementLayout>

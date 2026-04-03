@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import {
+    ArrowRight,
     CircleAlert,
     CircleCheck,
     RotateCcw,
+    SlidersHorizontal,
     ShieldCheck,
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -223,181 +225,199 @@ function formatModuleName(module: string): string {
     <AppLayout :breadcrumbs="breadcrumbItems">
         <Head title="Akses Peran" />
 
-        <div class="space-y-6 px-6 py-6">
-            <Alert
-                v-if="statusMessage"
-                class="border-green-200 bg-green-50 text-green-800"
-            >
-                <CircleCheck class="h-4 w-4 !text-green-600" />
-                <AlertTitle>Berhasil</AlertTitle>
-                <AlertDescription>{{ statusMessage }}</AlertDescription>
-            </Alert>
-
-            <Alert v-if="errorMessage" variant="destructive">
-                <CircleAlert class="h-4 w-4" />
-                <AlertTitle>Pembaruan gagal</AlertTitle>
-                <AlertDescription>{{ errorMessage }}</AlertDescription>
-            </Alert>
-
-            <Heading
-                title="Akses Peran"
-                description="Tinjau dan perbarui hak akses untuk setiap peran secara bertahap"
+        <div
+            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
+        >
+            <div
+                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[360px]"
+            />
+            <div
+                class="pointer-events-none absolute -top-10 left-1/3 -z-10 h-56 w-56 rounded-full bg-amber-200/18 blur-3xl"
+            />
+            <div
+                class="pointer-events-none absolute top-20 right-0 -z-10 h-64 w-64 rounded-full bg-blue-200/12 blur-3xl"
             />
 
-            <div
-                v-if="props.roles.length === 0"
-                class="rounded-lg border p-10 text-center text-muted-foreground"
-            >
-                <ShieldCheck class="mx-auto mb-3 h-10 w-10 opacity-30" />
-                <p class="text-sm font-medium text-foreground">
-                    Belum ada peran
-                </p>
-                <p class="text-xs">
-                    Buat peran terlebih dahulu sebelum mengatur hak akses.
-                </p>
-            </div>
-
-            <div
-                v-else-if="modules.length === 0"
-                class="rounded-lg border p-10 text-center text-muted-foreground"
-            >
-                <ShieldCheck class="mx-auto mb-3 h-10 w-10 opacity-30" />
-                <p class="text-sm font-medium text-foreground">
-                    Belum ada hak akses
-                </p>
-                <p class="text-xs">
-                    Tambahkan hak akses terlebih dahulu sebelum mengubah akses
-                    peran.
-                </p>
-            </div>
-
-            <div v-else class="space-y-6">
-                <Card
-                    v-for="role in props.roles"
-                    :key="role.id"
-                    class="border-border/80 shadow-sm"
+            <div class="space-y-8">
+                <Alert
+                    v-if="statusMessage"
+                    class="border-green-200 bg-green-50 text-green-800"
                 >
-                    <CardHeader
-                        class="sticky top-0 z-10 gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85"
+                    <CircleCheck class="h-4 w-4 !text-green-600" />
+                    <AlertTitle>Berhasil</AlertTitle>
+                    <AlertDescription>{{ statusMessage }}</AlertDescription>
+                </Alert>
+
+                <Alert v-if="errorMessage" variant="destructive">
+                    <CircleAlert class="h-4 w-4" />
+                    <AlertTitle>Pembaruan gagal</AlertTitle>
+                    <AlertDescription>{{ errorMessage }}</AlertDescription>
+                </Alert>
+
+                <section
+                    class="wm-surface-hero overflow-hidden rounded-[30px] to-amber-50/20 dark:to-amber-950/18"
+                >
+                    <div
+                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6"
                     >
-                        <div
-                            class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
-                        >
-                            <div class="space-y-2">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <CardTitle>{{ role.name }}</CardTitle>
-                                    <Badge variant="secondary">{{
-                                        role.slug
-                                    }}</Badge>
-                                    <Badge
-                                        :variant="
-                                            isDirty(role.id)
-                                                ? 'default'
-                                                : 'outline'
-                                        "
+                        <div class="space-y-5">
+                            <div class="space-y-3">
+                                <p
+                                    class="text-[11px] font-semibold tracking-[0.16em] text-amber-700/70 uppercase"
+                                >
+                                    Permission Matrix
+                                </p>
+                                <Heading
+                                    title="Akses Peran"
+                                    description="Tinjau dan perbarui hak akses lintas modul dengan layout matriks yang lebih jelas untuk audit perubahan."
+                                />
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <div
+                                    class="wm-hero-stat-card wm-hero-stat-neutral"
+                                >
+                                    <p
+                                        class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
                                     >
-                                        {{
-                                            isDirty(role.id)
-                                                ? `${changedPermissionCount(role.id)} perubahan belum disimpan`
-                                                : 'Tersimpan'
-                                        }}
-                                    </Badge>
-                                </div>
-                                <CardDescription>
-                                    {{
-                                        role.description ||
-                                        'Belum ada deskripsi untuk peran ini.'
-                                    }}
-                                </CardDescription>
-                                <div class="text-sm text-muted-foreground">
-                                    {{ countSelectedPermissions(role.id) }} dari
-                                    {{ props.permissions.length }} hak akses
-                                    aktif
+                                        Peran
+                                    </p>
+                                    <p
+                                        class="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                                    >
+                                        {{ roles.length }}
+                                    </p>
                                 </div>
                                 <div
-                                    v-if="isDirty(role.id)"
-                                    class="text-sm text-amber-700"
+                                    class="wm-hero-stat-card wm-hero-stat-blue"
                                 >
-                                    {{ changedPermissionCount(role.id) }}
-                                    hak akses berubah dari konfigurasi awal
+                                    <p
+                                        class="text-[11px] font-semibold tracking-[0.14em] text-blue-700/80 uppercase"
+                                    >
+                                        Modul
+                                    </p>
+                                    <p
+                                        class="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                                    >
+                                        {{ modules.length }}
+                                    </p>
+                                </div>
+                                <div
+                                    class="wm-hero-stat-card wm-hero-stat-emerald"
+                                >
+                                    <p
+                                        class="text-[11px] font-semibold tracking-[0.14em] text-emerald-700/80 uppercase"
+                                    >
+                                        Permission
+                                    </p>
+                                    <p
+                                        class="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                                    >
+                                        {{ permissions.length }}
+                                    </p>
                                 </div>
                             </div>
+                        </div>
 
-                            <div class="flex flex-wrap items-center gap-2">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    @click="selectAllPermissions(role.id)"
+                        <div
+                            class="wm-surface-panel space-y-3 rounded-[28px] p-5"
+                        >
+                            <div class="wm-surface-subtle rounded-[22px] p-4">
+                                <p
+                                    class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
                                 >
-                                    Pilih semua
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    @click="clearAllPermissions(role.id)"
+                                    Mode kerja
+                                </p>
+                                <p
+                                    class="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300"
                                 >
-                                    Kosongkan semua
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    :disabled="
-                                        !isDirty(role.id) ||
-                                        savingRoleId === role.id
-                                    "
-                                    @click="resetRole(role.id)"
-                                >
-                                    <RotateCcw class="mr-2 h-4 w-4" />
-                                    Atur ulang
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    :disabled="
-                                        !isDirty(role.id) ||
-                                        savingRoleId === role.id
-                                    "
-                                    @click="saveRole(role)"
-                                >
-                                    <Spinner
-                                        v-if="savingRoleId === role.id"
-                                        class="mr-2"
-                                    />
-                                    {{
-                                        savingRoleId === role.id
-                                            ? 'Menyimpan...'
-                                            : 'Simpan perubahan'
-                                    }}
-                                </Button>
+                                    Audit per peran, cek perubahan, lalu simpan
+                                    hanya jika konfigurasi sudah final.
+                                </p>
                             </div>
                         </div>
-                    </CardHeader>
+                    </div>
+                </section>
 
-                    <CardContent class="space-y-5 p-6">
-                        <section
-                            v-for="module in modules"
-                            :key="`${role.id}-${module}`"
-                            class="rounded-lg border border-border/70"
+                <div
+                    v-if="props.roles.length === 0"
+                    class="rounded-lg border p-10 text-center text-muted-foreground"
+                >
+                    <ShieldCheck class="mx-auto mb-3 h-10 w-10 opacity-30" />
+                    <p class="text-sm font-medium text-foreground">
+                        Belum ada peran
+                    </p>
+                    <p class="text-xs">
+                        Buat peran terlebih dahulu sebelum mengatur hak akses.
+                    </p>
+                </div>
+
+                <div
+                    v-else-if="modules.length === 0"
+                    class="rounded-lg border p-10 text-center text-muted-foreground"
+                >
+                    <ShieldCheck class="mx-auto mb-3 h-10 w-10 opacity-30" />
+                    <p class="text-sm font-medium text-foreground">
+                        Belum ada hak akses
+                    </p>
+                    <p class="text-xs">
+                        Tambahkan hak akses terlebih dahulu sebelum mengubah
+                        akses peran.
+                    </p>
+                </div>
+
+                <div v-else class="space-y-6">
+                    <Card
+                        v-for="role in props.roles"
+                        :key="role.id"
+                        class="wm-surface-elevated overflow-hidden rounded-[28px]"
+                    >
+                        <CardHeader
+                            class="sticky top-0 z-10 gap-4 border-b border-slate-200/80 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 dark:bg-slate-950/80"
                         >
                             <div
-                                class="flex flex-col gap-3 border-b bg-muted/30 px-4 py-3 md:flex-row md:items-center md:justify-between"
+                                class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
                             >
-                                <div>
-                                    <h3 class="font-medium">
-                                        {{ formatModuleName(module) }}
-                                    </h3>
-                                    <p class="text-sm text-muted-foreground">
+                                <div class="space-y-2">
+                                    <div
+                                        class="flex flex-wrap items-center gap-2"
+                                    >
+                                        <CardTitle>{{ role.name }}</CardTitle>
+                                        <Badge variant="secondary">{{
+                                            role.slug
+                                        }}</Badge>
+                                        <Badge
+                                            :variant="
+                                                isDirty(role.id)
+                                                    ? 'default'
+                                                    : 'outline'
+                                            "
+                                        >
+                                            {{
+                                                isDirty(role.id)
+                                                    ? `${changedPermissionCount(role.id)} perubahan belum disimpan`
+                                                    : 'Tersimpan'
+                                            }}
+                                        </Badge>
+                                    </div>
+                                    <CardDescription>
                                         {{
-                                            countModulePermissions(
-                                                role.id,
-                                                module,
-                                            )
+                                            role.description ||
+                                            'Belum ada deskripsi untuk peran ini.'
                                         }}
-                                        dari
-                                        {{ permissionsByModule[module].length }}
-                                        dipilih
-                                    </p>
+                                    </CardDescription>
+                                    <div class="text-sm text-muted-foreground">
+                                        {{ countSelectedPermissions(role.id) }}
+                                        dari {{ props.permissions.length }} hak
+                                        akses aktif
+                                    </div>
+                                    <div
+                                        v-if="isDirty(role.id)"
+                                        class="text-sm text-amber-700"
+                                    >
+                                        {{ changedPermissionCount(role.id) }}
+                                        hak akses berubah dari konfigurasi awal
+                                    </div>
                                 </div>
 
                                 <div class="flex flex-wrap items-center gap-2">
@@ -405,7 +425,7 @@ function formatModuleName(module: string): string {
                                         type="button"
                                         variant="outline"
                                         size="sm"
-                                        @click="selectModule(role.id, module)"
+                                        @click="selectAllPermissions(role.id)"
                                     >
                                         Pilih semua
                                     </Button>
@@ -413,54 +433,163 @@ function formatModuleName(module: string): string {
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        @click="clearModule(role.id, module)"
+                                        @click="clearAllPermissions(role.id)"
                                     >
-                                        Kosongkan
+                                        Kosongkan semua
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        :disabled="
+                                            !isDirty(role.id) ||
+                                            savingRoleId === role.id
+                                        "
+                                        @click="resetRole(role.id)"
+                                    >
+                                        <RotateCcw class="mr-2 h-4 w-4" />
+                                        Atur ulang
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        :disabled="
+                                            !isDirty(role.id) ||
+                                            savingRoleId === role.id
+                                        "
+                                        @click="saveRole(role)"
+                                    >
+                                        <ArrowRight
+                                            v-if="savingRoleId !== role.id"
+                                            class="mr-2 h-4 w-4"
+                                        />
+                                        <Spinner
+                                            v-if="savingRoleId === role.id"
+                                            class="mr-2"
+                                        />
+                                        {{
+                                            savingRoleId === role.id
+                                                ? 'Menyimpan...'
+                                                : 'Simpan perubahan'
+                                        }}
                                     </Button>
                                 </div>
                             </div>
+                        </CardHeader>
 
-                            <div
-                                class="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3"
+                        <CardContent class="space-y-5 p-6">
+                            <section
+                                v-for="module in modules"
+                                :key="`${role.id}-${module}`"
+                                class="rounded-[24px] border border-slate-200/80 bg-slate-50/50 dark:border-slate-800/80"
                             >
-                                <label
-                                    v-for="permission in permissionsByModule[
-                                        module
-                                    ]"
-                                    :key="permission.id"
-                                    :for="`${role.id}-${permission.id}`"
-                                    class="flex items-start gap-3 rounded-md border border-border/70 p-3 transition-colors hover:bg-muted/40"
+                                <div
+                                    class="flex flex-col gap-3 border-b border-slate-200/80 bg-slate-50/90 px-4 py-4 md:flex-row md:items-center md:justify-between dark:bg-slate-900/80"
                                 >
-                                    <Checkbox
-                                        :id="`${role.id}-${permission.id}`"
-                                        :checked="
-                                            hasPermission(
-                                                role.id,
-                                                permission.id,
-                                            )
-                                        "
-                                        @update:checked="
-                                            togglePermission(
-                                                role.id,
-                                                permission.id,
-                                            )
-                                        "
-                                    />
-                                    <div class="space-y-1">
-                                        <div class="text-sm font-medium">
-                                            {{ permission.name }}
-                                        </div>
-                                        <div
-                                            class="text-xs text-muted-foreground"
+                                    <div>
+                                        <h3 class="font-medium">
+                                            {{ formatModuleName(module) }}
+                                        </h3>
+                                        <p
+                                            class="text-sm text-muted-foreground"
                                         >
-                                            {{ permission.slug }}
-                                        </div>
+                                            {{
+                                                countModulePermissions(
+                                                    role.id,
+                                                    module,
+                                                )
+                                            }}
+                                            dari
+                                            {{
+                                                permissionsByModule[module]
+                                                    .length
+                                            }}
+                                            dipilih
+                                        </p>
                                     </div>
-                                </label>
-                            </div>
-                        </section>
-                    </CardContent>
-                </Card>
+
+                                    <div
+                                        class="flex flex-wrap items-center gap-2"
+                                    >
+                                        <span
+                                            class="inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-white/90 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300"
+                                        >
+                                            <SlidersHorizontal
+                                                class="h-3.5 w-3.5"
+                                            />
+                                            {{
+                                                countModulePermissions(
+                                                    role.id,
+                                                    module,
+                                                )
+                                            }}/{{
+                                                permissionsByModule[module]
+                                                    .length
+                                            }}
+                                        </span>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            @click="
+                                                selectModule(role.id, module)
+                                            "
+                                        >
+                                            Pilih semua
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            @click="
+                                                clearModule(role.id, module)
+                                            "
+                                        >
+                                            Kosongkan
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3"
+                                >
+                                    <label
+                                        v-for="permission in permissionsByModule[
+                                            module
+                                        ]"
+                                        :key="permission.id"
+                                        :for="`${role.id}-${permission.id}`"
+                                        class="flex items-start gap-3 rounded-[18px] border border-slate-200/80 bg-white/90 p-3 transition-colors hover:border-amber-200/80 hover:bg-white dark:bg-slate-950 dark:bg-slate-950/85"
+                                    >
+                                        <Checkbox
+                                            :id="`${role.id}-${permission.id}`"
+                                            :checked="
+                                                hasPermission(
+                                                    role.id,
+                                                    permission.id,
+                                                )
+                                            "
+                                            @update:checked="
+                                                togglePermission(
+                                                    role.id,
+                                                    permission.id,
+                                                )
+                                            "
+                                        />
+                                        <div class="space-y-1">
+                                            <div class="text-sm font-medium">
+                                                {{ permission.name }}
+                                            </div>
+                                            <div
+                                                class="text-xs text-muted-foreground"
+                                            >
+                                                {{ permission.slug }}
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </section>
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
         </div>
     </AppLayout>

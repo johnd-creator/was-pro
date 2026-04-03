@@ -177,372 +177,414 @@ function getHazardousClass(isHazardous: boolean): string {
         <Head title="Tambah Catatan Limbah - Manajemen Limbah" />
 
         <div
-            class="mx-auto w-full max-w-2xl space-y-8 md:max-w-3xl lg:max-w-5xl"
+            class="relative mx-auto w-full max-w-2xl overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 md:max-w-3xl lg:max-w-5xl lg:px-8 lg:py-8"
         >
-            <Heading
-                title="Tambah Catatan Limbah"
-                description="Catat limbah baru dengan detail yang dibutuhkan untuk proses operasional dan pemantauan masa simpan."
+            <div
+                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[340px]"
+            />
+            <div
+                class="pointer-events-none absolute -top-10 left-1/3 -z-10 h-56 w-56 rounded-full bg-sky-200/15 blur-3xl"
+            />
+            <div
+                class="pointer-events-none absolute top-28 right-0 -z-10 h-56 w-56 rounded-full bg-emerald-200/15 blur-3xl"
             />
 
-            <Alert v-if="form.hasErrors" variant="destructive">
-                <TriangleAlert class="h-4 w-4" />
-                <AlertTitle>Catatan belum dapat disimpan</AlertTitle>
-                <AlertDescription>
-                    Periksa kembali field yang ditandai lalu coba lagi.
-                </AlertDescription>
-            </Alert>
-
-            <form @submit.prevent="submit" class="space-y-8">
-                <AlertError
-                    v-if="form.hasErrors"
-                    :errors="Object.values(form.errors)"
-                    title="Validasi gagal"
+            <div class="space-y-8">
+                <Heading
+                    title="Tambah Catatan Limbah"
+                    description="Catat limbah baru dengan detail yang dibutuhkan untuk proses operasional dan pemantauan masa simpan."
                 />
 
-                <!-- Basic Information Card -->
-                <Card
-                    class="border border-slate-200 bg-white shadow-sm transition-shadow duration-300 hover:shadow-md"
-                >
-                    <CardContent class="space-y-6 p-8">
-                        <div class="grid gap-4">
-                            <Label for="date">Tanggal pencatatan *</Label>
-                            <Input
-                                id="date"
-                                v-model="form.date"
-                                type="date"
-                                required
-                                class="w-full"
-                            />
-                            <p class="text-xs text-muted-foreground">
-                                Gunakan tanggal saat limbah dicatat atau
-                                diterima di area penyimpanan.
-                            </p>
-                            <InputError :message="form.errors.date" />
-                        </div>
+                <Alert v-if="form.hasErrors" variant="destructive">
+                    <TriangleAlert class="h-4 w-4" />
+                    <AlertTitle>Catatan belum dapat disimpan</AlertTitle>
+                    <AlertDescription>
+                        Periksa kembali field yang ditandai lalu coba lagi.
+                    </AlertDescription>
+                </Alert>
 
-                        <div class="grid gap-2">
-                            <Label for="waste_type_id">Jenis limbah *</Label>
-                            <Select v-model="form.waste_type_id" required>
-                                <SelectTrigger id="waste_type_id">
-                                    <SelectValue
-                                        placeholder="Pilih jenis limbah"
-                                    />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem
-                                        v-for="type in props.wasteTypes"
-                                        :key="type.id"
-                                        :value="type.id"
-                                    >
-                                        <div
-                                            class="flex items-center justify-between gap-2"
-                                        >
-                                            <span
-                                                >{{ type.name }} ({{
-                                                    type.code
-                                                }})</span
-                                            >
-                                            <span
-                                                v-if="type.characteristic"
-                                                class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                                :class="
-                                                    getHazardousClass(
-                                                        type.characteristic
-                                                            .is_hazardous,
-                                                    )
-                                                "
-                                            >
-                                                {{ type.category?.name }}
-                                            </span>
-                                        </div>
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <p class="text-xs text-muted-foreground">
-                                Pilih jenis limbah yang paling sesuai agar
-                                kategori dan masa simpan dihitung dengan benar.
-                            </p>
-                            <InputError :message="form.errors.waste_type_id" />
-                        </div>
-                    </CardContent>
-                </Card>
+                <form @submit.prevent="submit" class="space-y-8">
+                    <AlertError
+                        v-if="form.hasErrors"
+                        :errors="Object.values(form.errors)"
+                        title="Validasi gagal"
+                    />
 
-                <!-- Expiry Information Card -->
-                <Card
-                    v-if="expiryInfo"
-                    class="border border-slate-200 bg-white shadow-sm transition-shadow duration-300 hover:shadow-md"
-                    :class="{
-                        'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20':
-                            expiryInfo.variant === 'danger',
-                        'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20':
-                            expiryInfo.variant === 'warning',
-                        'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20':
-                            expiryInfo.variant === 'safe',
-                        'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/20':
-                            expiryInfo.variant === 'neutral',
-                    }"
-                >
-                    <CardContent class="space-y-6 p-8">
-                        <div class="flex items-start gap-3">
-                            <component
-                                :is="
-                                    expiryInfo.variant === 'danger' ||
-                                    expiryInfo.variant === 'warning'
-                                        ? AlertCircle
-                                        : CalendarClock
-                                "
-                                class="mt-0.5 h-5 w-5"
-                                :class="{
-                                    'text-red-600 dark:text-red-400':
-                                        expiryInfo.variant === 'danger',
-                                    'text-amber-600 dark:text-amber-400':
-                                        expiryInfo.variant === 'warning',
-                                    'text-green-600 dark:text-green-400':
-                                        expiryInfo.variant === 'safe',
-                                    'text-slate-600 dark:text-slate-300':
-                                        expiryInfo.variant === 'neutral',
-                                }"
-                            />
-                            <div class="flex-1 space-y-3">
-                                <div>
-                                    <p
-                                        class="text-lg font-semibold text-slate-900"
-                                    >
-                                        {{ expiryInfo.title }}
-                                    </p>
-                                    <p class="mt-1 text-base text-slate-700">
-                                        {{ expiryInfo.summary }}
-                                    </p>
-                                </div>
-
-                                <div
-                                    class="grid gap-4 rounded-md bg-background/70 p-4 text-base md:grid-cols-3"
-                                >
-                                    <div>
-                                        <p
-                                            class="text-sm font-medium text-slate-600"
-                                        >
-                                            Tanggal kedaluwarsa
-                                        </p>
-                                        <p
-                                            class="text-base font-semibold text-slate-900"
-                                        >
-                                            {{
-                                                calculatedExpiryDate
-                                                    ? format(
-                                                          calculatedExpiryDate,
-                                                          'PPP',
-                                                      )
-                                                    : '-'
-                                            }}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p
-                                            class="text-sm font-medium text-slate-600"
-                                        >
-                                            Sisa masa simpan
-                                        </p>
-                                        <p
-                                            class="text-base font-semibold text-slate-900"
-                                        >
-                                            {{ expiryInfo.daysLabel }}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p
-                                            class="text-sm font-medium text-slate-600"
-                                        >
-                                            Rekomendasi
-                                        </p>
-                                        <p
-                                            class="text-base font-semibold text-slate-900"
-                                        >
-                                            {{ expiryInfo.recommendation }}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <!-- Quantity & Unit Card -->
-                <Card
-                    class="border border-slate-200 bg-white shadow-sm transition-shadow duration-300 hover:shadow-md"
-                >
-                    <CardContent class="space-y-6 p-8">
-                        <div class="grid gap-6 md:grid-cols-2">
-                            <div class="space-y-2">
-                                <Label
-                                    for="quantity"
-                                    class="text-sm font-medium text-slate-700"
-                                    >Jumlah *</Label
-                                >
+                    <!-- Basic Information Card -->
+                    <Card
+                        class="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] transition-shadow duration-300 hover:shadow-[0_28px_70px_-36px_rgba(15,23,42,0.38)] dark:bg-slate-950"
+                    >
+                        <CardContent class="space-y-6 p-8">
+                            <div class="grid gap-4">
+                                <Label for="date">Tanggal pencatatan *</Label>
                                 <Input
-                                    id="quantity"
-                                    v-model="form.quantity"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
+                                    id="date"
+                                    v-model="form.date"
+                                    type="date"
                                     required
-                                    placeholder="0.00"
-                                    class="h-11"
+                                    class="w-full"
                                 />
-                                <p class="text-sm text-slate-500">
-                                    Masukkan jumlah limbah sesuai hasil
-                                    timbangan atau pencatatan lapangan.
+                                <p class="text-xs text-muted-foreground">
+                                    Gunakan tanggal saat limbah dicatat atau
+                                    diterima di area penyimpanan.
                                 </p>
-                                <InputError :message="form.errors.quantity" />
+                                <InputError :message="form.errors.date" />
                             </div>
 
-                            <div class="space-y-2">
-                                <Label
-                                    for="unit"
-                                    class="text-sm font-medium text-slate-700"
-                                    >Satuan *</Label
+                            <div class="grid gap-2">
+                                <Label for="waste_type_id"
+                                    >Jenis limbah *</Label
                                 >
-                                <Select v-model="form.unit" required>
-                                    <SelectTrigger id="unit" class="h-11">
+                                <Select v-model="form.waste_type_id" required>
+                                    <SelectTrigger id="waste_type_id">
                                         <SelectValue
-                                            placeholder="Pilih satuan"
+                                            placeholder="Pilih jenis limbah"
                                         />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="kg"
-                                            >Kilogram (kg)</SelectItem
+                                        <SelectItem
+                                            v-for="type in props.wasteTypes"
+                                            :key="type.id"
+                                            :value="type.id"
                                         >
-                                        <SelectItem value="ton"
-                                            >Ton metrik (ton)</SelectItem
-                                        >
-                                        <SelectItem value="lb"
-                                            >Pound (lb)</SelectItem
-                                        >
-                                        <SelectItem value="g"
-                                            >Gram (g)</SelectItem
-                                        >
+                                            <div
+                                                class="flex items-center justify-between gap-2"
+                                            >
+                                                <span
+                                                    >{{ type.name }} ({{
+                                                        type.code
+                                                    }})</span
+                                                >
+                                                <span
+                                                    v-if="type.characteristic"
+                                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                                                    :class="
+                                                        getHazardousClass(
+                                                            type.characteristic
+                                                                .is_hazardous,
+                                                        )
+                                                    "
+                                                >
+                                                    {{ type.category?.name }}
+                                                </span>
+                                            </div>
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
-                                <p class="text-sm text-slate-500">
-                                    Gunakan satuan yang sama dengan proses
-                                    penimbangan.
+                                <p class="text-xs text-muted-foreground">
+                                    Pilih jenis limbah yang paling sesuai agar
+                                    kategori dan masa simpan dihitung dengan
+                                    benar.
                                 </p>
-                                <InputError :message="form.errors.unit" />
+                                <InputError
+                                    :message="form.errors.waste_type_id"
+                                />
                             </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                        </CardContent>
+                    </Card>
 
-                <!-- Additional Information Card -->
-                <Card
-                    class="border border-slate-200 bg-white shadow-sm transition-shadow duration-300 hover:shadow-md"
-                >
-                    <CardContent class="space-y-6 p-8">
-                        <div class="space-y-2">
-                            <Label
-                                for="source"
-                                class="text-sm font-medium text-slate-700"
-                                >Sumber / lokasi</Label
-                            >
-                            <Input
-                                id="source"
-                                v-model="form.source"
-                                placeholder="Contoh: Gudang A, Jalur Produksi 2"
-                                class="h-11"
-                            />
-                            <p class="text-sm text-slate-500">
-                                Isi asal limbah atau lokasi penemuan agar proses
-                                pelacakan lebih mudah.
-                            </p>
-                            <InputError :message="form.errors.source" />
-                        </div>
-
-                        <div class="space-y-2">
-                            <Label
-                                for="description"
-                                class="text-sm font-medium text-slate-700"
-                                >Deskripsi</Label
-                            >
-                            <Textarea
-                                id="description"
-                                v-model="form.description"
-                                placeholder="Tambahkan deskripsi singkat tentang kondisi atau jenis limbah"
-                                rows="3"
-                                class="min-h-[80px]"
-                            />
-                            <p class="text-sm text-slate-500">
-                                Gunakan deskripsi singkat bila ada informasi
-                                penting yang tidak tercakup pada jenis limbah.
-                            </p>
-                            <InputError :message="form.errors.description" />
-                        </div>
-
-                        <div class="space-y-2">
-                            <Label
-                                for="notes"
-                                class="text-sm font-medium text-slate-700"
-                                >Catatan internal</Label
-                            >
-                            <Textarea
-                                id="notes"
-                                v-model="form.notes"
-                                placeholder="Catatan tambahan untuk tim operasional"
-                                rows="2"
-                                class="min-h-[60px]"
-                            />
-                            <p class="text-sm text-slate-500">
-                                Catatan ini dipakai untuk kebutuhan internal
-                                seperti tindak lanjut inspeksi atau kondisi
-                                penyimpanan.
-                            </p>
-                            <InputError :message="form.errors.notes" />
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <!-- Actions Card -->
-                <Card
-                    class="border border-slate-200 bg-white shadow-sm transition-shadow duration-300 hover:shadow-md"
-                >
-                    <CardContent class="p-8">
-                        <div
-                            class="rounded-lg border border-dashed bg-muted/30 p-6 text-base text-slate-600"
-                        >
+                    <!-- Expiry Information Card -->
+                    <Card
+                        v-if="expiryInfo"
+                        class="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] transition-shadow duration-300 hover:shadow-[0_28px_70px_-36px_rgba(15,23,42,0.38)] dark:bg-slate-950"
+                        :class="{
+                            'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20':
+                                expiryInfo.variant === 'danger',
+                            'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20':
+                                expiryInfo.variant === 'warning',
+                            'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20':
+                                expiryInfo.variant === 'safe',
+                            'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/20':
+                                expiryInfo.variant === 'neutral',
+                        }"
+                    >
+                        <CardContent class="space-y-6 p-8">
                             <div class="flex items-start gap-3">
-                                <ClipboardList class="mt-0.5 h-5 w-5" />
-                                <p>
-                                    Setelah disimpan, catatan limbah akan
-                                    berstatus draf dan dapat ditinjau sebelum
-                                    diajukan untuk persetujuan.
-                                </p>
-                            </div>
-                        </div>
+                                <component
+                                    :is="
+                                        expiryInfo.variant === 'danger' ||
+                                        expiryInfo.variant === 'warning'
+                                            ? AlertCircle
+                                            : CalendarClock
+                                    "
+                                    class="mt-0.5 h-5 w-5"
+                                    :class="{
+                                        'text-red-600 dark:text-red-400':
+                                            expiryInfo.variant === 'danger',
+                                        'text-amber-600 dark:text-amber-400':
+                                            expiryInfo.variant === 'warning',
+                                        'text-green-600 dark:text-green-400':
+                                            expiryInfo.variant === 'safe',
+                                        'text-slate-600 dark:text-slate-300':
+                                            expiryInfo.variant === 'neutral',
+                                    }"
+                                />
+                                <div class="flex-1 space-y-3">
+                                    <div>
+                                        <p
+                                            class="text-lg font-semibold text-slate-900 dark:text-slate-100"
+                                        >
+                                            {{ expiryInfo.title }}
+                                        </p>
+                                        <p
+                                            class="mt-1 text-base text-slate-700 dark:text-slate-200"
+                                        >
+                                            {{ expiryInfo.summary }}
+                                        </p>
+                                    </div>
 
-                        <div
-                            class="flex flex-col gap-4 sm:flex-row sm:items-center"
-                        >
-                            <Button type="submit" :disabled="form.processing">
-                                <Spinner v-if="form.processing" class="mr-2" />
-                                <span v-if="form.processing">Menyimpan...</span>
-                                <span v-else>Simpan catatan</span>
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                :disabled="form.processing"
-                                @click="
-                                    form.get(
-                                        wasteManagementRoutes.records.index()
-                                            .url,
-                                    )
-                                "
+                                    <div
+                                        class="grid gap-4 rounded-md bg-background/70 p-4 text-base md:grid-cols-3"
+                                    >
+                                        <div>
+                                            <p
+                                                class="text-sm font-medium text-slate-600 dark:text-slate-300"
+                                            >
+                                                Tanggal kedaluwarsa
+                                            </p>
+                                            <p
+                                                class="text-base font-semibold text-slate-900 dark:text-slate-100"
+                                            >
+                                                {{
+                                                    calculatedExpiryDate
+                                                        ? format(
+                                                              calculatedExpiryDate,
+                                                              'PPP',
+                                                          )
+                                                        : '-'
+                                                }}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p
+                                                class="text-sm font-medium text-slate-600 dark:text-slate-300"
+                                            >
+                                                Sisa masa simpan
+                                            </p>
+                                            <p
+                                                class="text-base font-semibold text-slate-900 dark:text-slate-100"
+                                            >
+                                                {{ expiryInfo.daysLabel }}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p
+                                                class="text-sm font-medium text-slate-600 dark:text-slate-300"
+                                            >
+                                                Rekomendasi
+                                            </p>
+                                            <p
+                                                class="text-base font-semibold text-slate-900 dark:text-slate-100"
+                                            >
+                                                {{ expiryInfo.recommendation }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <!-- Quantity & Unit Card -->
+                    <Card
+                        class="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] transition-shadow duration-300 hover:shadow-[0_28px_70px_-36px_rgba(15,23,42,0.38)] dark:bg-slate-950"
+                    >
+                        <CardContent class="space-y-6 p-8">
+                            <div class="grid gap-6 md:grid-cols-2">
+                                <div class="space-y-2">
+                                    <Label
+                                        for="quantity"
+                                        class="text-sm font-medium text-slate-700 dark:text-slate-200"
+                                        >Jumlah *</Label
+                                    >
+                                    <Input
+                                        id="quantity"
+                                        v-model="form.quantity"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        required
+                                        placeholder="0.00"
+                                        class="h-11"
+                                    />
+                                    <p
+                                        class="text-sm text-slate-500 dark:text-slate-400"
+                                    >
+                                        Masukkan jumlah limbah sesuai hasil
+                                        timbangan atau pencatatan lapangan.
+                                    </p>
+                                    <InputError
+                                        :message="form.errors.quantity"
+                                    />
+                                </div>
+
+                                <div class="space-y-2">
+                                    <Label
+                                        for="unit"
+                                        class="text-sm font-medium text-slate-700 dark:text-slate-200"
+                                        >Satuan *</Label
+                                    >
+                                    <Select v-model="form.unit" required>
+                                        <SelectTrigger id="unit" class="h-11">
+                                            <SelectValue
+                                                placeholder="Pilih satuan"
+                                            />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="kg"
+                                                >Kilogram (kg)</SelectItem
+                                            >
+                                            <SelectItem value="ton"
+                                                >Ton metrik (ton)</SelectItem
+                                            >
+                                            <SelectItem value="lb"
+                                                >Pound (lb)</SelectItem
+                                            >
+                                            <SelectItem value="g"
+                                                >Gram (g)</SelectItem
+                                            >
+                                        </SelectContent>
+                                    </Select>
+                                    <p
+                                        class="text-sm text-slate-500 dark:text-slate-400"
+                                    >
+                                        Gunakan satuan yang sama dengan proses
+                                        penimbangan.
+                                    </p>
+                                    <InputError :message="form.errors.unit" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <!-- Additional Information Card -->
+                    <Card
+                        class="border border-slate-200 bg-white shadow-sm transition-shadow duration-300 hover:shadow-md dark:bg-slate-950"
+                    >
+                        <CardContent class="space-y-6 p-8">
+                            <div class="space-y-2">
+                                <Label
+                                    for="source"
+                                    class="text-sm font-medium text-slate-700 dark:text-slate-200"
+                                    >Sumber / lokasi</Label
+                                >
+                                <Input
+                                    id="source"
+                                    v-model="form.source"
+                                    placeholder="Contoh: Gudang A, Jalur Produksi 2"
+                                    class="h-11"
+                                />
+                                <p
+                                    class="text-sm text-slate-500 dark:text-slate-400"
+                                >
+                                    Isi asal limbah atau lokasi penemuan agar
+                                    proses pelacakan lebih mudah.
+                                </p>
+                                <InputError :message="form.errors.source" />
+                            </div>
+
+                            <div class="space-y-2">
+                                <Label
+                                    for="description"
+                                    class="text-sm font-medium text-slate-700 dark:text-slate-200"
+                                    >Deskripsi</Label
+                                >
+                                <Textarea
+                                    id="description"
+                                    v-model="form.description"
+                                    placeholder="Tambahkan deskripsi singkat tentang kondisi atau jenis limbah"
+                                    rows="3"
+                                    class="min-h-[80px]"
+                                />
+                                <p
+                                    class="text-sm text-slate-500 dark:text-slate-400"
+                                >
+                                    Gunakan deskripsi singkat bila ada informasi
+                                    penting yang tidak tercakup pada jenis
+                                    limbah.
+                                </p>
+                                <InputError
+                                    :message="form.errors.description"
+                                />
+                            </div>
+
+                            <div class="space-y-2">
+                                <Label
+                                    for="notes"
+                                    class="text-sm font-medium text-slate-700 dark:text-slate-200"
+                                    >Catatan internal</Label
+                                >
+                                <Textarea
+                                    id="notes"
+                                    v-model="form.notes"
+                                    placeholder="Catatan tambahan untuk tim operasional"
+                                    rows="2"
+                                    class="min-h-[60px]"
+                                />
+                                <p
+                                    class="text-sm text-slate-500 dark:text-slate-400"
+                                >
+                                    Catatan ini dipakai untuk kebutuhan internal
+                                    seperti tindak lanjut inspeksi atau kondisi
+                                    penyimpanan.
+                                </p>
+                                <InputError :message="form.errors.notes" />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <!-- Actions Card -->
+                    <Card
+                        class="border border-slate-200 bg-white shadow-sm transition-shadow duration-300 hover:shadow-md dark:bg-slate-950"
+                    >
+                        <CardContent class="p-8">
+                            <div
+                                class="rounded-lg border border-dashed bg-muted/30 p-6 text-base text-slate-600 dark:text-slate-300"
                             >
-                                Kembali ke daftar
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            </form>
+                                <div class="flex items-start gap-3">
+                                    <ClipboardList class="mt-0.5 h-5 w-5" />
+                                    <p>
+                                        Setelah disimpan, catatan limbah akan
+                                        berstatus draf dan dapat ditinjau
+                                        sebelum diajukan untuk persetujuan.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div
+                                class="flex flex-col gap-4 sm:flex-row sm:items-center"
+                            >
+                                <Button
+                                    type="submit"
+                                    :disabled="form.processing"
+                                >
+                                    <Spinner
+                                        v-if="form.processing"
+                                        class="mr-2"
+                                    />
+                                    <span v-if="form.processing"
+                                        >Menyimpan...</span
+                                    >
+                                    <span v-else>Simpan catatan</span>
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    :disabled="form.processing"
+                                    @click="
+                                        form.get(
+                                            wasteManagementRoutes.records.index()
+                                                .url,
+                                        )
+                                    "
+                                >
+                                    Kembali ke daftar
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </form>
+            </div>
         </div>
     </WasteManagementLayout>
 </template>

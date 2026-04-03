@@ -43,13 +43,14 @@ test('role can have permissions', function () {
 });
 
 test('role scope active returns only active roles', function () {
-    Role::factory()->create(['is_active' => true]);
-    Role::factory()->create(['is_active' => false]);
+    $activeRole = Role::factory()->create(['slug' => 'custom_active_role', 'is_active' => true]);
+    $inactiveRole = Role::factory()->create(['slug' => 'custom_inactive_role', 'is_active' => false]);
 
-    $activeRoles = Role::active()->get();
+    $activeRoleIds = Role::active()
+        ->whereIn('id', [$activeRole->id, $inactiveRole->id])
+        ->pluck('id');
 
-    expect($activeRoles)->toHaveCount(1);
-    expect($activeRoles->first()->is_active)->toBeTrue();
+    expect($activeRoleIds->all())->toBe([$activeRole->id]);
 });
 
 test('permission can be created', function () {
@@ -81,14 +82,20 @@ test('permission can belong to roles', function () {
 });
 
 test('permission scope module filters by module', function () {
-    Permission::factory()->create(['module' => 'users']);
-    Permission::factory()->create(['module' => 'organizations']);
-    Permission::factory()->create(['module' => 'users']);
+    $userPermissionA = Permission::factory()->create(['slug' => 'custom_users_permission_a', 'module' => 'users']);
+    $organizationPermission = Permission::factory()->create(['slug' => 'custom_organizations_permission', 'module' => 'organizations']);
+    $userPermissionB = Permission::factory()->create(['slug' => 'custom_users_permission_b', 'module' => 'users']);
 
-    $userPermissions = Permission::module('users')->get();
+    $userPermissionIds = Permission::module('users')
+        ->whereIn('id', [$userPermissionA->id, $organizationPermission->id, $userPermissionB->id])
+        ->pluck('id')
+        ->sort()
+        ->values();
 
-    expect($userPermissions)->toHaveCount(2);
-    expect($userPermissions->every->module)->toBe('users');
+    expect($userPermissionIds->all())->toBe([
+        $userPermissionA->id,
+        $userPermissionB->id,
+    ]);
 });
 
 test('user can belong to organization and role', function () {

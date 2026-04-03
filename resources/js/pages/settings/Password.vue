@@ -26,7 +26,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
         <h1 class="sr-only">Pengaturan kata sandi</h1>
 
         <SettingsLayout>
-            <div class="space-y-6">
+            <div class="wm-surface-elevated space-y-6 rounded-[28px] p-6">
                 <Heading
                     variant="small"
                     title="Perbarui kata sandi"

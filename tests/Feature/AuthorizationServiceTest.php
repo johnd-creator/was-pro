@@ -11,21 +11,14 @@ use function Pest\Laravel\actingAs;
 beforeEach(function () {
     // Switch to public schema before each test
     app(\App\Services\TenantService::class)->switchToPublic();
-
-    // Set up roles and permissions
-    Role::factory()->create(['slug' => 'admin', 'name' => 'Admin']);
-    Role::factory()->create(['slug' => 'operator', 'name' => 'Operator']);
-
-    Permission::factory()->create(['slug' => 'users.view', 'module' => 'users']);
-    Permission::factory()->create(['slug' => 'waste_records.create', 'module' => 'waste_records']);
 });
 
 test('authorization service checks permissions for authenticated user', function () {
     $organization = Organization::factory()->create();
-    $role = Role::where('slug', 'admin')->first();
-    $permission = Permission::where('slug', 'users.view')->first();
+    $role = Role::query()->where('slug', 'admin')->firstOrFail();
+    $permission = Permission::query()->where('slug', 'users.view')->firstOrFail();
 
-    $role->permissions()->attach($permission);
+    $role->permissions()->syncWithoutDetaching([$permission->id]);
 
     $user = User::factory()->for($organization)->for($role)->create();
 
@@ -34,12 +27,12 @@ test('authorization service checks permissions for authenticated user', function
     $authService = app(AuthorizationService::class);
 
     expect($authService->hasPermission('users.view'))->toBeTrue();
-    expect($authService->hasPermission('waste_records.create'))->toBeFalse();
+    expect($authService->hasPermission('organizations.view'))->toBeFalse();
 });
 
 test('authorization service checks roles for authenticated user', function () {
     $organization = Organization::factory()->create();
-    $role = Role::where('slug', 'admin')->first();
+    $role = Role::query()->where('slug', 'admin')->firstOrFail();
 
     $user = User::factory()->for($organization)->for($role)->create();
 

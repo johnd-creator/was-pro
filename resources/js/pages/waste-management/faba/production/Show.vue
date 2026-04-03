@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
+import { CalendarClock, FileText, Layers3, PackageOpen } from 'lucide-vue-next';
 import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,34 +35,203 @@ const breadcrumbItems: BreadcrumbItem[] = [
         title="Detail Produksi FABA"
     >
         <Head title="Detail Produksi FABA" />
-        <div class="space-y-6 p-6">
-            <Heading
-                :title="entry.display_number"
-                description="Detail transaksi produksi FABA."
+        <div
+            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
+        >
+            <div
+                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px]"
             />
-            <Card>
-                <CardHeader><CardTitle>Informasi utama</CardTitle></CardHeader>
-                <CardContent class="grid gap-4 md:grid-cols-2">
-                    <div>
-                        <strong>Tanggal:</strong> {{ formatFabaDate(entry.transaction_date) }}
+            <div
+                class="pointer-events-none absolute -top-10 left-1/3 -z-10 h-56 w-56 rounded-full bg-blue-200/15 blur-3xl"
+            />
+            <div
+                class="pointer-events-none absolute top-20 right-0 -z-10 h-56 w-56 rounded-full bg-emerald-200/15 blur-3xl"
+            />
+
+            <div class="mx-auto max-w-5xl space-y-8">
+                <section
+                    class="wm-surface-hero overflow-hidden rounded-[30px] via-slate-50/80 to-blue-50/20 dark:via-slate-900 dark:to-blue-950/20"
+                >
+                    <div
+                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:p-6"
+                    >
+                        <div class="space-y-4">
+                            <p
+                                class="text-[11px] font-semibold tracking-[0.16em] text-blue-700/70 uppercase"
+                            >
+                                Production Detail
+                            </p>
+                            <Heading
+                                :title="entry.display_number"
+                                description="Detail transaksi produksi FABA dengan ringkasan status dan metadata utama."
+                            />
+                            <div class="flex flex-wrap gap-3">
+                                <Badge
+                                    variant="secondary"
+                                    class="rounded-full border border-slate-200/80 bg-white/90 text-slate-700 dark:text-slate-200"
+                                >
+                                    {{
+                                        formatFabaStatus(entry.approval_status)
+                                    }}
+                                </Badge>
+                                <div
+                                    class="wm-chip px-3 py-1.5 text-xs font-medium"
+                                >
+                                    {{ formatFabaDate(entry.transaction_date) }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid gap-3">
+                            <div class="wm-hero-stat-card wm-hero-stat-neutral">
+                                <p
+                                    class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
+                                >
+                                    Material
+                                </p>
+                                <p
+                                    class="mt-2 text-base font-semibold text-slate-950 dark:text-slate-100"
+                                >
+                                    {{
+                                        formatFabaMaterial(entry.material_type)
+                                    }}
+                                </p>
+                            </div>
+                            <div class="wm-hero-stat-card wm-hero-stat-blue">
+                                <p
+                                    class="text-[11px] font-semibold tracking-[0.14em] text-blue-700/80 uppercase"
+                                >
+                                    Quantity
+                                </p>
+                                <p
+                                    class="mt-2 text-base font-semibold text-slate-950 dark:text-slate-100"
+                                >
+                                    {{ entry.quantity }} {{ entry.unit }}
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <strong>Material:</strong> {{ formatFabaMaterial(entry.material_type) }}
-                    </div>
-                    <div><strong>Tipe:</strong> {{ formatFabaMovementType(entry.movement_type) }}</div>
-                    <div>
-                        <strong>Jumlah:</strong> {{ entry.quantity }}
-                        {{ entry.unit }}
-                    </div>
-                    <div>
-                        <strong>Status bulan:</strong>
-                        <Badge variant="secondary">
-                            {{ formatFabaStatus(entry.approval_status) }}
-                        </Badge>
-                    </div>
-                    <div><strong>Catatan:</strong> {{ entry.note || '-' }}</div>
-                </CardContent>
-            </Card>
+                </section>
+
+                <Card
+                    class="rounded-[28px] border-slate-200/80 bg-white/90 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.28)] dark:bg-slate-950/85"
+                >
+                    <CardHeader>
+                        <CardTitle>Informasi Utama</CardTitle>
+                    </CardHeader>
+                    <CardContent class="grid gap-4 lg:grid-cols-2">
+                        <div class="wm-surface-subtle rounded-[20px] p-4">
+                            <div class="flex items-center gap-3">
+                                <CalendarClock
+                                    class="h-4 w-4 text-slate-500 dark:text-slate-400"
+                                />
+                                <div>
+                                    <p
+                                        class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
+                                    >
+                                        Tanggal
+                                    </p>
+                                    <p
+                                        class="mt-1 text-sm font-semibold text-slate-950 dark:text-slate-100"
+                                    >
+                                        {{
+                                            formatFabaDate(
+                                                entry.transaction_date,
+                                            )
+                                        }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="wm-surface-subtle rounded-[20px] p-4">
+                            <div class="flex items-center gap-3">
+                                <PackageOpen
+                                    class="h-4 w-4 text-slate-500 dark:text-slate-400"
+                                />
+                                <div>
+                                    <p
+                                        class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
+                                    >
+                                        Material
+                                    </p>
+                                    <p
+                                        class="mt-1 text-sm font-semibold text-slate-950 dark:text-slate-100"
+                                    >
+                                        {{
+                                            formatFabaMaterial(
+                                                entry.material_type,
+                                            )
+                                        }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="wm-surface-subtle rounded-[20px] p-4">
+                            <div class="flex items-center gap-3">
+                                <Layers3
+                                    class="h-4 w-4 text-slate-500 dark:text-slate-400"
+                                />
+                                <div>
+                                    <p
+                                        class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
+                                    >
+                                        Tipe
+                                    </p>
+                                    <p
+                                        class="mt-1 text-sm font-semibold text-slate-950 dark:text-slate-100"
+                                    >
+                                        {{
+                                            formatFabaMovementType(
+                                                entry.movement_type,
+                                            )
+                                        }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="wm-surface-subtle rounded-[20px] p-4">
+                            <div class="flex items-center gap-3">
+                                <PackageOpen
+                                    class="h-4 w-4 text-slate-500 dark:text-slate-400"
+                                />
+                                <div>
+                                    <p
+                                        class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
+                                    >
+                                        Jumlah
+                                    </p>
+                                    <p
+                                        class="mt-1 text-sm font-semibold text-slate-950 dark:text-slate-100"
+                                    >
+                                        {{ entry.quantity }} {{ entry.unit }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            class="wm-surface-subtle rounded-[20px] p-4 lg:col-span-2"
+                        >
+                            <div class="flex items-start gap-3">
+                                <FileText
+                                    class="mt-0.5 h-4 w-4 text-slate-500 dark:text-slate-400"
+                                />
+                                <div>
+                                    <p
+                                        class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
+                                    >
+                                        Catatan
+                                    </p>
+                                    <p
+                                        class="mt-1 text-sm leading-6 text-slate-700 dark:text-slate-200"
+                                    >
+                                        {{ entry.note || '-' }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     </WasteManagementLayout>
 </template>

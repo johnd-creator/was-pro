@@ -32,7 +32,7 @@ class WasteTransportationFactory extends Factory
             'transportation_number' => $prefix.'-'.str_pad(fake()->unique()->numberBetween(1, 9999), 4, '0', STR_PAD_LEFT),
             'waste_record_id' => WasteRecord::factory(),
             'vendor_id' => Vendor::factory(),
-            'transportation_date' => fake()->dateBetween('-30 days', 'today'),
+            'transportation_date' => fake()->dateTimeBetween('-30 days', 'now')->format('Y-m-d'),
             'quantity' => fake()->randomFloat(2, 10, 500),
             'unit' => fake()->randomElement(['kg', 'ton', 'lb']),
             'vehicle_number' => fake()->bothify('?? ####'),

@@ -48,8 +48,12 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
 </script>
 
 <template>
-    <div class="space-y-8 px-4 py-6">
-        <div class="rounded-2xl border bg-card/80 p-5 shadow-sm">
+    <div class="relative space-y-8 overflow-x-hidden px-4 py-6">
+        <div class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px] bg-linear-to-b from-slate-50 via-white to-transparent dark:from-slate-950 dark:via-slate-950" />
+        <div class="pointer-events-none absolute -top-10 left-1/4 -z-10 h-56 w-56 rounded-full bg-cyan-200/18 blur-3xl dark:bg-cyan-500/10" />
+        <div class="pointer-events-none absolute top-24 right-0 -z-10 h-64 w-64 rounded-full bg-amber-200/12 blur-3xl dark:bg-amber-500/8" />
+
+        <div class="rounded-[30px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-slate-950/88 dark:shadow-[0_22px_45px_-32px_rgba(2,6,23,0.8)]">
             <div
                 class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
             >
@@ -61,7 +65,7 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
                     Area akun & keamanan
                 </Badge>
             </div>
-            <p class="max-w-3xl text-sm text-muted-foreground">
+            <p class="max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
                 Gunakan panel ini untuk memperbarui informasi dasar, mengamankan
                 proses masuk, dan menyesuaikan tampilan aplikasi sesuai
                 preferensi kerja Anda.
@@ -70,25 +74,25 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
 
         <div class="grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
             <aside class="space-y-4">
-                <div class="rounded-2xl border bg-card p-3 shadow-sm">
+                <div class="rounded-[26px] border border-slate-200/80 bg-white/90 p-3 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.24)] dark:border-slate-800/80 dark:bg-slate-950/88 dark:shadow-[0_22px_45px_-32px_rgba(2,6,23,0.8)]">
                     <nav class="space-y-2" aria-label="Pengaturan akun">
                         <Link
                             v-for="item in sidebarNavItems"
                             :key="toUrl(item.href)"
                             :href="item.href"
                             :class="[
-                                'group flex rounded-xl border px-4 py-3 transition-colors',
+                                'group flex rounded-[18px] border px-4 py-3 transition-colors',
                                 isCurrentOrParentUrl(item.href)
-                                    ? 'border-primary/30 bg-primary/10 text-foreground'
-                                    : 'border-transparent hover:border-border hover:bg-muted/50',
+                                    ? 'border-cyan-200/80 bg-cyan-50/90 text-foreground dark:border-cyan-800/80 dark:bg-cyan-950/40'
+                                    : 'border-transparent hover:border-slate-200/80 hover:bg-slate-50/70 dark:hover:border-slate-800/80 dark:hover:bg-slate-900/70',
                             ]"
                         >
                             <div
                                 class="mt-0.5 mr-3 rounded-lg p-2"
                                 :class="
                                     isCurrentOrParentUrl(item.href)
-                                        ? 'bg-primary/15 text-primary'
-                                        : 'bg-muted text-muted-foreground'
+                                        ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/60 dark:text-cyan-200'
+                                        : 'bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400'
                                 "
                             >
                                 <component :is="item.icon" class="h-4 w-4" />
@@ -105,7 +109,7 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
                                         class="h-2 w-2 rounded-full bg-primary"
                                     ></span>
                                 </div>
-                                <p class="mt-1 text-xs text-muted-foreground">
+                                <p class="mt-1 text-xs text-muted-foreground dark:text-slate-400">
                                     {{ item.description }}
                                 </p>
                             </div>

@@ -20,10 +20,10 @@ const inputEmail = ref(props.email);
 
 <template>
     <AuthLayout
-        title="Reset password"
-        description="Please enter your new password below"
+        title="Reset kata sandi"
+        description="Masukkan kata sandi baru untuk akun Anda"
     >
-        <Head title="Reset password" />
+        <Head title="Reset kata sandi" />
 
         <Form
             v-bind="update.form()"
@@ -47,21 +47,21 @@ const inputEmail = ref(props.email);
                 </div>
 
                 <div class="grid gap-2">
-                    <Label for="password">Password</Label>
+                    <Label for="password">Kata sandi baru</Label>
                     <PasswordInput
                         id="password"
                         name="password"
                         autocomplete="new-password"
                         class="mt-1 block w-full"
                         autofocus
-                        placeholder="Password"
+                        placeholder="Kata sandi baru"
                     />
                     <InputError :message="errors.password" />
                 </div>
 
                 <div class="grid gap-2">
                     <Label for="password_confirmation">
-                        Confirm password
+                        Konfirmasi kata sandi
                     </Label>
                     <PasswordInput
                         id="password_confirmation"
@@ -80,7 +80,7 @@ const inputEmail = ref(props.email);
                     data-test="reset-password-button"
                 >
                     <Spinner v-if="processing" />
-                    Reset password
+                    Simpan kata sandi baru
                 </Button>
             </div>
         </Form>

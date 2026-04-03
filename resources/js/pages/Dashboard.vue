@@ -73,13 +73,6 @@ interface CategoryData {
     percentage: number;
 }
 
-interface StatusData {
-    status: string;
-    count: number;
-    color: string;
-    percentage?: number;
-}
-
 interface Props {
     organizationName: string;
     header: {
@@ -117,7 +110,12 @@ interface Props {
         closing_balance: number;
     }>;
     fabaPendingApprovals: ApprovalItem[];
-    fabaWarnings: Array<{ month: number; period_label: string; message: string; closing_balance: number }>;
+    fabaWarnings: Array<{
+        month: number;
+        period_label: string;
+        message: string;
+        closing_balance: number;
+    }>;
     wasteChart: Array<{
         label: string;
         month: number;
@@ -131,15 +129,12 @@ const props = defineProps<Props>();
 
 const wasteStatsContext = computed(() => {
     const snapshotLabel = props.header.snapshot_month_label ?? 'periode aktif';
-    const snapshotDate = props.filters.month ? new Date(`${props.filters.month}-01`) : null;
-    const yearLabel = snapshotDate?.getFullYear() ?? new Date().getFullYear();
-
     return {
         label: 's.d. Snapshot',
-        totalHint: `Seluruh catatan limbah yang sudah tercatat sampai ${snapshotLabel}.`,
-        transportedHint: `Catatan yang sudah memiliki pengangkutan valid sampai ${snapshotLabel}.`,
-        backlogHint: `Catatan approved yang masih punya sisa pengangkutan pada ${snapshotLabel}, termasuk carry-over tahun sebelumnya.`,
-        yearHint: `Tahun ${yearLabel}`,
+        totalHint: `Tercatat sampai ${snapshotLabel}`,
+        transportedHint: `Sudah terangkut valid`,
+        backlogHint: `Carry-over aktif`,
+        fabaLabel: props.header.snapshot_month_label ?? 'Snapshot',
     };
 });
 
@@ -183,124 +178,252 @@ const entranceAnimationClass = computed(() =>
     <Head title="Dashboard" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div :class="['space-y-8 p-6 lg:p-8', entranceAnimationClass]">
-            <div class="sr-only">
-                <Heading
-                    title="Dashboard Terpadu"
-                    :description="pageDescription"
-                />
-            </div>
+        <div
+            :class="[
+                'relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8',
+                entranceAnimationClass,
+            ]"
+        >
+            <div
+                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] dark:from-slate-950 dark:via-slate-950"
+            />
+            <div
+                class="pointer-events-none absolute -top-16 left-1/2 -z-10 h-64 w-64 -translate-x-[55%] rounded-full bg-blue-200/20 blur-3xl dark:bg-blue-500/10"
+            />
+            <div
+                class="pointer-events-none absolute top-36 right-0 -z-10 h-56 w-56 rounded-full bg-emerald-200/15 blur-3xl dark:bg-emerald-500/8"
+            />
 
-            <!-- Row 1: Compliance & Risk Hero -->
-            <section>
-                <ComplianceHero
-                    :expired-waste="stats.expired_waste"
-                    :expiring-soon-waste="stats.expiring_soon_waste"
-                    :pending-waste-approvals="pendingApprovals.length"
-                    :pending-faba-approvals="fabaPendingApprovals.length"
-                    :faba-warnings="fabaWarnings.length"
-                    :risk-status="header.risk_status"
-                    :risk-label="header.risk_label"
-                    :risk-tone="header.risk_tone"
-                />
-            </section>
-
-            <!-- Row 2: Compact Stats Grid (6 columns) -->
-            <section>
-                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                    <CompactStat
-                        title="Total Limbah"
-                        :value="stats.waste_total_records_snapshot"
-                        :context-label="wasteStatsContext.label"
-                        :hint="wasteStatsContext.totalHint"
-                        color="blue"
-                    />
-                    <CompactStat
-                        title="Limbah Terangkut"
-                        :value="stats.waste_transported_records_snapshot"
-                        :context-label="wasteStatsContext.label"
-                        :hint="wasteStatsContext.transportedHint"
-                        color="emerald"
-                    />
-                    <CompactStat
-                        title="Belum Terangkut"
-                        :value="stats.waste_untransported_records_snapshot"
-                        :context-label="wasteStatsContext.label"
-                        :hint="wasteStatsContext.backlogHint"
-                        :color="stats.waste_untransported_records_snapshot > 0 ? 'orange' : 'blue'"
-                    />
-                    <CompactStat
-                        title="FABA Produksi"
-                        :value="fabaStats.total_production"
-                        unit="ton"
-                        :context-label="props.header.snapshot_month_label ?? wasteStatsContext.yearHint"
-                        color="blue"
-                    />
-                    <CompactStat
-                        title="FABA Pemanfaatan"
-                        :value="fabaStats.total_utilization"
-                        unit="ton"
-                        :context-label="props.header.snapshot_month_label ?? wasteStatsContext.yearHint"
-                        color="emerald"
-                    />
-                    <CompactStat
-                        title="Saldo FABA"
-                        :value="fabaStats.current_balance"
-                        unit="ton"
-                        :context-label="props.header.snapshot_month_label ?? wasteStatsContext.yearHint"
-                        :color="fabaStats.current_balance < 0 ? 'red' : 'emerald'"
+            <div class="space-y-8 lg:space-y-10">
+                <div class="sr-only">
+                    <Heading
+                        title="Dashboard Terpadu"
+                        :description="pageDescription"
                     />
                 </div>
-            </section>
 
-            <section class="grid gap-6 xl:grid-cols-2">
-                <WasteFlowChart :data="wasteChart" />
-                <FabaTrendChart :data="fabaChart" />
-            </section>
+                <!-- Row 1: Compliance & Risk Hero -->
+                <section>
+                    <ComplianceHero
+                        :expired-waste="stats.expired_waste"
+                        :expiring-soon-waste="stats.expiring_soon_waste"
+                        :pending-waste-approvals="pendingApprovals.length"
+                        :pending-faba-approvals="fabaPendingApprovals.length"
+                        :faba-warnings="fabaWarnings.length"
+                        :risk-status="header.risk_status"
+                        :risk-label="header.risk_label"
+                        :risk-tone="header.risk_tone"
+                    />
+                </section>
 
-            <section class="grid gap-6 xl:grid-cols-2">
-                <Card class="border-slate-200/80 shadow-sm">
-                    <CardHeader class="space-y-2">
-                        <CardTitle class="text-lg">
-                            Distribusi Kategori Limbah
-                        </CardTitle>
-                        <CardDescription>
-                            Komposisi volume limbah approved per kategori pada
-                            snapshot bulan aktif.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <DistributionDonut
-                            :data="wasteByCategory"
-                            total-label="Total"
-                            value-suffix="kg"
+                <!-- Row 2: Compact Stats Grid (6 columns) -->
+                <section class="relative lg:-mt-3">
+                    <div class="mb-4 flex items-end justify-between gap-4">
+                        <div>
+                            <p
+                                class="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400"
+                            >
+                                Snapshot Board
+                            </p>
+                            <h3
+                                class="mt-2 flex items-center gap-3 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                            >
+                                <span
+                                    class="h-px w-8 bg-slate-300 dark:bg-slate-700"
+                                />
+                                Ringkasan angka utama
+                            </h3>
+                        </div>
+                        <p
+                            class="hidden text-sm text-slate-500 lg:block dark:text-slate-400"
+                        >
+                            Enam KPI untuk membaca posisi operasional dalam satu
+                            scan.
+                        </p>
+                    </div>
+
+                    <div
+                        class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+                    >
+                        <CompactStat
+                            title="Total Limbah"
+                            :value="stats.waste_total_records_snapshot"
+                            :context-label="wasteStatsContext.label"
+                            :hint="wasteStatsContext.totalHint"
+                            color="blue"
                         />
-                    </CardContent>
-                </Card>
-
-                <Card class="border-slate-200/80 shadow-sm">
-                    <CardHeader class="space-y-2">
-                        <CardTitle class="text-lg">
-                            Distribusi Material Produksi FABA
-                        </CardTitle>
-                        <CardDescription>
-                            Komposisi material produksi Fly Ash dan Bottom Ash
-                            pada tahun aktif dashboard.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <DistributionDonut
-                            :data="fabaProductionMaterialDistribution"
-                            total-label="Total"
-                            value-suffix="ton"
+                        <CompactStat
+                            title="Limbah Terangkut"
+                            :value="stats.waste_transported_records_snapshot"
+                            :context-label="wasteStatsContext.label"
+                            :hint="wasteStatsContext.transportedHint"
+                            color="emerald"
                         />
-                    </CardContent>
-                </Card>
-            </section>
+                        <CompactStat
+                            title="Belum Terangkut"
+                            :value="stats.waste_untransported_records_snapshot"
+                            :context-label="wasteStatsContext.label"
+                            :hint="wasteStatsContext.backlogHint"
+                            :color="
+                                stats.waste_untransported_records_snapshot > 0
+                                    ? 'orange'
+                                    : 'blue'
+                            "
+                        />
+                        <CompactStat
+                            title="FABA Produksi"
+                            :value="fabaStats.total_production"
+                            unit="ton"
+                            :context-label="wasteStatsContext.fabaLabel"
+                            color="blue"
+                        />
+                        <CompactStat
+                            title="FABA Pemanfaatan"
+                            :value="fabaStats.total_utilization"
+                            unit="ton"
+                            :context-label="wasteStatsContext.fabaLabel"
+                            color="emerald"
+                        />
+                        <CompactStat
+                            title="Saldo FABA"
+                            :value="fabaStats.current_balance"
+                            unit="ton"
+                            :context-label="wasteStatsContext.fabaLabel"
+                            :color="
+                                fabaStats.current_balance < 0
+                                    ? 'red'
+                                    : 'emerald'
+                            "
+                        />
+                    </div>
+                </section>
 
-            <section>
-                <CombinedApprovals :approvals="combinedApprovals" />
-            </section>
+                <section class="space-y-4">
+                    <div class="flex items-end justify-between gap-4">
+                        <div>
+                            <p
+                                class="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400"
+                            >
+                                Trend Monitor
+                            </p>
+                            <h3
+                                class="mt-2 flex items-center gap-3 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                            >
+                                <span class="h-px w-8 bg-slate-300" />
+                                Ritme operasional 6 bulan terakhir
+                            </h3>
+                        </div>
+                        <p
+                            class="hidden max-w-md text-right text-sm text-slate-500 lg:block dark:text-slate-400"
+                        >
+                            Bandingkan laju input, pengangkutan, produksi, dan
+                            pemanfaatan tanpa tenggelam dalam caption panjang.
+                        </p>
+                    </div>
+
+                    <div class="grid gap-6 xl:grid-cols-2">
+                        <WasteFlowChart :data="wasteChart" />
+                        <FabaTrendChart :data="fabaChart" />
+                    </div>
+                </section>
+
+                <section class="space-y-4">
+                    <div class="flex items-end justify-between gap-4">
+                        <div>
+                            <p
+                                class="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400"
+                            >
+                                Composition
+                            </p>
+                            <h3
+                                class="mt-2 flex items-center gap-3 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                            >
+                                <span
+                                    class="h-px w-8 bg-slate-300 dark:bg-slate-700"
+                                />
+                                Komposisi kategori dan material
+                            </h3>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-6 xl:grid-cols-2">
+                        <Card
+                            class="overflow-hidden rounded-[30px] border-slate-200/70 bg-linear-to-br from-white via-slate-50/60 to-blue-50/20 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800/80 dark:from-slate-950 dark:via-slate-900 dark:to-blue-950/20 dark:shadow-[0_24px_60px_-36px_rgba(2,6,23,0.9)]"
+                        >
+                            <CardHeader class="space-y-2 pb-3">
+                                <p
+                                    class="text-[11px] font-semibold tracking-[0.16em] text-blue-700/70 uppercase dark:text-blue-300/70"
+                                >
+                                    Waste Mix
+                                </p>
+                                <CardTitle class="text-lg dark:text-slate-100">
+                                    Distribusi Kategori Limbah
+                                </CardTitle>
+                                <CardDescription
+                                    class="text-sm text-slate-600 dark:text-slate-300"
+                                >
+                                    Komposisi approved pada snapshot aktif.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <DistributionDonut
+                                    :data="wasteByCategory"
+                                    total-label="Total"
+                                    value-suffix="kg"
+                                />
+                            </CardContent>
+                        </Card>
+
+                        <Card
+                            class="overflow-hidden rounded-[30px] border-slate-200/70 bg-linear-to-br from-white via-slate-50/60 to-emerald-50/20 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800/80 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950/20 dark:shadow-[0_24px_60px_-36px_rgba(2,6,23,0.9)]"
+                        >
+                            <CardHeader class="space-y-2">
+                                <p
+                                    class="text-[11px] font-semibold tracking-[0.16em] text-emerald-700/70 uppercase dark:text-emerald-300/70"
+                                >
+                                    FABA Mix
+                                </p>
+                                <CardTitle class="text-lg dark:text-slate-100">
+                                    Distribusi Material Produksi FABA
+                                </CardTitle>
+                                <CardDescription
+                                    class="text-sm text-slate-600 dark:text-slate-300"
+                                >
+                                    Komposisi material produksi pada snapshot
+                                    aktif.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <DistributionDonut
+                                    :data="fabaProductionMaterialDistribution"
+                                    total-label="Total"
+                                    value-suffix="ton"
+                                />
+                            </CardContent>
+                        </Card>
+                    </div>
+                </section>
+
+                <section class="space-y-4">
+                    <div class="flex items-end justify-between gap-4">
+                        <div>
+                            <p
+                                class="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400"
+                            >
+                                Workflow
+                            </p>
+                            <h3
+                                class="mt-2 flex items-center gap-3 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                            >
+                                <span class="h-px w-8 bg-slate-300" />
+                                Antrian keputusan operasional
+                            </h3>
+                        </div>
+                    </div>
+
+                    <CombinedApprovals :approvals="combinedApprovals" />
+                </section>
+            </div>
         </div>
     </AppLayout>
 </template>

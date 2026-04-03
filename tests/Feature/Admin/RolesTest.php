@@ -4,7 +4,6 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Inertia\Testing\AssertableInertia;
 
 uses(RefreshDatabase::class);
 
@@ -20,14 +19,12 @@ test('super admin can view roles index', function () {
     Role::factory()->create(['name' => 'Test Role', 'slug' => 'test_role']);
     Permission::factory()->create(['name' => 'Perm 1', 'slug' => 'perm_1', 'module' => 'roles']);
 
-    $response = $this->get(route('admin.roles.index'));
+    $response = $this->getJson(route('admin.roles.index'));
 
     $response->assertSuccessful();
-    $response->assertInertia(fn (AssertableInertia $page) => $page
-        ->component('admin/Roles')
-        ->has('roles', 1)
-        ->has('permissions', 1)
-    );
+    $response->assertJsonPath('roles.0.slug', 'admin');
+    $response->assertJsonFragment(['slug' => 'test_role']);
+    $response->assertJsonFragment(['slug' => 'perm_1']);
 });
 
 test('super admin can update role permissions', function () {
@@ -54,11 +51,7 @@ test('super admin can update role permissions', function () {
 });
 
 test('user without manage permission can not update role permissions', function () {
-    $viewPermission = Permission::factory()->create([
-        'name' => 'View Roles',
-        'slug' => 'roles.view',
-        'module' => 'roles',
-    ]);
+    $viewPermission = Permission::query()->where('slug', 'roles.view')->firstOrFail();
 
     $role = Role::factory()->create(['name' => 'Staff', 'slug' => 'staff']);
     $role->permissions()->attach($viewPermission->id);
@@ -69,11 +62,7 @@ test('user without manage permission can not update role permissions', function 
     ]);
 
     $targetRole = Role::factory()->create(['name' => 'Target', 'slug' => 'target']);
-    $permission = Permission::factory()->create([
-        'name' => 'Manage Roles',
-        'slug' => 'roles.manage',
-        'module' => 'roles',
-    ]);
+    $permission = Permission::query()->where('slug', 'roles.manage')->firstOrFail();
 
     $response = $this->actingAs($user)->put(route('admin.roles.update', $targetRole), [
         'permissions' => [$permission->id],

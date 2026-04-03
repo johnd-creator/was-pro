@@ -4,9 +4,10 @@ import {
     AlertTriangle,
     ShieldAlert,
     ShieldCheck,
-    Timer,
-    type LucideIcon,
+    Timer
+    
 } from 'lucide-vue-next';
+import type {LucideIcon} from 'lucide-vue-next';
 import { computed } from 'vue';
 import { Button } from '@/components/ui/button';
 import wasteManagementRoutes from '@/routes/waste-management';
@@ -29,6 +30,7 @@ interface HeroTone {
     buttonClass: string;
     iconWrapClass: string;
     iconGlowClass: string;
+    dividerClass: string;
 }
 
 interface MetricCard {
@@ -128,6 +130,7 @@ const toneMap: Record<Props['riskTone'], HeroTone> = {
             'bg-white text-red-700 shadow-lg transition-all duration-200 hover:bg-red-50',
         iconWrapClass: 'bg-white/12 ring-1 ring-white/16',
         iconGlowClass: 'bg-red-300/20',
+        dividerClass: 'bg-white/14',
     },
     orange: {
         shellClass:
@@ -138,6 +141,7 @@ const toneMap: Record<Props['riskTone'], HeroTone> = {
             'bg-white text-amber-700 shadow-lg transition-all duration-200 hover:bg-amber-50',
         iconWrapClass: 'bg-white/12 ring-1 ring-white/16',
         iconGlowClass: 'bg-amber-200/20',
+        dividerClass: 'bg-white/14',
     },
     green: {
         shellClass:
@@ -148,6 +152,7 @@ const toneMap: Record<Props['riskTone'], HeroTone> = {
             'bg-white text-emerald-700 shadow-lg transition-all duration-200 hover:bg-emerald-50',
         iconWrapClass: 'bg-white/12 ring-1 ring-white/16',
         iconGlowClass: 'bg-emerald-200/20',
+        dividerClass: 'bg-white/14',
     },
 };
 
@@ -224,10 +229,12 @@ const metricCards = computed<MetricCard[]>(() => [
 <template>
     <div
         :class="[
-            'overflow-hidden rounded-[28px] text-white shadow-xl transition-all duration-300',
+            'relative overflow-hidden rounded-[28px] text-white shadow-xl transition-all duration-300',
             tone.shellClass,
         ]"
     >
+        <div class="pointer-events-none absolute -left-12 top-0 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
+        <div class="pointer-events-none absolute bottom-0 right-0 h-40 w-40 rounded-full bg-black/10 blur-3xl" />
         <div class="flex flex-col gap-5 p-5 lg:p-6">
             <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-stretch xl:grid-cols-[minmax(0,1fr)_300px]">
                 <div class="space-y-5">
@@ -286,12 +293,14 @@ const metricCards = computed<MetricCard[]>(() => [
                 </div>
             </div>
 
+            <div :class="['h-px w-full', tone.dividerClass]" />
+
             <div class="grid gap-3 sm:grid-cols-2 lg:max-w-[70%] xl:max-w-[72%] xl:grid-cols-4">
                 <div
                     v-for="card in metricCards"
                     :key="card.title"
                     :class="[
-                        'flex min-h-[108px] items-start justify-between gap-3 rounded-2xl border px-3.5 py-3.5 backdrop-blur-sm transition-all duration-200 hover:bg-white/14',
+                        'flex min-h-[108px] items-start justify-between gap-3 rounded-2xl border px-3.5 py-3.5 backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/14',
                         card.cardClass,
                     ]"
                 >
@@ -318,7 +327,10 @@ const metricCards = computed<MetricCard[]>(() => [
                 </div>
             </div>
 
-            <div>
+            <div class="flex items-center justify-between gap-4">
+                <p class="hidden text-sm text-white/72 lg:block">
+                    Ringkasan ini menyorot isu aktif yang paling memengaruhi ritme kepatuhan saat ini.
+                </p>
                 <Button as-child :class="tone.buttonClass">
                     <Link
                         :href="

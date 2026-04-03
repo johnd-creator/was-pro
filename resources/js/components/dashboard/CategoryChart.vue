@@ -117,17 +117,25 @@ function downloadCSV() {
         />
     </div>
     <div v-else class="space-y-4">
-        <div class="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center">
+        <div
+            class="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center"
+        >
             <div class="flex justify-center">
                 <div
                     class="relative flex h-48 w-48 items-center justify-center rounded-full"
                     :style="donutStyle"
                 >
-                    <div class="flex h-28 w-28 flex-col items-center justify-center rounded-full bg-background text-center shadow-sm">
-                        <span class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <div
+                        class="flex h-28 w-28 flex-col items-center justify-center rounded-full bg-background text-center shadow-sm"
+                    >
+                        <span
+                            class="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase"
+                        >
                             Total
                         </span>
-                        <span class="mt-1 text-3xl font-semibold text-foreground tabular-nums">
+                        <span
+                            class="mt-1 text-3xl font-semibold text-foreground tabular-nums"
+                        >
                             {{ totalCount }}
                         </span>
                         <span class="text-xs text-muted-foreground">
@@ -156,7 +164,9 @@ function downloadCSV() {
                         </p>
                     </div>
                     <div class="text-right">
-                        <p class="text-sm font-semibold tabular-nums text-foreground">
+                        <p
+                            class="text-sm font-semibold text-foreground tabular-nums"
+                        >
                             {{ item.normalizedPercentage.toFixed(1) }}%
                         </p>
                     </div>

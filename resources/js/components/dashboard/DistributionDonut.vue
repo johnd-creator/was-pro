@@ -89,17 +89,18 @@ function formatValue(value: number): string {
         <div class="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center">
             <div class="flex justify-center">
                 <div
-                    class="relative flex h-48 w-48 items-center justify-center rounded-full"
+                    class="relative flex h-52 w-52 items-center justify-center rounded-full border border-white/90 shadow-[0_22px_45px_-28px_rgba(15,23,42,0.35)] dark:border-slate-800/80 dark:shadow-[0_22px_45px_-28px_rgba(2,6,23,0.9)]"
                     :style="donutStyle"
                 >
-                    <div class="flex h-28 w-28 flex-col items-center justify-center rounded-full bg-background text-center shadow-sm">
-                        <span class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <div class="absolute inset-3 rounded-full border border-white/40 dark:border-slate-700/70" />
+                    <div class="flex h-30 w-30 flex-col items-center justify-center rounded-full border border-white/90 bg-white/95 text-center shadow-sm backdrop-blur dark:border-slate-800/80 dark:bg-slate-950/92 dark:shadow-none">
+                        <span class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground dark:text-slate-400">
                             {{ totalLabel }}
                         </span>
                         <span class="mt-1 text-3xl font-semibold text-foreground tabular-nums">
                             {{ isEmpty ? emptyLabel : formatValue(totalValue) }}
                         </span>
-                        <span class="text-xs text-muted-foreground">
+                        <span class="text-xs text-muted-foreground dark:text-slate-400">
                             {{ valueSuffix || '' }}
                         </span>
                     </div>
@@ -108,9 +109,15 @@ function formatValue(value: number): string {
 
             <div class="space-y-3">
                 <div
+                    v-if="isEmpty"
+                    class="rounded-[20px] border border-dashed border-slate-200 bg-white/80 px-4 py-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-400"
+                >
+                    Belum ada komposisi yang dapat ditampilkan pada snapshot ini.
+                </div>
+                <div
                     v-for="item in segments"
                     :key="item.label"
-                    class="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5"
+                    class="flex items-center gap-3 rounded-[20px] border border-white/90 bg-white/85 px-3.5 py-3 shadow-sm shadow-slate-100/70 transition-all duration-200 hover:-translate-y-0.5 hover:bg-white dark:border-slate-800/80 dark:bg-slate-950/78 dark:shadow-none dark:hover:bg-slate-900/90"
                 >
                     <div
                         class="h-3.5 w-3.5 shrink-0 rounded-full"

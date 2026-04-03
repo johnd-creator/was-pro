@@ -45,7 +45,7 @@ onUnmounted(() => {
         <h1 class="sr-only">Pengaturan verifikasi dua langkah</h1>
 
         <SettingsLayout>
-            <div class="space-y-6">
+            <div class="wm-surface-elevated space-y-6 rounded-[28px] p-6">
                 <Heading
                     variant="small"
                     title="Verifikasi dua langkah"

@@ -198,221 +198,368 @@ function rejectRecord(): void {
     >
         <Head title="Menunggu Persetujuan - Catatan Limbah" />
 
-        <div class="space-y-6 p-6">
-            <Alert
-                v-if="statusMessage"
-                class="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-100"
-            >
-                <CircleCheck
-                    class="h-4 w-4 !text-emerald-600 dark:!text-emerald-300"
-                />
-                <AlertTitle>Aksi berhasil</AlertTitle>
-                <AlertDescription>{{ statusMessage }}</AlertDescription>
-            </Alert>
-
-            <Alert v-if="errorMessage" variant="destructive">
-                <CircleX class="h-4 w-4" />
-                <AlertTitle>Aksi gagal</AlertTitle>
-                <AlertDescription>{{ errorMessage }}</AlertDescription>
-            </Alert>
-
+        <div
+            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
+        >
             <div
-                class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
-            >
-                <Heading
-                    title="Menunggu Persetujuan"
-                    description="Tinjau catatan limbah yang membutuhkan keputusan. Anda dapat menyetujui cepat, membuka detail, atau menolak dengan alasan yang jelas."
-                />
-                <Button variant="outline" as-child>
-                    <Link :href="wasteManagementRoutes.records.index().url">
-                        Kembali ke semua catatan
-                    </Link>
-                </Button>
-            </div>
+                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[340px]"
+            />
+            <div
+                class="pointer-events-none absolute -top-10 left-1/3 -z-10 h-56 w-56 rounded-full bg-amber-200/15 blur-3xl"
+            />
+            <div
+                class="pointer-events-none absolute top-28 right-0 -z-10 h-56 w-56 rounded-full bg-blue-200/15 blur-3xl"
+            />
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Antrian review</CardTitle>
-                    <CardDescription>
-                        Gunakan halaman ini untuk triage cepat. Buka detail saat
-                        Anda membutuhkan konteks lebih lengkap sebelum mengambil
-                        keputusan.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent class="px-0 pb-0">
-                    <div class="overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Catatan</TableHead>
-                                    <TableHead>Jenis limbah</TableHead>
-                                    <TableHead>Jumlah</TableHead>
-                                    <TableHead>Diajukan oleh</TableHead>
-                                    <TableHead>Diajukan pada</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead class="w-[360px]"
-                                        >Tindakan</TableHead
-                                    >
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                <TableRow v-if="wasteRecords.length === 0">
-                                    <TableCell
-                                        :colspan="7"
-                                        class="py-12 text-center"
-                                    >
-                                        <div
-                                            class="mx-auto flex max-w-lg flex-col items-center gap-3 text-muted-foreground"
-                                        >
-                                            <FileText
-                                                class="h-8 w-8 opacity-60"
-                                            />
-                                            <p
-                                                class="text-sm font-medium text-foreground"
-                                            >
-                                                Tidak ada catatan yang menunggu
-                                                persetujuan
-                                            </p>
-                                            <p class="text-sm leading-6">
-                                                Semua review yang membutuhkan
-                                                tindakan sudah diproses. Anda
-                                                dapat kembali ke daftar catatan
-                                                untuk memantau aktivitas
-                                                operasional lainnya.
-                                            </p>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                as-child
-                                            >
-                                                <Link
-                                                    :href="
-                                                        wasteManagementRoutes.records.index()
-                                                            .url
-                                                    "
-                                                >
-                                                    Kembali ke catatan limbah
-                                                </Link>
-                                            </Button>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
+            <div class="space-y-8">
+                <Alert
+                    v-if="statusMessage"
+                    class="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-100"
+                >
+                    <CircleCheck
+                        class="h-4 w-4 !text-emerald-600 dark:!text-emerald-300"
+                    />
+                    <AlertTitle>Aksi berhasil</AlertTitle>
+                    <AlertDescription>{{ statusMessage }}</AlertDescription>
+                </Alert>
 
-                                <TableRow
-                                    v-for="record in wasteRecords"
-                                    :key="record.id"
-                                    class="align-top"
+                <Alert v-if="errorMessage" variant="destructive">
+                    <CircleX class="h-4 w-4" />
+                    <AlertTitle>Aksi gagal</AlertTitle>
+                    <AlertDescription>{{ errorMessage }}</AlertDescription>
+                </Alert>
+
+                <section
+                    class="wm-surface-hero overflow-hidden rounded-[30px] via-slate-50/80 to-amber-50/20 dark:via-slate-900 dark:to-amber-950/18"
+                >
+                    <div
+                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6"
+                    >
+                        <div class="space-y-5">
+                            <div class="space-y-3">
+                                <p
+                                    class="text-[11px] font-semibold tracking-[0.16em] text-amber-700/70 uppercase"
                                 >
-                                    <TableCell class="space-y-1">
-                                        <p class="font-medium">
-                                            {{ record.record_number }}
-                                        </p>
-                                        <p
-                                            class="text-xs text-muted-foreground"
-                                        >
-                                            {{ formatDate(record.date) }}
-                                        </p>
-                                    </TableCell>
-                                    <TableCell>
-                                        <p>
-                                            {{ record.waste_type?.name || '-' }}
-                                        </p>
-                                        <p
-                                            class="text-xs text-muted-foreground"
-                                        >
-                                            {{
-                                                record.waste_type?.category
-                                                    ?.name || '-'
-                                            }}
-                                        </p>
-                                    </TableCell>
-                                    <TableCell>
-                                        {{ Number(record.quantity).toFixed(2) }}
-                                        {{ record.unit }}
-                                    </TableCell>
-                                    <TableCell>
-                                        {{
-                                            record.submitted_by_user?.name ||
-                                            '-'
-                                        }}
-                                    </TableCell>
-                                    <TableCell>
-                                        {{ formatDate(record.submitted_at) }}
-                                    </TableCell>
-                                    <TableCell>
-                                        <StatusBadge
-                                            :status="record.status"
-                                            size="sm"
-                                        />
-                                    </TableCell>
-                                    <TableCell class="space-y-3">
-                                        <div class="flex flex-wrap gap-2">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                as-child
-                                            >
-                                                <Link
-                                                    :href="
-                                                        recordDetailHref(record)
-                                                    "
-                                                >
-                                                    Lihat detail
-                                                </Link>
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                :disabled="
-                                                    processing[record.id]
-                                                "
-                                                @click="approveRecord(record)"
-                                            >
-                                                <LoaderCircle
-                                                    v-if="processing[record.id]"
-                                                    class="mr-2 h-4 w-4 animate-spin"
-                                                />
-                                                <CircleCheck
-                                                    v-else
-                                                    class="mr-2 h-4 w-4"
-                                                />
-                                                Setujui cepat
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="destructive"
-                                                :disabled="
-                                                    processing[record.id]
-                                                "
-                                                @click="
-                                                    openRejectDialog(record)
-                                                "
-                                            >
-                                                <CircleX class="mr-2 h-4 w-4" />
-                                                Tolak
-                                            </Button>
-                                        </div>
-                                        <div class="space-y-2">
-                                            <Label
-                                                :for="`approval-notes-${record.id}`"
-                                            >
-                                                Catatan persetujuan
-                                            </Label>
-                                            <Textarea
-                                                :id="`approval-notes-${record.id}`"
-                                                v-model="
-                                                    approvalNotesById[record.id]
-                                                "
-                                                rows="3"
-                                                placeholder="Tambahkan catatan persetujuan bila ada konteks yang perlu diketahui operator."
-                                            />
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
+                                    Meja Persetujuan
+                                </p>
+                                <Heading
+                                    title="Menunggu Persetujuan"
+                                    description="Tinjau catatan limbah yang membutuhkan keputusan. Anda dapat menyetujui cepat, membuka detail, atau menolak dengan alasan yang jelas."
+                                />
+                            </div>
+
+                            <div class="flex flex-wrap gap-3">
+                                <div
+                                    class="wm-chip px-3 py-1.5 text-xs font-medium"
+                                >
+                                    Total antrian: {{ wasteRecords.length }}
+                                </div>
+                                <div
+                                    class="wm-chip-amber px-3 py-1.5 text-xs font-medium"
+                                >
+                                    Review aktif
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="wm-surface-panel space-y-4 rounded-[28px] p-5"
+                        >
+                            <div class="space-y-2">
+                                <p
+                                    class="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400"
+                                >
+                                    Rute Cepat
+                                </p>
+                                <p
+                                    class="text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                                >
+                                    Kembali ke monitor utama
+                                </p>
+                            </div>
+
+                            <Button
+                                variant="outline"
+                                class="w-full justify-start border-white/90 bg-white/85 shadow-sm hover:bg-white dark:bg-slate-950 dark:bg-slate-950/80"
+                                as-child
+                            >
+                                <Link
+                                    :href="
+                                        wasteManagementRoutes.records.index()
+                                            .url
+                                    "
+                                >
+                                    Kembali ke semua catatan
+                                </Link>
+                            </Button>
+
+                            <div class="wm-surface-subtle rounded-[22px] p-4">
+                                <p
+                                    class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
+                                >
+                                    Cara pakai
+                                </p>
+                                <p
+                                    class="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300"
+                                >
+                                    Gunakan approve cepat untuk kasus yang
+                                    jelas, lalu buka detail saat butuh validasi
+                                    konteks lebih lengkap.
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                </CardContent>
-            </Card>
+                </section>
+
+                <section class="space-y-4">
+                    <div class="flex items-end justify-between gap-4">
+                        <div>
+                            <p
+                                class="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400"
+                            >
+                                Antrian Review
+                            </p>
+                            <h3
+                                class="mt-2 flex items-center gap-3 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                            >
+                                <span class="h-px w-8 bg-slate-300" />
+                                Antrian review
+                            </h3>
+                        </div>
+                    </div>
+
+                    <Card
+                        class="wm-surface-elevated overflow-hidden rounded-[30px] dark:bg-slate-950/95"
+                    >
+                        <CardHeader class="pb-4">
+                            <CardTitle>Antrian review</CardTitle>
+                            <CardDescription>
+                                Gunakan halaman ini untuk triage cepat. Buka
+                                detail saat Anda membutuhkan konteks lebih
+                                lengkap sebelum mengambil keputusan.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent class="px-0 pb-0">
+                            <div class="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow
+                                            class="bg-slate-50/80 dark:bg-slate-900/70"
+                                        >
+                                            <TableHead>Catatan</TableHead>
+                                            <TableHead>Jenis limbah</TableHead>
+                                            <TableHead>Jumlah</TableHead>
+                                            <TableHead>Diajukan oleh</TableHead>
+                                            <TableHead>Diajukan pada</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead class="w-[360px]"
+                                                >Tindakan</TableHead
+                                            >
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        <TableRow
+                                            v-if="wasteRecords.length === 0"
+                                        >
+                                            <TableCell
+                                                :colspan="7"
+                                                class="py-12 text-center"
+                                            >
+                                                <div
+                                                    class="mx-auto flex max-w-lg flex-col items-center gap-3 text-muted-foreground"
+                                                >
+                                                    <FileText
+                                                        class="h-8 w-8 opacity-60"
+                                                    />
+                                                    <p
+                                                        class="text-sm font-medium text-foreground"
+                                                    >
+                                                        Tidak ada catatan yang
+                                                        menunggu persetujuan
+                                                    </p>
+                                                    <p
+                                                        class="text-sm leading-6"
+                                                    >
+                                                        Semua review yang
+                                                        membutuhkan tindakan
+                                                        sudah diproses. Anda
+                                                        dapat kembali ke daftar
+                                                        catatan untuk memantau
+                                                        aktivitas operasional
+                                                        lainnya.
+                                                    </p>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        as-child
+                                                    >
+                                                        <Link
+                                                            :href="
+                                                                wasteManagementRoutes.records.index()
+                                                                    .url
+                                                            "
+                                                        >
+                                                            Kembali ke catatan
+                                                            limbah
+                                                        </Link>
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+
+                                        <TableRow
+                                            v-for="record in wasteRecords"
+                                            :key="record.id"
+                                            class="align-top transition-colors hover:bg-slate-50/80 dark:bg-slate-900/70"
+                                        >
+                                            <TableCell class="space-y-1">
+                                                <p class="font-medium">
+                                                    {{ record.record_number }}
+                                                </p>
+                                                <p
+                                                    class="text-xs text-muted-foreground"
+                                                >
+                                                    {{
+                                                        formatDate(record.date)
+                                                    }}
+                                                </p>
+                                            </TableCell>
+                                            <TableCell>
+                                                <p>
+                                                    {{
+                                                        record.waste_type
+                                                            ?.name || '-'
+                                                    }}
+                                                </p>
+                                                <p
+                                                    class="text-xs text-muted-foreground"
+                                                >
+                                                    {{
+                                                        record.waste_type
+                                                            ?.category?.name ||
+                                                        '-'
+                                                    }}
+                                                </p>
+                                            </TableCell>
+                                            <TableCell>
+                                                {{
+                                                    Number(
+                                                        record.quantity,
+                                                    ).toFixed(2)
+                                                }}
+                                                {{ record.unit }}
+                                            </TableCell>
+                                            <TableCell>
+                                                {{
+                                                    record.submitted_by_user
+                                                        ?.name || '-'
+                                                }}
+                                            </TableCell>
+                                            <TableCell>
+                                                {{
+                                                    formatDate(
+                                                        record.submitted_at,
+                                                    )
+                                                }}
+                                            </TableCell>
+                                            <TableCell>
+                                                <StatusBadge
+                                                    :status="record.status"
+                                                    size="sm"
+                                                />
+                                            </TableCell>
+                                            <TableCell class="space-y-3">
+                                                <div
+                                                    class="flex flex-wrap gap-2"
+                                                >
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        as-child
+                                                    >
+                                                        <Link
+                                                            :href="
+                                                                recordDetailHref(
+                                                                    record,
+                                                                )
+                                                            "
+                                                        >
+                                                            Lihat detail
+                                                        </Link>
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        :disabled="
+                                                            processing[
+                                                                record.id
+                                                            ]
+                                                        "
+                                                        @click="
+                                                            approveRecord(
+                                                                record,
+                                                            )
+                                                        "
+                                                    >
+                                                        <LoaderCircle
+                                                            v-if="
+                                                                processing[
+                                                                    record.id
+                                                                ]
+                                                            "
+                                                            class="mr-2 h-4 w-4 animate-spin"
+                                                        />
+                                                        <CircleCheck
+                                                            v-else
+                                                            class="mr-2 h-4 w-4"
+                                                        />
+                                                        Setujui cepat
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="destructive"
+                                                        :disabled="
+                                                            processing[
+                                                                record.id
+                                                            ]
+                                                        "
+                                                        @click="
+                                                            openRejectDialog(
+                                                                record,
+                                                            )
+                                                        "
+                                                    >
+                                                        <CircleX
+                                                            class="mr-2 h-4 w-4"
+                                                        />
+                                                        Tolak
+                                                    </Button>
+                                                </div>
+                                                <div class="space-y-2">
+                                                    <Label
+                                                        :for="`approval-notes-${record.id}`"
+                                                    >
+                                                        Catatan persetujuan
+                                                    </Label>
+                                                    <Textarea
+                                                        :id="`approval-notes-${record.id}`"
+                                                        v-model="
+                                                            approvalNotesById[
+                                                                record.id
+                                                            ]
+                                                        "
+                                                        rows="3"
+                                                        placeholder="Tambahkan catatan persetujuan bila ada konteks yang perlu diketahui operator."
+                                                    />
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </section>
+            </div>
 
             <Dialog v-model:open="rejectDialogOpen">
                 <DialogContent class="sm:max-w-lg">

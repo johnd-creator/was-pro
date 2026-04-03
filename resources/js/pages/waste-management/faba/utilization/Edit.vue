@@ -1,5 +1,12 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
+import {
+    Building2,
+    CalendarClock,
+    FilePenLine,
+    FileText,
+    Save,
+} from 'lucide-vue-next';
 import { watch } from 'vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
@@ -51,7 +58,10 @@ const initialMovementType = props.entry.movement_type;
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
-        title: initialMovementType === 'utilization_internal' ? 'Pemanfaatan Internal' : 'Pemanfaatan Eksternal',
+        title:
+            initialMovementType === 'utilization_internal'
+                ? 'Pemanfaatan Internal'
+                : 'Pemanfaatan Eksternal',
         href: wasteManagementRoutes.faba.utilization.index.url(),
     },
     {
@@ -65,7 +75,8 @@ const form = useForm({
     material_type: props.entry.material_type,
     movement_type: initialMovementType,
     vendor_id: props.entry.vendor_id ?? NO_VENDOR,
-    internal_destination_id: props.entry.internal_destination_id ?? NO_INTERNAL_DESTINATION,
+    internal_destination_id:
+        props.entry.internal_destination_id ?? NO_INTERNAL_DESTINATION,
     purpose_id: props.entry.purpose_id ?? NO_PURPOSE,
     quantity: String(props.entry.quantity),
     unit: props.entry.unit,
@@ -79,11 +90,13 @@ function submit(): void {
     form.transform((data) => ({
         ...data,
         vendor_id:
-            data.movement_type === 'utilization_internal' || data.vendor_id === NO_VENDOR
+            data.movement_type === 'utilization_internal' ||
+            data.vendor_id === NO_VENDOR
                 ? null
                 : data.vendor_id,
         internal_destination_id:
-            data.movement_type === 'utilization_external' || data.internal_destination_id === NO_INTERNAL_DESTINATION
+            data.movement_type === 'utilization_external' ||
+            data.internal_destination_id === NO_INTERNAL_DESTINATION
                 ? null
                 : data.internal_destination_id,
         purpose_id: data.purpose_id === NO_PURPOSE ? null : data.purpose_id,
@@ -125,217 +138,537 @@ watch(
                     : 'Edit Pemanfaatan Eksternal'
             "
         />
-        <div class="mx-auto max-w-3xl space-y-6">
-            <Heading
-                :title="
-                    form.movement_type === 'utilization_internal'
-                        ? 'Edit Pemanfaatan Internal'
-                        : 'Edit Pemanfaatan Eksternal'
-                "
-                description="Perbarui movement pemanfaatan."
+
+        <div
+            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
+        >
+            <div
+                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[360px]"
             />
-            <form class="space-y-6" @submit.prevent="submit">
-                <Card>
-                    <CardContent class="space-y-6 p-6">
-                        <div class="grid gap-2">
-                            <Label for="transaction_date"
-                                >Tanggal transaksi</Label
+            <div
+                class="pointer-events-none absolute -top-10 left-1/3 -z-10 h-56 w-56 rounded-full bg-emerald-200/15 blur-3xl"
+            />
+            <div
+                class="pointer-events-none absolute top-24 right-0 -z-10 h-56 w-56 rounded-full bg-orange-200/15 blur-3xl"
+            />
+
+            <div class="mx-auto max-w-5xl space-y-8">
+                <section
+                    class="wm-surface-hero overflow-hidden rounded-[30px] via-slate-50/80 to-emerald-50/20 dark:via-slate-900 dark:to-emerald-950/18"
+                >
+                    <div
+                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6"
+                    >
+                        <div class="space-y-4">
+                            <p
+                                class="text-[11px] font-semibold tracking-[0.16em] text-emerald-700/70 uppercase"
                             >
-                            <Input
-                                id="transaction_date"
-                                v-model="form.transaction_date"
-                                type="date"
-                            />
-                        </div>
-                        <div class="grid gap-6 md:grid-cols-2">
-                            <div class="grid gap-2">
-                                <Label>Material</Label>
-                                <Select v-model="form.material_type">
-                                    <SelectTrigger
-                                        ><SelectValue
-                                    /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem
-                                            v-for="item in materialOptions"
-                                            :key="item"
-                                            :value="item"
-                                            >{{ item }}</SelectItem
-                                        >
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div class="grid gap-2">
-                                <Label>Tipe pemanfaatan</Label>
-                                <Select v-model="form.movement_type">
-                                    <SelectTrigger
-                                        ><SelectValue
-                                    /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem
-                                            v-for="item in movementTypeOptions"
-                                            :key="item"
-                                            :value="item"
-                                            >{{ formatFabaMovementType(item) }}</SelectItem
-                                        >
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                        <div class="grid gap-6 md:grid-cols-2">
-                            <div class="grid gap-2">
-                                <Label>
-                                    {{
-                                        form.movement_type === 'utilization_internal'
-                                            ? 'Tujuan internal'
-                                            : 'Vendor'
-                                    }}
-                                </Label>
-                                <Select
-                                    v-if="form.movement_type === 'utilization_internal'"
-                                    v-model="form.internal_destination_id"
-                                >
-                                    <SelectTrigger
-                                        ><SelectValue
-                                            placeholder="Pilih tujuan internal"
-                                    /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem :value="NO_INTERNAL_DESTINATION"
-                                            >Pilih tujuan internal</SelectItem
-                                        >
-                                        <SelectItem
-                                            v-for="destination in internalDestinations"
-                                            :key="destination.id"
-                                            :value="destination.id"
-                                            >{{ destination.name }}</SelectItem
-                                        >
-                                    </SelectContent>
-                                </Select>
-                                <Select v-else v-model="form.vendor_id">
-                                    <SelectTrigger
-                                        ><SelectValue
-                                            placeholder="Pilih vendor"
-                                    /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem :value="NO_VENDOR"
-                                            >Tanpa vendor</SelectItem
-                                        >
-                                        <SelectItem
-                                            v-for="vendor in vendors"
-                                            :key="vendor.id"
-                                            :value="vendor.id"
-                                            >{{ vendor.name }}</SelectItem
-                                        >
-                                    </SelectContent>
-                                </Select>
-                                <InputError
-                                    :message="
-                                        form.movement_type === 'utilization_internal'
-                                            ? form.errors.internal_destination_id
-                                            : form.errors.vendor_id
-                                    "
-                                />
-                                <p class="text-sm text-muted-foreground">
-                                    {{
-                                        props.requirements[form.movement_type]?.requiresVendor
-                                            ? 'Vendor wajib untuk pemanfaatan eksternal.'
-                                            : 'Tujuan internal wajib dipilih untuk pemanfaatan internal.'
-                                    }}
-                                </p>
-                            </div>
-                            <div class="grid gap-2">
-                                <Label for="quantity">Jumlah</Label>
-                                <Input
-                                    id="quantity"
-                                    v-model="form.quantity"
-                                    type="number"
-                                    step="0.01"
-                                />
-                            </div>
-                        </div>
-                        <div class="grid gap-6 md:grid-cols-2">
-                            <div class="grid gap-2">
-                                <Label for="unit">Satuan</Label>
-                                <Input id="unit" v-model="form.unit" readonly />
-                                <p class="text-sm text-muted-foreground">
-                                    Satuan transaksi ditetapkan ton.
-                                </p>
-                            </div>
-                            <div class="grid gap-2">
-                                <Label for="document_number"
-                                    >Nomor dokumen</Label
-                                >
-                                <Input
-                                    id="document_number"
-                                    v-model="form.document_number"
-                                />
-                                <p
-                                    v-if="props.requirements[form.movement_type]?.requiresDocument"
-                                    class="text-sm text-muted-foreground"
-                                >
-                                    Nomor dokumen wajib untuk transaksi eksternal.
-                                </p>
-                            </div>
-                            <div class="grid gap-2">
-                                <Label for="document_date"
-                                    >Tanggal dokumen</Label
-                                >
-                                <Input
-                                    id="document_date"
-                                    v-model="form.document_date"
-                                    type="date"
-                                />
-                                <p
-                                    v-if="props.requirements[form.movement_type]?.requiresDocument"
-                                    class="text-sm text-muted-foreground"
-                                >
-                                    Tanggal dokumen wajib untuk transaksi eksternal.
-                                </p>
-                            </div>
-                            <div class="grid gap-2">
-                                <Label>Use-case / purpose</Label>
-                                <Select v-model="form.purpose_id">
-                                    <SelectTrigger
-                                        ><SelectValue placeholder="Pilih use-case (opsional)"
-                                    /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem :value="NO_PURPOSE"
-                                            >Tanpa use-case</SelectItem
-                                        >
-                                        <SelectItem
-                                            v-for="purpose in purposes"
-                                            :key="purpose.id"
-                                            :value="purpose.id"
-                                            >{{ purpose.name }}</SelectItem
-                                        >
-                                    </SelectContent>
-                                </Select>
-                                <InputError :message="form.errors.purpose_id" />
-                            </div>
-                        </div>
-                        <div class="grid gap-2">
-                            <Label for="attachment">Lampiran baru</Label>
-                            <Input
-                                id="attachment"
-                                type="file"
-                                @change="updateAttachment"
-                            />
-                            <p class="text-sm text-muted-foreground">
-                                Lampiran saat ini:
-                                {{ entry.attachment_path || '-' }}
+                                Utilization Revision
                             </p>
+                            <Heading
+                                :title="
+                                    form.movement_type ===
+                                    'utilization_internal'
+                                        ? 'Edit Pemanfaatan Internal'
+                                        : 'Edit Pemanfaatan Eksternal'
+                                "
+                                description="Perbarui movement pemanfaatan tanpa kehilangan konteks pihak, dokumen, dan tujuan penggunaan."
+                            />
                         </div>
-                        <div class="grid gap-2">
-                            <Label for="note">Catatan</Label>
-                            <Textarea id="note" v-model="form.note" />
-                        </div>
-                        <div class="flex justify-end">
-                            <Button type="submit" :disabled="form.processing"
-                                >Simpan perubahan</Button
+
+                        <div
+                            class="wm-surface-panel space-y-3 rounded-[28px] p-5"
+                        >
+                            <div
+                                class="flex items-start gap-3 rounded-[18px] border border-slate-200/80 bg-slate-50/80 px-4 py-3 dark:bg-slate-900/70"
                             >
+                                <FilePenLine
+                                    class="mt-0.5 h-4 w-4 text-slate-500 dark:text-slate-400"
+                                />
+                                <p
+                                    class="text-sm leading-6 text-slate-600 dark:text-slate-300"
+                                >
+                                    Jika jalur berubah dari internal ke
+                                    eksternal, cek ulang dokumen dan pihak
+                                    tujuan.
+                                </p>
+                            </div>
                         </div>
-                    </CardContent>
-                </Card>
-            </form>
+                    </div>
+                </section>
+
+                <form class="space-y-6" @submit.prevent="submit">
+                    <Card
+                        class="rounded-[28px] border-slate-200/80 bg-white/90 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.28)] dark:bg-slate-950/85"
+                    >
+                        <CardContent class="space-y-6 p-6">
+                            <div
+                                class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]"
+                            >
+                                <div class="space-y-6">
+                                    <div
+                                        class="rounded-[22px] border border-slate-200/80 bg-slate-50/70 p-5 dark:bg-slate-900/65"
+                                    >
+                                        <div
+                                            class="mb-4 flex items-center gap-3"
+                                        >
+                                            <div
+                                                class="rounded-2xl bg-emerald-100 p-3 text-emerald-700"
+                                            >
+                                                <CalendarClock
+                                                    class="h-5 w-5"
+                                                />
+                                            </div>
+                                            <div>
+                                                <p
+                                                    class="text-sm font-semibold text-slate-950 dark:text-slate-100"
+                                                >
+                                                    Identitas Movement
+                                                </p>
+                                                <p
+                                                    class="text-sm text-slate-500 dark:text-slate-400"
+                                                >
+                                                    Perbarui tanggal, material,
+                                                    dan jenis pemanfaatan.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div class="grid gap-6">
+                                            <div class="grid gap-2">
+                                                <Label for="transaction_date"
+                                                    >Tanggal transaksi</Label
+                                                >
+                                                <Input
+                                                    id="transaction_date"
+                                                    v-model="
+                                                        form.transaction_date
+                                                    "
+                                                    type="date"
+                                                    class="bg-white dark:bg-slate-950"
+                                                />
+                                                <InputError
+                                                    :message="
+                                                        form.errors
+                                                            .transaction_date
+                                                    "
+                                                />
+                                            </div>
+                                            <div
+                                                class="grid gap-6 md:grid-cols-2"
+                                            >
+                                                <div class="grid gap-2">
+                                                    <Label>Material</Label>
+                                                    <Select
+                                                        v-model="
+                                                            form.material_type
+                                                        "
+                                                    >
+                                                        <SelectTrigger
+                                                            class="bg-white dark:bg-slate-950"
+                                                            ><SelectValue
+                                                        /></SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem
+                                                                v-for="item in materialOptions"
+                                                                :key="item"
+                                                                :value="item"
+                                                                >{{
+                                                                    item
+                                                                }}</SelectItem
+                                                            >
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <InputError
+                                                        :message="
+                                                            form.errors
+                                                                .material_type
+                                                        "
+                                                    />
+                                                </div>
+                                                <div class="grid gap-2">
+                                                    <Label
+                                                        >Tipe pemanfaatan</Label
+                                                    >
+                                                    <Select
+                                                        v-model="
+                                                            form.movement_type
+                                                        "
+                                                    >
+                                                        <SelectTrigger
+                                                            class="bg-white dark:bg-slate-950"
+                                                            ><SelectValue
+                                                        /></SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem
+                                                                v-for="item in movementTypeOptions"
+                                                                :key="item"
+                                                                :value="item"
+                                                                >{{
+                                                                    formatFabaMovementType(
+                                                                        item,
+                                                                    )
+                                                                }}</SelectItem
+                                                            >
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <InputError
+                                                        :message="
+                                                            form.errors
+                                                                .movement_type
+                                                        "
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        class="rounded-[22px] border border-slate-200/80 bg-slate-50/70 p-5 dark:bg-slate-900/65"
+                                    >
+                                        <div
+                                            class="mb-4 flex items-center gap-3"
+                                        >
+                                            <div
+                                                class="rounded-2xl bg-blue-100 p-3 text-blue-700"
+                                            >
+                                                <Building2 class="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <p
+                                                    class="text-sm font-semibold text-slate-950 dark:text-slate-100"
+                                                >
+                                                    Pihak dan Volume
+                                                </p>
+                                                <p
+                                                    class="text-sm text-slate-500 dark:text-slate-400"
+                                                >
+                                                    Sesuaikan tujuan atau vendor
+                                                    bila ada perubahan jalur.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div class="grid gap-6">
+                                            <div
+                                                class="grid gap-6 md:grid-cols-2"
+                                            >
+                                                <div class="grid gap-2">
+                                                    <Label>
+                                                        {{
+                                                            form.movement_type ===
+                                                            'utilization_internal'
+                                                                ? 'Tujuan internal'
+                                                                : 'Vendor'
+                                                        }}
+                                                    </Label>
+                                                    <Select
+                                                        v-if="
+                                                            form.movement_type ===
+                                                            'utilization_internal'
+                                                        "
+                                                        v-model="
+                                                            form.internal_destination_id
+                                                        "
+                                                    >
+                                                        <SelectTrigger
+                                                            class="bg-white dark:bg-slate-950"
+                                                            ><SelectValue
+                                                        /></SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem
+                                                                :value="
+                                                                    NO_INTERNAL_DESTINATION
+                                                                "
+                                                                >Pilih tujuan
+                                                                internal</SelectItem
+                                                            >
+                                                            <SelectItem
+                                                                v-for="destination in internalDestinations"
+                                                                :key="
+                                                                    destination.id
+                                                                "
+                                                                :value="
+                                                                    destination.id
+                                                                "
+                                                                >{{
+                                                                    destination.name
+                                                                }}</SelectItem
+                                                            >
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <Select
+                                                        v-else
+                                                        v-model="form.vendor_id"
+                                                    >
+                                                        <SelectTrigger
+                                                            class="bg-white dark:bg-slate-950"
+                                                            ><SelectValue
+                                                        /></SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem
+                                                                :value="
+                                                                    NO_VENDOR
+                                                                "
+                                                                >Tanpa
+                                                                vendor</SelectItem
+                                                            >
+                                                            <SelectItem
+                                                                v-for="vendor in vendors"
+                                                                :key="vendor.id"
+                                                                :value="
+                                                                    vendor.id
+                                                                "
+                                                                >{{
+                                                                    vendor.name
+                                                                }}</SelectItem
+                                                            >
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <InputError
+                                                        :message="
+                                                            form.movement_type ===
+                                                            'utilization_internal'
+                                                                ? form.errors
+                                                                      .internal_destination_id
+                                                                : form.errors
+                                                                      .vendor_id
+                                                        "
+                                                    />
+                                                </div>
+                                                <div class="grid gap-2">
+                                                    <Label for="quantity"
+                                                        >Jumlah</Label
+                                                    >
+                                                    <Input
+                                                        id="quantity"
+                                                        v-model="form.quantity"
+                                                        type="number"
+                                                        step="0.01"
+                                                        class="bg-white dark:bg-slate-950"
+                                                    />
+                                                    <InputError
+                                                        :message="
+                                                            form.errors.quantity
+                                                        "
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="grid gap-6 md:grid-cols-2"
+                                            >
+                                                <div class="grid gap-2">
+                                                    <Label for="unit"
+                                                        >Satuan</Label
+                                                    >
+                                                    <Input
+                                                        id="unit"
+                                                        v-model="form.unit"
+                                                        readonly
+                                                        class="bg-white dark:bg-slate-950"
+                                                    />
+                                                </div>
+                                                <div class="grid gap-2">
+                                                    <Label
+                                                        >Use-case /
+                                                        purpose</Label
+                                                    >
+                                                    <Select
+                                                        v-model="
+                                                            form.purpose_id
+                                                        "
+                                                    >
+                                                        <SelectTrigger
+                                                            class="bg-white dark:bg-slate-950"
+                                                            ><SelectValue
+                                                        /></SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem
+                                                                :value="
+                                                                    NO_PURPOSE
+                                                                "
+                                                                >Tanpa
+                                                                use-case</SelectItem
+                                                            >
+                                                            <SelectItem
+                                                                v-for="purpose in purposes"
+                                                                :key="
+                                                                    purpose.id
+                                                                "
+                                                                :value="
+                                                                    purpose.id
+                                                                "
+                                                                >{{
+                                                                    purpose.name
+                                                                }}</SelectItem
+                                                            >
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <InputError
+                                                        :message="
+                                                            form.errors
+                                                                .purpose_id
+                                                        "
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        class="rounded-[22px] border border-slate-200/80 bg-slate-50/70 p-5 dark:bg-slate-900/65"
+                                    >
+                                        <div
+                                            class="mb-4 flex items-center gap-3"
+                                        >
+                                            <div
+                                                class="rounded-2xl bg-amber-100 p-3 text-amber-700"
+                                            >
+                                                <FileText class="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <p
+                                                    class="text-sm font-semibold text-slate-950 dark:text-slate-100"
+                                                >
+                                                    Dokumen dan Catatan
+                                                </p>
+                                                <p
+                                                    class="text-sm text-slate-500 dark:text-slate-400"
+                                                >
+                                                    Perbarui metadata dokumen
+                                                    jika jalur eksternal
+                                                    berubah.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div class="grid gap-6">
+                                            <div
+                                                class="grid gap-6 md:grid-cols-2"
+                                            >
+                                                <div class="grid gap-2">
+                                                    <Label for="document_number"
+                                                        >Nomor dokumen</Label
+                                                    >
+                                                    <Input
+                                                        id="document_number"
+                                                        v-model="
+                                                            form.document_number
+                                                        "
+                                                        class="bg-white dark:bg-slate-950"
+                                                    />
+                                                </div>
+                                                <div class="grid gap-2">
+                                                    <Label for="document_date"
+                                                        >Tanggal dokumen</Label
+                                                    >
+                                                    <Input
+                                                        id="document_date"
+                                                        v-model="
+                                                            form.document_date
+                                                        "
+                                                        type="date"
+                                                        class="bg-white dark:bg-slate-950"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="grid gap-6 md:grid-cols-2"
+                                            >
+                                                <div class="grid gap-2">
+                                                    <Label for="attachment"
+                                                        >Lampiran</Label
+                                                    >
+                                                    <Input
+                                                        id="attachment"
+                                                        type="file"
+                                                        class="bg-white dark:bg-slate-950"
+                                                        @change="
+                                                            updateAttachment
+                                                        "
+                                                    />
+                                                    <InputError
+                                                        :message="
+                                                            form.errors
+                                                                .attachment
+                                                        "
+                                                    />
+                                                </div>
+                                                <div class="grid gap-2">
+                                                    <Label for="note"
+                                                        >Catatan</Label
+                                                    >
+                                                    <Textarea
+                                                        id="note"
+                                                        v-model="form.note"
+                                                        class="min-h-28 bg-white dark:bg-slate-950"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-4">
+                                    <div
+                                        class="rounded-[22px] border border-slate-200/80 bg-white/90 p-5 shadow-sm shadow-slate-100/60 dark:bg-slate-950/85"
+                                    >
+                                        <p
+                                            class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
+                                        >
+                                            Preview Revisi
+                                        </p>
+                                        <div class="mt-4 space-y-3">
+                                            <div
+                                                class="rounded-[18px] border border-slate-200/80 bg-slate-50/80 px-4 py-3 dark:bg-slate-900/70"
+                                            >
+                                                <p
+                                                    class="text-[11px] font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                                                >
+                                                    Jalur
+                                                </p>
+                                                <p
+                                                    class="mt-2 text-sm font-semibold text-slate-950 dark:text-slate-100"
+                                                >
+                                                    {{
+                                                        formatFabaMovementType(
+                                                            form.movement_type,
+                                                        )
+                                                    }}
+                                                </p>
+                                            </div>
+                                            <div
+                                                class="rounded-[18px] border border-slate-200/80 bg-slate-50/80 px-4 py-3 dark:bg-slate-900/70"
+                                            >
+                                                <p
+                                                    class="text-[11px] font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                                                >
+                                                    Quantity
+                                                </p>
+                                                <p
+                                                    class="mt-2 text-sm font-semibold text-slate-950 dark:text-slate-100"
+                                                >
+                                                    {{ form.quantity }}
+                                                    {{ form.unit }}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <Button
+                                        type="submit"
+                                        class="w-full justify-between"
+                                        :disabled="form.processing"
+                                    >
+                                        Simpan perubahan
+                                        <Save class="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </form>
+            </div>
         </div>
     </WasteManagementLayout>
 </template>

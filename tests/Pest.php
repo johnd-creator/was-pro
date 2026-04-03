@@ -11,23 +11,60 @@
 |
 */
 
-// Default test case configuration
+function bootstrapFeatureTestCase(): void
+{
+    test()->seed(\Database\Seeders\TestingBaselineSeeder::class);
+
+    $tenantService = app(\App\Services\TenantService::class);
+
+    \App\Models\Organization::all()->each(function ($organization) use ($tenantService) {
+        if (! $tenantService->schemaExists($organization->schema_name)) {
+            $tenantService->createSchema($organization->schema_name);
+        }
+    });
+}
+
+function resetTenantSchemas(): void
+{
+    $tenantService = app(\App\Services\TenantService::class);
+
+    $tenantService->switchToPublic();
+
+    collect(\Illuminate\Support\Facades\DB::select("
+        SELECT schema_name
+        FROM information_schema.schemata
+        WHERE schema_name LIKE 'tenant\\_%' ESCAPE '\\'
+    "))
+        ->pluck('schema_name')
+        ->each(function ($schemaName) {
+            \Illuminate\Support\Facades\DB::statement(sprintf('DROP SCHEMA IF EXISTS "%s" CASCADE', $schemaName));
+        });
+}
+
 pest()->extend(Tests\TestCase::class)
     ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
     ->beforeEach(function () {
-        $this->seed(\Database\Seeders\TestingBaselineSeeder::class);
-
-        // Create tenant schemas before each test
-        $tenantService = app(\App\Services\TenantService::class);
-
-        // Get all organizations and create their schemas
-        \App\Models\Organization::all()->each(function ($org) use ($tenantService) {
-            if (! $tenantService->schemaExists($org->schema_name)) {
-                $tenantService->createSchema($org->schema_name);
-            }
-        });
+        bootstrapFeatureTestCase();
     })
-    ->in('Feature');
+    ->in(
+        'Feature/Admin',
+        'Feature/Auth',
+        'Feature/Feature',
+        'Feature/Settings',
+        'Feature/AuthorizationServiceTest.php',
+        'Feature/DashboardTest.php',
+        'Feature/ExampleTest.php',
+        'Feature/OrganizationTest.php',
+        'Feature/RolesAndPermissionsTest.php',
+    );
+
+pest()->extend(Tests\TestCase::class)
+    ->use(Illuminate\Foundation\Testing\DatabaseMigrations::class)
+    ->beforeEach(function () {
+        resetTenantSchemas();
+        bootstrapFeatureTestCase();
+    })
+    ->in('Feature/WasteManagement');
 
 /*
 |--------------------------------------------------------------------------

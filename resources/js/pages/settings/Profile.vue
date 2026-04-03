@@ -39,7 +39,9 @@ const user = computed(() => page.props.auth.user);
         <h1 class="sr-only">Pengaturan profil</h1>
 
         <SettingsLayout>
-            <div class="flex flex-col space-y-6">
+            <div
+                class="wm-surface-elevated flex flex-col space-y-6 rounded-[28px] p-6"
+            >
                 <Heading
                     variant="small"
                     title="Informasi profil"
