@@ -1051,6 +1051,17 @@ test('faba demo seed rejects fresh mode for an existing non-demo tenant', functi
     expect($response)->toBe(1);
 });
 
+test('faba demo seed rejects fresh mode for protected default demo schema on a non-testing database', function () {
+    config()->set('database.connections.'.config('database.default').'.database', 'was_pro');
+
+    $response = Artisan::call('faba:seed-demo', [
+        '--fresh-tenant' => true,
+    ]);
+
+    expect($response)->toBe(1);
+    expect(Artisan::output())->toContain('hanya diizinkan pada database testing');
+});
+
 test('integrated demo seed command prepares waste and faba data in one tenant', function () {
     CarbonImmutable::setTestNow('2026-03-19 10:00:00');
 

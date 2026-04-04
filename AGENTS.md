@@ -48,6 +48,9 @@ This project has domain-specific skills available. You MUST activate the relevan
 ## Verification Scripts
 
 - Do not create verification scripts or tinker when tests cover that functionality and prove they work. Unit and feature tests are more important.
+- Never run test, seed reset, or destructive verification commands against `DB_DATABASE=was_pro`. Use the dedicated test database (for example `was_pro_test`) for any command that can migrate, refresh, seed, or drop schemas.
+- Never run manual `DROP SCHEMA` against protected demo schemas such as `tenant_twms_demo` unless the user explicitly asks for that destructive action.
+- Treat `php artisan test`, `demo:seed --fresh-tenant`, `faba:seed-demo --fresh-tenant`, and `waste-management:seed-demo --fresh-tenant` as destructive verification flows that must stay off the main database.
 
 ## Application Structure & Architecture
 

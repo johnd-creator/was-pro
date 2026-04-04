@@ -30,12 +30,17 @@ function resetTenantSchemas(): void
 
     $tenantService->switchToPublic();
 
+    $protectedSchemas = [
+        \App\Services\WasteManagementDemoDataService::DEFAULT_SCHEMA_NAME,
+    ];
+
     collect(\Illuminate\Support\Facades\DB::select("
         SELECT schema_name
         FROM information_schema.schemata
         WHERE schema_name LIKE 'tenant\\_%' ESCAPE '\\'
     "))
         ->pluck('schema_name')
+        ->reject(fn (string $schemaName): bool => in_array($schemaName, $protectedSchemas, true))
         ->each(function ($schemaName) {
             \Illuminate\Support\Facades\DB::statement(sprintf('DROP SCHEMA IF EXISTS "%s" CASCADE', $schemaName));
         });
@@ -47,6 +52,7 @@ pest()->extend(Tests\TestCase::class)
         bootstrapFeatureTestCase();
     })
     ->in(
+        'Feature/Api',
         'Feature/Admin',
         'Feature/Auth',
         'Feature/Feature',

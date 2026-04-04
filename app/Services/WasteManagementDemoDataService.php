@@ -42,6 +42,8 @@ class WasteManagementDemoDataService
         $tenantCode = Str::upper($tenantCode ?: self::DEFAULT_TENANT_CODE);
         $schemaName = $schemaName ?: $this->deriveSchemaName($tenantCode);
 
+        $this->guardProtectedDemoFreshReset($tenantCode, $schemaName, $freshTenant);
+
         $this->seedRolesAndPermissions();
 
         $existingOrganization = Organization::withTrashed()->where('code', $tenantCode)->first();
@@ -221,6 +223,25 @@ class WasteManagementDemoDataService
 
         if ($tenantCode !== self::DEFAULT_TENANT_CODE) {
             throw new RuntimeException('Mode --fresh-tenant tidak diizinkan untuk tenant existing. Gunakan tenant demo terpisah atau seed tanpa overwrite.');
+        }
+    }
+
+    protected function guardProtectedDemoFreshReset(string $tenantCode, string $schemaName, bool $freshTenant): void
+    {
+        if (! $freshTenant) {
+            return;
+        }
+
+        if (
+            $tenantCode === self::DEFAULT_TENANT_CODE
+            && $schemaName === self::DEFAULT_SCHEMA_NAME
+            && ! $this->tenantService->usesDedicatedTestingDatabase()
+        ) {
+            throw new RuntimeException(sprintf(
+                'Mode --fresh-tenant untuk schema demo default [%s] hanya diizinkan pada database testing. Database aktif: [%s].',
+                $schemaName,
+                config('database.connections.'.config('database.default').'.database'),
+            ));
         }
     }
 

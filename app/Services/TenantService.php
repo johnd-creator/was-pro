@@ -4,9 +4,17 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use RuntimeException;
 
 class TenantService
 {
+    /**
+     * @var list<string>
+     */
+    protected array $protectedSchemas = [
+        'tenant_twms_demo',
+    ];
+
     /**
      * The current schema name.
      */
@@ -38,6 +46,8 @@ class TenantService
      */
     public function dropSchema(string $schemaName): bool
     {
+        $this->guardProtectedSchemaDrop($schemaName);
+
         try {
             // Drop all tables in the schema first
             $tables = DB::select("SELECT tablename FROM pg_tables WHERE schemaname = '{$schemaName}'");
@@ -54,6 +64,11 @@ class TenantService
 
             return false;
         }
+    }
+
+    public function usesDedicatedTestingDatabase(): bool
+    {
+        return str_ends_with($this->currentDatabaseName(), '_test');
     }
 
     /**
@@ -178,5 +193,30 @@ class TenantService
         DB::statement("SET search_path TO {$searchPath}");
 
         $this->currentSchema = $schema;
+    }
+
+    protected function guardProtectedSchemaDrop(string $schemaName): void
+    {
+        if (! $this->isProtectedSchema($schemaName) || $this->usesDedicatedTestingDatabase()) {
+            return;
+        }
+
+        throw new RuntimeException(sprintf(
+            'Refusing to drop protected schema [%s] while using database [%s]. Use the dedicated *_test database for destructive verification.',
+            $schemaName,
+            $this->currentDatabaseName(),
+        ));
+    }
+
+    protected function isProtectedSchema(string $schemaName): bool
+    {
+        return in_array($schemaName, $this->protectedSchemas, true);
+    }
+
+    protected function currentDatabaseName(): string
+    {
+        $connectionName = (string) config('database.default');
+
+        return (string) config("database.connections.{$connectionName}.database");
     }
 }

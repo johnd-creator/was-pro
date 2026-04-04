@@ -8,6 +8,7 @@ use App\Models\WasteRecord;
 use App\Models\WasteTransportation;
 use App\Models\WasteType;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia;
@@ -961,4 +962,15 @@ test('waste management demo seed rejects fresh mode for an existing non-demo ten
     ]);
 
     $response->assertFailed();
+});
+
+test('waste management demo seed rejects fresh mode for protected default demo schema on a non-testing database', function () {
+    config()->set('database.connections.'.config('database.default').'.database', 'was_pro');
+
+    $response = $this->artisan('waste-management:seed-demo', [
+        '--fresh-tenant' => true,
+    ]);
+
+    $response->assertFailed();
+    expect(Artisan::output())->toContain('hanya diizinkan pada database testing');
 });

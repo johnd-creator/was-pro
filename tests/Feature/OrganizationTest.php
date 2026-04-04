@@ -95,3 +95,10 @@ test('tenant service can switch schemas', function () {
     // Cleanup
     $tenantService->dropSchema($schemaName);
 });
+
+test('protected demo schema cannot be dropped on a non-testing database', function () {
+    config()->set('database.connections.'.config('database.default').'.database', 'was_pro');
+
+    expect(fn () => app(TenantService::class)->dropSchema('tenant_twms_demo'))
+        ->toThrow(\RuntimeException::class, 'Refusing to drop protected schema [tenant_twms_demo] while using database [was_pro].');
+});
