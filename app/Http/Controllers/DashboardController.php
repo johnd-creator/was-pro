@@ -79,8 +79,10 @@ class DashboardController extends Controller
             // NEW: Tab system props
             'wasteTasks' => $data['waste_tasks'],
             'fabaTasks' => $data['faba_tasks'],
+            'haulingAttentionTasks' => $data['hauling_attention_tasks'],
             'wastePendingCount' => $data['waste_pending_count'],
             'fabaPendingCount' => $data['faba_pending_count'],
+            'haulingAttentionCount' => $data['hauling_attention_count'],
         ]);
     }
 

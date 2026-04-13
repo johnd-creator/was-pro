@@ -29,6 +29,12 @@ export const appNavigationItems: NavItem[] = [
         permissions: ['waste_records.view_all', 'waste_records.view_own'],
     },
     {
+        title: 'Pengangkutan Limbah',
+        href: wasteManagementRoutes.haulings.index.url(),
+        icon: Truck,
+        permissions: ['waste_hauling.view_all', 'waste_hauling.view_own'],
+    },
+    {
         title: 'Transportasi',
         href: wasteManagementRoutes.transportations.index.url(),
         icon: Truck,

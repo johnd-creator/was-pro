@@ -61,6 +61,15 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Reject Waste Records', 'slug' => 'waste_records.reject', 'module' => 'waste_records', 'description' => 'Reject waste records'],
             ['name' => 'Submit Waste Records', 'slug' => 'waste_records.submit', 'module' => 'waste_records', 'description' => 'Submit waste records for approval'],
 
+            // Waste hauling permissions
+            ['name' => 'View All Waste Haulings', 'slug' => 'waste_hauling.view_all', 'module' => 'waste_hauling', 'description' => 'View all waste hauling records'],
+            ['name' => 'View Own Waste Haulings', 'slug' => 'waste_hauling.view_own', 'module' => 'waste_hauling', 'description' => 'View own waste hauling records'],
+            ['name' => 'Create Waste Haulings', 'slug' => 'waste_hauling.create', 'module' => 'waste_hauling', 'description' => 'Open waste hauling request form'],
+            ['name' => 'Submit Waste Haulings', 'slug' => 'waste_hauling.submit', 'module' => 'waste_hauling', 'description' => 'Submit waste hauling requests'],
+            ['name' => 'Approve Waste Haulings', 'slug' => 'waste_hauling.approve', 'module' => 'waste_hauling', 'description' => 'Approve waste hauling requests'],
+            ['name' => 'Reject Waste Haulings', 'slug' => 'waste_hauling.reject', 'module' => 'waste_hauling', 'description' => 'Reject waste hauling requests'],
+            ['name' => 'Cancel Waste Haulings', 'slug' => 'waste_hauling.cancel', 'module' => 'waste_hauling', 'description' => 'Cancel waste hauling requests'],
+
             // Waste transportation permissions
             ['name' => 'View All Transportation', 'slug' => 'transportation.view_all', 'module' => 'transportation', 'description' => 'View all transportation records'],
             ['name' => 'View Own Transportation', 'slug' => 'transportation.view_own', 'module' => 'transportation', 'description' => 'View own transportation records'],

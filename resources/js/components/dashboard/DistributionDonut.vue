@@ -91,18 +91,18 @@ function formatValue(value: number): string {
 <template>
     <div class="space-y-4">
         <div
-            class="grid gap-4 lg:grid-cols-[156px_minmax(0,1fr)] lg:items-center"
+            class="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)] lg:items-start"
         >
-            <div class="flex justify-center">
+            <div class="flex justify-center lg:pt-1">
                 <div
-                    class="wm-panel-elevated relative flex h-32 w-32 items-center justify-center rounded-full border"
+                    class="wm-panel-elevated relative flex h-44 w-44 items-center justify-center rounded-full border"
                     :style="donutStyle"
                 >
                     <div
-                        class="absolute inset-2.5 rounded-full border border-white/70 dark:border-slate-700/70"
+                        class="absolute inset-3 rounded-full border border-white/70 dark:border-slate-700/70"
                     />
                     <div
-                        class="wm-panel flex h-20 w-20 flex-col items-center justify-center rounded-full border text-center"
+                        class="wm-panel flex h-28 w-28 flex-col items-center justify-center rounded-full border text-center"
                     >
                         <span
                             class="wm-text-muted text-[10px] font-semibold tracking-[0.12em] uppercase"
@@ -110,7 +110,7 @@ function formatValue(value: number): string {
                             {{ totalLabel }}
                         </span>
                         <span
-                            class="wm-text-primary mt-1 text-xl font-bold tabular-nums"
+                            class="wm-text-primary mt-1 text-2xl leading-tight font-bold tabular-nums"
                         >
                             {{ isEmpty ? emptyLabel : formatValue(totalValue) }}
                         </span>
@@ -121,10 +121,10 @@ function formatValue(value: number): string {
                 </div>
             </div>
 
-            <div class="space-y-2.5">
+            <div class="space-y-1.5">
                 <div
                     v-if="isEmpty"
-                    class="wm-panel rounded-lg border border-dashed px-4 py-6 text-center text-sm"
+                    class="wm-panel rounded-lg border border-dashed px-3 py-4 text-center text-sm"
                 >
                     Belum ada komposisi yang dapat ditampilkan pada snapshot
                     ini.
@@ -132,27 +132,34 @@ function formatValue(value: number): string {
                 <div
                     v-for="(item, index) in segments"
                     :key="item.label"
-                    class="wm-panel flex items-center gap-3 rounded-xl border px-3.5 py-3 transition-colors duration-200 hover:bg-white dark:hover:bg-slate-900"
+                    class="wm-panel flex items-center gap-2.5 rounded-lg border px-3 py-2 transition-colors duration-200 hover:bg-white dark:hover:bg-slate-900"
                 >
                     <div
-                        class="wm-text-muted w-5 text-[11px] font-semibold tabular-nums"
+                        class="wm-text-muted w-4 text-[10px] font-semibold tabular-nums"
                     >
                         {{ index + 1 }}
                     </div>
                     <div
-                        class="h-3.5 w-3.5 shrink-0 rounded-full"
+                        class="h-2.5 w-2.5 shrink-0 rounded-full"
                         :style="{ backgroundColor: item.color }"
                     />
                     <div class="min-w-0 flex-1">
-                        <p class="wm-text-primary truncate text-sm font-medium">
+                        <p
+                            class="wm-text-primary truncate text-sm leading-tight font-medium"
+                        >
                             {{ item.label }}
                         </p>
-                        <p class="wm-text-secondary text-xs">
-                            {{ formatValue(item.value) }} {{ valueSuffix }} •
+                        <p
+                            class="wm-text-secondary mt-0.5 text-[11px] leading-tight"
+                        >
+                            {{ formatValue(item.value) }} {{ valueSuffix }}
+                            <span class="text-slate-400 dark:text-slate-600"
+                                >•</span
+                            >
                             {{ item.normalizedPercentage.toFixed(1) }}%
                         </p>
                     </div>
-                    <div class="text-right">
+                    <div class="shrink-0 text-right">
                         <p
                             class="wm-text-primary text-sm font-semibold tabular-nums"
                         >

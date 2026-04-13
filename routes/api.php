@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\FabaProductionController;
 use App\Http\Controllers\Api\FabaRecapController;
 use App\Http\Controllers\Api\FabaUtilizationController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\WasteHaulingController;
 use App\Http\Controllers\Api\WasteRecordController;
 use App\Http\Controllers\Api\WasteTransportationController;
 use Illuminate\Support\Facades\Route;
@@ -45,6 +46,17 @@ Route::prefix('v1')->group(function () {
             Route::post('/{wasteRecord}/approve', [WasteRecordController::class, 'approve'])->name('api.v1.waste-records.approve');
             Route::post('/{wasteRecord}/reject', [WasteRecordController::class, 'reject'])->name('api.v1.waste-records.reject');
             Route::post('/{wasteRecord}/return-to-draft', [WasteRecordController::class, 'returnToDraft'])->name('api.v1.waste-records.return-to-draft');
+        });
+
+        Route::prefix('waste-haulings')->group(function () {
+            Route::get('/', [WasteHaulingController::class, 'index'])->name('api.v1.waste-haulings.index');
+            Route::post('/', [WasteHaulingController::class, 'store'])->name('api.v1.waste-haulings.store');
+            Route::get('/pending-approval', [WasteHaulingController::class, 'pendingApproval'])->name('api.v1.waste-haulings.pending-approval');
+            Route::get('/history/{wasteRecord}', [WasteHaulingController::class, 'history'])->name('api.v1.waste-haulings.history');
+            Route::get('/{wasteHauling}', [WasteHaulingController::class, 'show'])->name('api.v1.waste-haulings.show');
+            Route::post('/{wasteHauling}/approve', [WasteHaulingController::class, 'approve'])->name('api.v1.waste-haulings.approve');
+            Route::post('/{wasteHauling}/reject', [WasteHaulingController::class, 'reject'])->name('api.v1.waste-haulings.reject');
+            Route::post('/{wasteHauling}/cancel', [WasteHaulingController::class, 'cancel'])->name('api.v1.waste-haulings.cancel');
         });
 
         Route::prefix('transportations')->group(function () {

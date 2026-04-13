@@ -63,7 +63,7 @@ class WasteRecordsController extends Controller
      */
     public function index(): Response
     {
-        $query = WasteRecord::with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser'])
+        $query = WasteRecord::with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser', 'haulings'])
             ->orderBy('date', 'desc')
             ->orderBy('created_at', 'desc');
 
@@ -74,8 +74,14 @@ class WasteRecordsController extends Controller
 
         $wasteRecords = $query->get();
 
+        $wasteTypes = WasteType::with(['category', 'characteristic'])
+            ->active()
+            ->orderBy('name')
+            ->get();
+
         return Inertia::render('waste-management/records/Index', [
-            'wasteRecords' => $wasteRecords,
+            'wasteRecords' => $wasteRecords->map(fn (WasteRecord $record): array => $this->serializeWasteRecord($record))->all(),
+            'wasteTypes' => $wasteTypes,
         ]);
     }
 
@@ -137,9 +143,10 @@ class WasteRecordsController extends Controller
         }
 
         $wasteRecord->load(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser', 'createdBy']);
+        $wasteRecord->load(['haulings.createdBy', 'haulings.approvedByUser']);
 
         return Inertia::render('waste-management/records/Show', [
-            'wasteRecord' => $wasteRecord,
+            'wasteRecord' => $this->serializeWasteRecord($wasteRecord, true),
             'abilities' => [
                 'can_edit' => $wasteRecord->canBeEdited() && $this->canModifyRecord($wasteRecord),
                 'can_submit' => $wasteRecord->isDraft()
@@ -198,6 +205,13 @@ class WasteRecordsController extends Controller
         // Check if user owns this record (unless they can view all)
         if (! $this->canModifyRecord($wasteRecord)) {
             abort(403, 'You do not have permission to edit this record.');
+        }
+
+        $approvedHauledQuantity = $wasteRecord->getApprovedHauledQuantity();
+        if ((float) $request->validated('quantity') < $approvedHauledQuantity) {
+            return Redirect::back()
+                ->with('error', "Jumlah limbah tidak boleh lebih kecil dari total yang sudah diangkut ({$approvedHauledQuantity} {$wasteRecord->unit}).")
+                ->withInput();
         }
 
         $wasteRecord->update([
@@ -442,5 +456,85 @@ class WasteRecordsController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function serializeWasteRecord(WasteRecord $record, bool $includeHistory = false): array
+    {
+        $payload = [
+            'id' => $record->id,
+            'record_number' => $record->record_number,
+            'date' => $record->date?->format('Y-m-d'),
+            'expiry_date' => $record->expiry_date?->format('Y-m-d'),
+            'waste_type_id' => $record->waste_type_id,
+            'quantity' => (float) $record->quantity,
+            'unit' => $record->unit,
+            'source' => $record->source,
+            'description' => $record->description,
+            'notes' => $record->notes,
+            'status' => $record->status,
+            'rejection_reason' => $record->rejection_reason,
+            'submitted_at' => $record->submitted_at?->toIso8601String(),
+            'approved_at' => $record->approved_at?->toIso8601String(),
+            'approval_notes' => $record->approval_notes,
+            'operational_status' => $record->getOperationalStatus(),
+            'operational_status_label' => $record->getOperationalStatusLabel(),
+            'approved_hauled_quantity' => $record->getApprovedHauledQuantity(),
+            'remaining_quantity' => $record->getRemainingQuantity(),
+            'reserved_quantity' => $record->getReservedHaulingQuantity(),
+            'waste_type' => $record->wasteType ? [
+                'name' => $record->wasteType->name,
+                'code' => $record->wasteType->code,
+                'category' => $record->wasteType->category ? [
+                    'name' => $record->wasteType->category->name,
+                    'code' => $record->wasteType->category->code,
+                ] : null,
+                'characteristic' => $record->wasteType->characteristic ? [
+                    'name' => $record->wasteType->characteristic->name,
+                    'is_hazardous' => (bool) $record->wasteType->characteristic->is_hazardous,
+                ] : null,
+            ] : null,
+            'submitted_by_user' => $record->submittedByUser ? [
+                'name' => $record->submittedByUser->name,
+                'email' => $record->submittedByUser->email,
+            ] : null,
+            'approved_by_user' => $record->approvedByUser ? [
+                'name' => $record->approvedByUser->name,
+            ] : null,
+            'created_by' => $record->createdBy ? [
+                'name' => $record->createdBy->name,
+            ] : null,
+        ];
+
+        if ($includeHistory) {
+            $payload['hauling_history'] = $record->haulings
+                ->sortBy('created_at')
+                ->values()
+                ->map(fn ($hauling): array => [
+                    'id' => $hauling->id,
+                    'hauling_number' => $hauling->hauling_number,
+                    'hauling_date' => $hauling->hauling_date?->format('Y-m-d'),
+                    'quantity' => (float) $hauling->quantity,
+                    'unit' => $hauling->unit,
+                    'status' => $hauling->status,
+                    'status_label' => $hauling->getStatusLabel(),
+                    'notes' => $hauling->notes,
+                    'submitted_at' => $hauling->submitted_at?->toIso8601String(),
+                    'approved_at' => $hauling->approved_at?->toIso8601String(),
+                    'approval_notes' => $hauling->approval_notes,
+                    'rejection_reason' => $hauling->rejection_reason,
+                    'created_by' => $hauling->createdBy ? [
+                        'name' => $hauling->createdBy->name,
+                    ] : null,
+                    'approved_by' => $hauling->approvedByUser ? [
+                        'name' => $hauling->approvedByUser->name,
+                    ] : null,
+                ])
+                ->all();
+        }
+
+        return $payload;
     }
 }

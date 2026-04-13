@@ -127,6 +127,22 @@ class WasteRecord extends Model
     }
 
     /**
+     * Get the hauling requests for the waste record.
+     */
+    public function haulings(): HasMany
+    {
+        return $this->hasMany(WasteHauling::class, 'waste_record_id');
+    }
+
+    /**
+     * Get approved hauling requests for the waste record.
+     */
+    public function approvedHaulings(): HasMany
+    {
+        return $this->haulings()->where('status', 'approved');
+    }
+
+    /**
      * Scope to filter by status.
      */
     public function scopeWithStatus($query, $status)
@@ -351,6 +367,86 @@ class WasteRecord extends Model
             'approved' => 'Approved',
             'rejected' => 'Rejected',
             default => ucfirst($this->status),
+        };
+    }
+
+    /**
+     * Get total approved hauled quantity.
+     */
+    public function getApprovedHauledQuantity(): float
+    {
+        if (array_key_exists('approved_hauled_quantity', $this->attributes)) {
+            return (float) $this->attributes['approved_hauled_quantity'];
+        }
+
+        if ($this->relationLoaded('haulings')) {
+            return (float) $this->haulings
+                ->where('status', 'approved')
+                ->sum('quantity');
+        }
+
+        return (float) $this->approvedHaulings()->sum('quantity');
+    }
+
+    /**
+     * Get remaining quantity that has not been hauled.
+     */
+    public function getRemainingQuantity(): float
+    {
+        return max(0, (float) $this->quantity - $this->getApprovedHauledQuantity());
+    }
+
+    /**
+     * Get quantity reserved by approved and pending hauling requests.
+     */
+    public function getReservedHaulingQuantity(?string $ignoreHaulingId = null): float
+    {
+        if ($this->relationLoaded('haulings')) {
+            return (float) $this->haulings
+                ->filter(function (WasteHauling $hauling) use ($ignoreHaulingId): bool {
+                    if ($ignoreHaulingId && (string) $hauling->id === $ignoreHaulingId) {
+                        return false;
+                    }
+
+                    return in_array($hauling->status, ['pending_approval', 'approved'], true);
+                })
+                ->sum('quantity');
+        }
+
+        return (float) $this->haulings()
+            ->whereIn('status', ['pending_approval', 'approved'])
+            ->when($ignoreHaulingId, fn ($query) => $query->where('id', '!=', $ignoreHaulingId))
+            ->sum('quantity');
+    }
+
+    /**
+     * Get derived operational status for hauling.
+     */
+    public function getOperationalStatus(): string
+    {
+        $hauledQuantity = $this->getApprovedHauledQuantity();
+
+        if ($hauledQuantity <= 0) {
+            return 'not_hauled';
+        }
+
+        if ($this->getRemainingQuantity() <= 0) {
+            return 'completed';
+        }
+
+        return 'partially_hauled';
+    }
+
+    /**
+     * Get derived operational status label for hauling.
+     */
+    public function getOperationalStatusLabel(): string
+    {
+        return match ($this->getOperationalStatus()) {
+            'not_hauled' => 'Belum Diangkut',
+            'partially_hauled' => 'Sebagian Diangkut',
+            'completed' => 'Selesai',
+            default => 'Belum Diangkut',
         };
     }
 

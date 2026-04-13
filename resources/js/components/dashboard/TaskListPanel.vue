@@ -7,6 +7,7 @@ import {
     Clock3,
     FilePenLine,
     ShieldAlert,
+    Truck,
 } from 'lucide-vue-next';
 import type { LucideIcon } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -15,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface DashboardTaskItem {
     id: string;
-    type: 'waste_record' | 'faba_approval';
+    type: 'waste_record' | 'faba_approval' | 'waste_hauling';
     task_group: 'approval' | 'revision' | 'follow_up';
     title: string;
     subtitle: string;
@@ -25,20 +26,27 @@ interface DashboardTaskItem {
     href: string;
 }
 
-type TabType = 'waste' | 'faba';
+type TabType = 'waste' | 'faba' | 'hauling_attention';
 
 interface Props {
     wasteTasks: DashboardTaskItem[];
     fabaTasks: DashboardTaskItem[];
+    haulingAttentionTasks: DashboardTaskItem[];
     taskContext: 'operator' | 'approver';
     wastePendingCount: number;
     fabaPendingCount: number;
+    haulingAttentionCount: number;
 }
 
 const props = defineProps<Props>();
 
 const activeTab = ref<TabType>(
-    props.wastePendingCount >= props.fabaPendingCount ? 'waste' : 'faba',
+    props.haulingAttentionCount >= props.wastePendingCount &&
+        props.haulingAttentionCount >= props.fabaPendingCount
+        ? 'hauling_attention'
+        : props.wastePendingCount >= props.fabaPendingCount
+          ? 'waste'
+          : 'faba',
 );
 
 const panelTitle = computed(() =>
@@ -48,13 +56,27 @@ const panelTitle = computed(() =>
 );
 
 const activeTasks = computed(() => {
-    return activeTab.value === 'waste' ? props.wasteTasks : props.fabaTasks;
+    if (activeTab.value === 'waste') {
+        return props.wasteTasks;
+    }
+
+    if (activeTab.value === 'faba') {
+        return props.fabaTasks;
+    }
+
+    return props.haulingAttentionTasks;
 });
 
 const activePendingCount = computed(() => {
-    return activeTab.value === 'waste'
-        ? props.wastePendingCount
-        : props.fabaPendingCount;
+    if (activeTab.value === 'waste') {
+        return props.wastePendingCount;
+    }
+
+    if (activeTab.value === 'faba') {
+        return props.fabaPendingCount;
+    }
+
+    return props.haulingAttentionCount;
 });
 
 const viewAllHref = computed(() => {
@@ -62,6 +84,10 @@ const viewAllHref = computed(() => {
         return props.taskContext === 'operator'
             ? '/waste-management/records?status=pending_review,rejected'
             : '/waste-management/records?status=pending_review';
+    }
+
+    if (activeTab.value === 'hauling_attention') {
+        return '/waste-management/haulings';
     }
 
     return props.taskContext === 'operator'
@@ -93,6 +119,10 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
         return ShieldAlert;
     }
 
+    if (task.type === 'waste_hauling') {
+        return Truck;
+    }
+
     if (task.task_group === 'approval') {
         return ClipboardList;
     }
@@ -103,41 +133,26 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
 
 <template>
     <Card
-        class="wm-panel-work flex h-full min-h-[520px] flex-col border shadow-sm xl:min-h-0"
+        class="wm-panel-work flex h-full min-h-[520px] flex-col overflow-hidden border shadow-sm xl:min-h-0"
     >
         <CardHeader
             class="wm-border-strong shrink-0 border-b bg-slate-50/40 px-3 py-2 dark:bg-slate-900/30"
         >
-            <div class="flex items-start justify-between gap-3">
-                <div class="space-y-0.5">
-                    <p
-                        class="wm-text-muted text-[10px] font-semibold tracking-[0.12em] uppercase"
-                    >
-                        Task List
-                    </p>
-                    <CardTitle class="wm-text-primary text-sm">
-                        {{ panelTitle }}
-                    </CardTitle>
-                </div>
-
-                <div
-                    class="wm-panel-elevated rounded-lg border px-2 py-1.5 text-right"
+            <div class="space-y-0.5">
+                <p
+                    class="wm-text-muted text-[10px] font-semibold tracking-[0.12em] uppercase"
                 >
-                    <p
-                        class="wm-text-muted text-[9px] font-semibold tracking-[0.12em] uppercase"
-                    >
-                        Total
-                    </p>
-                    <p class="wm-text-primary text-lg font-bold tracking-tight">
-                        {{ wastePendingCount + fabaPendingCount }}
-                    </p>
-                </div>
+                    Task List
+                </p>
+                <CardTitle class="wm-text-primary text-sm">
+                    {{ panelTitle }}
+                </CardTitle>
             </div>
 
             <!-- Tab Navigation -->
             <div class="mt-3">
                 <div
-                    class="grid grid-cols-2 gap-0 border-b border-slate-200 dark:border-slate-700"
+                    class="grid grid-cols-3 gap-0 border-b border-slate-200 dark:border-slate-700"
                 >
                     <button
                         :class="[
@@ -212,11 +227,48 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                             class="absolute right-0 bottom-0 left-0 h-0.5 bg-emerald-500 dark:bg-emerald-400"
                         />
                     </button>
+
+                    <button
+                        :class="[
+                            'relative px-3 py-2 text-left transition-all duration-200',
+                            activeTab === 'hauling_attention'
+                                ? ''
+                                : 'hover:bg-slate-50/50 dark:hover:bg-slate-900/30',
+                        ]"
+                        @click="activeTab = 'hauling_attention'"
+                    >
+                        <div class="flex items-center justify-between gap-2">
+                            <span
+                                :class="[
+                                    'text-xs font-medium',
+                                    activeTab === 'hauling_attention'
+                                        ? 'text-emerald-700 dark:text-emerald-300'
+                                        : 'wm-text-muted',
+                                ]"
+                            >
+                                Atensi
+                            </span>
+                            <span
+                                :class="[
+                                    'rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                                    activeTab === 'hauling_attention'
+                                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200'
+                                        : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
+                                ]"
+                            >
+                                {{ haulingAttentionCount }}
+                            </span>
+                        </div>
+                        <div
+                            v-if="activeTab === 'hauling_attention'"
+                            class="absolute right-0 bottom-0 left-0 h-0.5 bg-emerald-500 dark:bg-emerald-400"
+                        />
+                    </button>
                 </div>
             </div>
         </CardHeader>
 
-        <CardContent class="flex min-h-0 flex-1 flex-col p-2.5">
+        <CardContent class="flex min-h-0 flex-1 flex-col overflow-hidden p-2.5">
             <div
                 v-if="activeTasks.length === 0"
                 class="wm-panel-elevated flex flex-1 items-center justify-center rounded-lg border border-dashed p-4 text-center"
@@ -235,8 +287,14 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                 <!-- Pending Count Badge -->
                 <div class="flex shrink-0 items-center justify-between px-1">
                     <p class="wm-text-secondary text-[10px] font-medium">
-                        {{ activeTab === 'waste' ? 'Limbah' : 'FABA' }} yang
-                        perlu ditangani
+                        {{
+                            activeTab === 'waste'
+                                ? 'Limbah'
+                                : activeTab === 'faba'
+                                  ? 'FABA'
+                                  : 'Limbah atensi'
+                        }}
+                        yang perlu ditangani
                     </p>
                     <span
                         class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
@@ -246,7 +304,7 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                 </div>
 
                 <!-- Scrollable List -->
-                <div class="flex min-h-0 flex-1 overflow-y-auto pr-1">
+                <div class="flex h-0 min-h-0 flex-1 overflow-y-auto pr-1">
                     <div class="flex w-full flex-col space-y-2">
                         <Link
                             v-for="task in activeTasks"

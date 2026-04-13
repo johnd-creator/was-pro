@@ -25,7 +25,7 @@ class WasteRecordController extends ApiController
         }
 
         $query = WasteRecord::query()
-            ->with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser', 'createdBy'])
+            ->with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser', 'createdBy', 'haulings'])
             ->orderByDesc('date')
             ->orderByDesc('created_at');
 
@@ -119,6 +119,15 @@ class WasteRecordController extends ApiController
 
         if (! $record->canBeEdited()) {
             return $this->error('Waste record ini tidak dapat diubah pada status saat ini.', 'CONFLICT', status: 409);
+        }
+
+        $approvedHauledQuantity = $record->getApprovedHauledQuantity();
+        if ((float) $request->validated('quantity') < $approvedHauledQuantity) {
+            $message = "Jumlah limbah tidak boleh lebih kecil dari total yang sudah diangkut ({$approvedHauledQuantity} {$record->unit}).";
+
+            return $this->error($message, 'VALIDATION_ERROR', [
+                'quantity' => [$message],
+            ], 422);
         }
 
         $record->update([
@@ -302,6 +311,11 @@ class WasteRecordController extends ApiController
             'approved_at' => $record->approved_at?->toIso8601String(),
             'expiry_date' => $record->expiry_date?->format('Y-m-d'),
             'expiry_status' => $record->getExpiryStatus(),
+            'approved_hauled_quantity' => $record->getApprovedHauledQuantity(),
+            'remaining_quantity' => $record->getRemainingQuantity(),
+            'reserved_quantity' => $record->getReservedHaulingQuantity(),
+            'operational_status' => $record->getOperationalStatus(),
+            'operational_status_label' => $record->getOperationalStatusLabel(),
             'waste_type' => $record->wasteType ? [
                 'id' => $record->wasteType->id,
                 'name' => $record->wasteType->name,
@@ -329,6 +343,26 @@ class WasteRecordController extends ApiController
                 'id' => $record->approvedByUser->id,
                 'name' => $record->approvedByUser->name,
             ] : null,
+            'hauling_history' => $record->relationLoaded('haulings')
+                ? $record->haulings
+                    ->sortBy('created_at')
+                    ->values()
+                    ->map(fn ($hauling): array => [
+                        'id' => $hauling->id,
+                        'hauling_number' => $hauling->hauling_number,
+                        'hauling_date' => $hauling->hauling_date?->format('Y-m-d'),
+                        'quantity' => (float) $hauling->quantity,
+                        'unit' => $hauling->unit,
+                        'status' => $hauling->status,
+                        'status_label' => $hauling->getStatusLabel(),
+                        'notes' => $hauling->notes,
+                        'submitted_at' => $hauling->submitted_at?->toIso8601String(),
+                        'approved_at' => $hauling->approved_at?->toIso8601String(),
+                        'approval_notes' => $hauling->approval_notes,
+                        'rejection_reason' => $hauling->rejection_reason,
+                    ])
+                    ->all()
+                : [],
             'allowed_actions' => $this->allowedActions($user, $record),
         ];
     }
@@ -374,7 +408,7 @@ class WasteRecordController extends ApiController
     protected function findWasteRecordOrFail(string $id): WasteRecord
     {
         return WasteRecord::query()
-            ->with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser', 'createdBy'])
+            ->with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser', 'createdBy', 'haulings'])
             ->findOrFail($id);
     }
 

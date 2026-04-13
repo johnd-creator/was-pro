@@ -11,6 +11,7 @@ use App\Http\Controllers\WasteManagement\MasterData\CategoriesController;
 use App\Http\Controllers\WasteManagement\MasterData\CharacteristicsController;
 use App\Http\Controllers\WasteManagement\MasterData\TypesController;
 use App\Http\Controllers\WasteManagement\MasterData\VendorsController;
+use App\Http\Controllers\WasteManagement\WasteHaulingsController;
 use App\Http\Controllers\WasteManagement\WasteRecordsController;
 use App\Http\Controllers\WasteManagement\WasteTransportationsController;
 use Illuminate\Support\Facades\Route;
@@ -335,6 +336,40 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
         Route::middleware(['permission:waste_records.submit'])
             ->post('/{wasteRecord}/return-to-draft', [WasteRecordsController::class, 'returnToDraft'])
             ->name('return-to-draft');
+    });
+
+    Route::prefix('haulings')->name('haulings.')->group(function () {
+        Route::middleware(['permission:waste_hauling.view_all|waste_hauling.view_own'])
+            ->get('/', [WasteHaulingsController::class, 'index'])
+            ->name('index');
+
+        Route::middleware(['permission:waste_hauling.create'])
+            ->get('/create', [WasteHaulingsController::class, 'create'])
+            ->name('create');
+
+        Route::middleware(['permission:waste_hauling.submit'])
+            ->post('/', [WasteHaulingsController::class, 'store'])
+            ->name('store');
+
+        Route::middleware(['permission:waste_hauling.approve|waste_hauling.reject'])
+            ->get('/pending-approval', [WasteHaulingsController::class, 'pendingApproval'])
+            ->name('pending-approval');
+
+        Route::middleware(['permission:waste_hauling.view_all|waste_hauling.view_own|waste_hauling.approve|waste_hauling.reject'])
+            ->get('/{wasteHauling}', [WasteHaulingsController::class, 'show'])
+            ->name('show');
+
+        Route::middleware(['permission:waste_hauling.approve'])
+            ->post('/{wasteHauling}/approve', [WasteHaulingsController::class, 'approve'])
+            ->name('approve');
+
+        Route::middleware(['permission:waste_hauling.reject'])
+            ->post('/{wasteHauling}/reject', [WasteHaulingsController::class, 'reject'])
+            ->name('reject');
+
+        Route::middleware(['permission:waste_hauling.cancel'])
+            ->post('/{wasteHauling}/cancel', [WasteHaulingsController::class, 'cancel'])
+            ->name('cancel');
     });
 
     // Waste Transportations Routes

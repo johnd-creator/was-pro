@@ -67,7 +67,7 @@ interface ApprovalItem {
 
 interface DashboardTaskItem {
     id: string;
-    type: 'waste_record' | 'faba_approval';
+    type: 'waste_record' | 'faba_approval' | 'waste_hauling';
     task_group: 'approval' | 'revision' | 'follow_up';
     title: string;
     subtitle: string;
@@ -131,8 +131,10 @@ interface Props {
     taskContext: 'operator' | 'approver';
     wasteTasks: DashboardTaskItem[];
     fabaTasks: DashboardTaskItem[];
+    haulingAttentionTasks: DashboardTaskItem[];
     wastePendingCount: number;
     fabaPendingCount: number;
+    haulingAttentionCount: number;
 }
 
 const props = defineProps<Props>();
@@ -168,7 +170,7 @@ const wasteStatsContext = computed(() => {
 
             <div class="space-y-4 lg:space-y-5">
                 <section
-                    class="grid gap-4 xl:grid-cols-6 xl:grid-rows-[auto_auto] xl:items-start"
+                    class="grid gap-4 xl:grid-cols-6 xl:grid-rows-[auto_auto] xl:items-stretch"
                 >
                     <div class="xl:col-span-4 xl:row-start-1">
                         <ComplianceHero
@@ -267,13 +269,17 @@ const wasteStatsContext = computed(() => {
                         </div>
                     </div>
 
-                    <div class="xl:col-span-2 xl:row-span-2 xl:row-start-1">
+                    <div
+                        class="overflow-hidden xl:col-span-2 xl:row-span-2 xl:row-start-1 xl:min-h-0"
+                    >
                         <TaskListPanel
                             :waste-tasks="wasteTasks"
                             :faba-tasks="fabaTasks"
+                            :hauling-attention-tasks="haulingAttentionTasks"
                             :task-context="taskContext"
                             :waste-pending-count="wastePendingCount"
                             :faba-pending-count="fabaPendingCount"
+                            :hauling-attention-count="haulingAttentionCount"
                         />
                     </div>
                 </section>

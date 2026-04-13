@@ -26,6 +26,7 @@ import { Textarea } from '@/components/ui/textarea';
 import ExpiryBadge from '@/components/waste-management/ExpiryBadge.vue';
 import StatusBadge from '@/components/waste-management/StatusBadge.vue';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 
 interface WasteRecord {
@@ -39,6 +40,11 @@ interface WasteRecord {
     description: string | null;
     notes: string | null;
     status: 'draft' | 'pending_review' | 'approved' | 'rejected';
+    operational_status: 'not_hauled' | 'partially_hauled' | 'completed';
+    operational_status_label: string;
+    approved_hauled_quantity: number;
+    remaining_quantity: number;
+    reserved_quantity: number;
     rejection_reason: string | null;
     submitted_at: string | null;
     approved_at: string | null;
@@ -63,6 +69,22 @@ interface WasteRecord {
     approved_by_user?: {
         name: string;
     };
+    hauling_history?: Array<{
+        id: string;
+        hauling_number: string;
+        hauling_date: string;
+        quantity: number;
+        unit: string;
+        status: string;
+        status_label: string;
+        notes: string | null;
+        submitted_at: string | null;
+        approved_at: string | null;
+        approval_notes: string | null;
+        rejection_reason: string | null;
+        created_by?: { name: string } | null;
+        approved_by?: { name: string } | null;
+    }>;
 }
 
 type Props = {
@@ -146,7 +168,7 @@ const workflowSummary = computed(() => {
         approved: {
             title: 'Catatan sudah disetujui',
             description:
-                'Catatan ini siap dipantau untuk tindak lanjut operasional berikutnya, termasuk transportasi.',
+                'Catatan ini siap dipantau untuk tindak lanjut operasional berikutnya, termasuk pengangkutan limbah.',
         },
         rejected: {
             title: 'Catatan ditolak dan perlu diperbaiki',
@@ -175,6 +197,18 @@ function formatDate(date: string | null): string {
         hour: '2-digit',
         minute: '2-digit',
     });
+}
+
+function haulingStatusClass(status: WasteRecord['operational_status']): string {
+    if (status === 'completed') {
+        return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200';
+    }
+
+    if (status === 'partially_hauled') {
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200';
+    }
+
+    return 'bg-slate-100 text-slate-800 dark:bg-slate-900/40 dark:text-slate-200';
 }
 
 function submitForApproval(): void {
@@ -654,11 +688,80 @@ function returnToDraft(): void {
                                         {{ wasteRecord.unit }}
                                     </p>
                                 </div>
+                                <div>
+                                    <p class="font-medium">Sudah diangkut</p>
+                                    <p class="text-muted-foreground">
+                                        {{
+                                            Number(
+                                                wasteRecord.approved_hauled_quantity,
+                                            ).toFixed(2)
+                                        }}
+                                        {{ wasteRecord.unit }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="font-medium">Sisa limbah</p>
+                                    <p class="text-muted-foreground">
+                                        {{
+                                            Number(
+                                                wasteRecord.remaining_quantity,
+                                            ).toFixed(2)
+                                        }}
+                                        {{ wasteRecord.unit }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="font-medium">
+                                        Status pengangkutan
+                                    </p>
+                                    <div class="mt-1">
+                                        <span
+                                            class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
+                                            :class="
+                                                haulingStatusClass(
+                                                    wasteRecord.operational_status,
+                                                )
+                                            "
+                                        >
+                                            {{
+                                                wasteRecord.operational_status_label
+                                            }}
+                                        </span>
+                                    </div>
+                                </div>
                                 <div class="sm:col-span-2">
                                     <p class="font-medium">Sumber / lokasi</p>
                                     <p class="text-muted-foreground">
                                         {{ wasteRecord.source || '-' }}
                                     </p>
+                                </div>
+                                <div
+                                    v-if="
+                                        wasteRecord.status === 'approved' &&
+                                        wasteRecord.remaining_quantity > 0
+                                    "
+                                    class="sm:col-span-2"
+                                >
+                                    <Button
+                                        as-child
+                                        size="sm"
+                                        variant="outline"
+                                    >
+                                        <Link
+                                            :href="
+                                                wasteManagementRoutes.haulings.create.url(
+                                                    {
+                                                        query: {
+                                                            waste_record:
+                                                                wasteRecord.id,
+                                                        },
+                                                    },
+                                                )
+                                            "
+                                        >
+                                            Ajukan pengangkutan limbah
+                                        </Link>
+                                    </Button>
                                 </div>
                             </CardContent>
                         </Card>
@@ -755,6 +858,52 @@ function returnToDraft(): void {
                             <p class="mt-1 leading-6 text-muted-foreground">
                                 {{ wasteRecord.notes || '-' }}
                             </p>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card
+                    class="wm-surface-elevated overflow-hidden rounded-[30px] dark:bg-slate-950/95"
+                >
+                    <CardHeader>
+                        <CardTitle>Riwayat pengangkutan</CardTitle>
+                        <CardDescription>
+                            Timeline pengajuan angkut yang terkait dengan
+                            catatan limbah ini.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent class="space-y-3 text-sm">
+                        <div
+                            v-if="!wasteRecord.hauling_history?.length"
+                            class="text-muted-foreground"
+                        >
+                            Belum ada pengajuan pengangkutan untuk catatan ini.
+                        </div>
+                        <div
+                            v-for="hauling in wasteRecord.hauling_history"
+                            :key="hauling.id"
+                            class="rounded-2xl border border-slate-200/70 p-4 dark:border-slate-800"
+                        >
+                            <div
+                                class="flex flex-wrap items-center justify-between gap-2"
+                            >
+                                <div class="font-medium">
+                                    {{ hauling.hauling_number }}
+                                </div>
+                                <div class="text-muted-foreground">
+                                    {{ hauling.status_label }}
+                                </div>
+                            </div>
+                            <div class="mt-2 text-muted-foreground">
+                                {{ hauling.hauling_date }} •
+                                {{ hauling.quantity }} {{ hauling.unit }}
+                            </div>
+                            <div
+                                v-if="hauling.notes"
+                                class="mt-1 text-muted-foreground"
+                            >
+                                {{ hauling.notes }}
+                            </div>
                         </div>
                     </CardContent>
                 </Card>

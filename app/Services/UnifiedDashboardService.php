@@ -67,8 +67,10 @@ class UnifiedDashboardService
                 // NEW: Separate task lists for tab system
                 'waste_tasks' => $this->getWasteTasks(),
                 'faba_tasks' => $this->getFabaTasks(),
+                'hauling_attention_tasks' => $this->getHaulingAttentionTasks(),
                 'waste_pending_count' => $this->getWastePendingCount(),
                 'faba_pending_count' => $this->getFabaPendingCount(),
+                'hauling_attention_count' => $this->getHaulingAttentionCount(),
             ];
         });
     }
@@ -151,7 +153,7 @@ class UnifiedDashboardService
                 ['priority_weight', 'desc'],
                 ['submitted_at_timestamp', 'desc'],
             ])
-            ->take(7)
+            ->take(4)
             ->map(function (array $task): array {
                 unset($task['priority_weight'], $task['submitted_at_timestamp']);
 
@@ -460,6 +462,130 @@ class UnifiedDashboardService
             ->all();
     }
 
+    private function getHaulingAttentionTasks(): array
+    {
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return [];
+        }
+
+        $canViewAllHaulings = $user->hasPermission('waste_hauling.view_all');
+        $canViewOwnHaulings = $user->hasPermission('waste_hauling.view_own');
+        $canCreateHaulings = $user->hasPermission('waste_hauling.create');
+        $canApproveHaulings = $user->hasPermission('waste_hauling.approve');
+        $canRejectHaulings = $user->hasPermission('waste_hauling.reject');
+
+        if (! $canViewAllHaulings && ! $canViewOwnHaulings && ! $canCreateHaulings && ! $canApproveHaulings && ! $canRejectHaulings) {
+            return [];
+        }
+
+        $records = WasteRecord::query()
+            ->approved()
+            ->with(['wasteType.category', 'haulings'])
+            ->orderBy('expiry_date')
+            ->orderBy('date')
+            ->get();
+
+        if (! $canViewAllHaulings && ! $canApproveHaulings && ! $canRejectHaulings) {
+            $records = $records->where('created_by', $user->id);
+        }
+
+        return $records
+            ->filter(function (WasteRecord $record): bool {
+                return $record->getRemainingQuantity() > 0;
+            })
+            ->map(function (WasteRecord $record) use ($canCreateHaulings): array {
+                $expiryStatus = $record->getExpiryStatus();
+                $remainingQuantity = $record->getRemainingQuantity();
+                $approvedHauledQuantity = $record->getApprovedHauledQuantity();
+
+                $status = match ($expiryStatus) {
+                    'expired' => 'Expired',
+                    'expiring_soon' => 'Mendekati expired',
+                    default => $approvedHauledQuantity > 0 ? 'Angkut lanjutan' : 'Perlu diangkut',
+                };
+
+                $priority = match ($expiryStatus) {
+                    'expired' => 'danger',
+                    'expiring_soon' => 'warning',
+                    default => 'info',
+                };
+
+                $priorityWeight = match ($expiryStatus) {
+                    'expired' => 4,
+                    'expiring_soon' => 3,
+                    default => $approvedHauledQuantity > 0 ? 2 : 1,
+                };
+
+                $subtitle = sprintf(
+                    '%s • %s • Sisa %s',
+                    $record->wasteType->name,
+                    $record->wasteType->category->name ?? 'N/A',
+                    $this->formatQuantity($remainingQuantity, $record->unit)
+                );
+
+                if ($record->expiry_date) {
+                    $subtitle .= sprintf(' • Batas simpan %s', $record->expiry_date->format('d M Y'));
+                }
+
+                return [
+                    'id' => $record->id,
+                    'type' => 'waste_hauling',
+                    'task_group' => 'follow_up',
+                    'title' => $record->record_number,
+                    'subtitle' => $subtitle,
+                    'status' => $status,
+                    'priority' => $priority,
+                    'priority_weight' => $priorityWeight,
+                    'age_label' => $this->formatHaulingAttentionAgeLabel($record),
+                    'href' => $canCreateHaulings
+                        ? route('waste-management.haulings.create', ['waste_record' => $record->id])
+                        : route('waste-management.haulings.index'),
+                    'submitted_at_timestamp' => $record->expiry_date?->getTimestamp() ?? $record->date?->getTimestamp() ?? 0,
+                ];
+            })
+            ->sortBy([
+                ['priority_weight', 'desc'],
+                ['submitted_at_timestamp', 'asc'],
+            ])
+            ->take(4)
+            ->values()
+            ->all();
+    }
+
+    private function getHaulingAttentionCount(): int
+    {
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return 0;
+        }
+
+        $canViewAllHaulings = $user->hasPermission('waste_hauling.view_all');
+        $canViewOwnHaulings = $user->hasPermission('waste_hauling.view_own');
+        $canCreateHaulings = $user->hasPermission('waste_hauling.create');
+        $canApproveHaulings = $user->hasPermission('waste_hauling.approve');
+        $canRejectHaulings = $user->hasPermission('waste_hauling.reject');
+
+        if (! $canViewAllHaulings && ! $canViewOwnHaulings && ! $canCreateHaulings && ! $canApproveHaulings && ! $canRejectHaulings) {
+            return 0;
+        }
+
+        $records = WasteRecord::query()
+            ->approved()
+            ->with('haulings')
+            ->get();
+
+        if (! $canViewAllHaulings && ! $canApproveHaulings && ! $canRejectHaulings) {
+            $records = $records->where('created_by', $user->id);
+        }
+
+        return $records
+            ->filter(fn (WasteRecord $record): bool => $record->getRemainingQuantity() > 0)
+            ->count();
+    }
+
     private function getOperatorFabaTasks(User $user): array
     {
         return FabaMonthlyApproval::query()
@@ -681,6 +807,26 @@ class UnifiedDashboardService
         return ! $user->isSuperAdmin() && $user->role?->slug === 'operator';
     }
 
+    private function formatHaulingAttentionAgeLabel(WasteRecord $record): string
+    {
+        if (! $record->expiry_date) {
+            return 'Tanpa batas simpan';
+        }
+
+        $today = now()->startOfDay();
+        $expiryDate = $record->expiry_date->copy()->startOfDay();
+
+        if ($expiryDate->lt($today)) {
+            return sprintf('Lewat %d hari', $expiryDate->diffInDays($today));
+        }
+
+        if ($expiryDate->equalTo($today)) {
+            return 'Batas simpan hari ini';
+        }
+
+        return sprintf('%d hari lagi', $today->diffInDays($expiryDate));
+    }
+
     private function wasteRecordsForSelectedMonth()
     {
         return WasteRecord::query()
@@ -848,7 +994,7 @@ class UnifiedDashboardService
                 ['priority_weight', 'desc'],
                 ['submitted_at_timestamp', 'desc'],
             ])
-            ->take(7)
+            ->take(4)
             ->map(function (array $task): array {
                 unset($task['priority_weight'], $task['submitted_at_timestamp']);
 
