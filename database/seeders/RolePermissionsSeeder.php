@@ -68,7 +68,7 @@ class RolePermissionsSeeder extends Seeder
             $operator = $roles->get('operator');
             $operatorPermissionSlugs = [
                 // Waste records (own only)
-                'waste_records.view_own', 'waste_records.create', 'waste_records.edit_own', 'waste_records.submit',
+                'waste_records.view_all', 'waste_records.view_own', 'waste_records.create', 'waste_records.edit_own', 'waste_records.submit',
                 // Transportation
                 'transportation.view_own', 'transportation.create', 'transportation.edit', 'transportation.delete',
                 'transportation.dispatch', 'transportation.deliver', 'transportation.cancel',

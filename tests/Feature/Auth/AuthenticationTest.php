@@ -9,6 +9,7 @@ test('login screen can be rendered', function () {
 
     $response->assertOk();
     $response->assertDontSee('Sign up');
+    $response->assertSee('Masuk');
 });
 
 test('users can authenticate using the login screen', function () {

@@ -1,7 +1,10 @@
 <?php
 
+use App\Models\FabaMonthlyApproval;
 use App\Models\FabaMovement;
 use App\Models\Organization;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\WasteCategory;
@@ -66,6 +69,8 @@ test('authenticated users can visit the dashboard', function () {
             ->has('headerRiskTone')
             ->has('stats')
             ->has('pendingApprovals')
+            ->has('tasks')
+            ->has('taskContext')
             ->has('wasteByCategory')
             ->has('fabaProductionMaterialDistribution')
             ->has('transportationByStatus')
@@ -80,6 +85,174 @@ test('authenticated users can visit the dashboard', function () {
             ->has('stats.waste_total_records_snapshot')
             ->has('stats.waste_transported_records_snapshot')
             ->has('stats.waste_untransported_records_snapshot')
+        );
+});
+
+test('dashboard shows approval tasks for supervisor users', function () {
+    $organization = Organization::factory()->create([
+        'code' => 'DASHSUP',
+        'schema_name' => 'tenant_dashboard_supervisor_tasks',
+    ]);
+    migrateTenantSchema($organization);
+
+    $submitter = User::factory()->create([
+        'organization_id' => $organization->id,
+        'email_verified_at' => now(),
+    ]);
+
+    $approvePermission = Permission::query()->firstOrCreate(
+        ['slug' => 'waste_records.approve'],
+        [
+            'name' => 'Approve Waste Records',
+            'module' => 'waste_records',
+            'description' => 'Approve waste records',
+            'is_active' => true,
+        ],
+    );
+
+    $supervisorRole = Role::query()->firstOrCreate(
+        ['slug' => 'supervisor'],
+        [
+            'name' => 'Supervisor',
+            'description' => 'Supervisor role',
+            'level' => 50,
+            'is_active' => true,
+        ],
+    );
+    $supervisorRole->permissions()->syncWithoutDetaching([$approvePermission->id]);
+
+    $supervisor = User::factory()->create([
+        'organization_id' => $organization->id,
+        'role_id' => $supervisorRole->id,
+        'email_verified_at' => now(),
+    ]);
+
+    $tenantService = app(TenantService::class);
+    $tenantService->switchToSchema($organization->schema_name);
+
+    $wasteType = createDashboardWasteType(90);
+
+    $wasteRecord = WasteRecord::factory()->create([
+        'waste_type_id' => $wasteType->id,
+        'status' => 'pending_review',
+        'date' => '2026-04-08',
+        'created_by' => $submitter->id,
+        'submitted_by' => $submitter->id,
+        'submitted_at' => now()->subDays(2),
+    ]);
+
+    $fabaApproval = FabaMonthlyApproval::factory()->create([
+        'year' => 2026,
+        'month' => 4,
+        'status' => FabaMonthlyApproval::STATUS_SUBMITTED,
+        'submitted_by' => $submitter->id,
+        'submitted_at' => now()->subDay(),
+    ]);
+
+    $tenantService->switchToPublic();
+
+    $response = $this->actingAs($supervisor)->get(route('dashboard', [
+        'month' => '2026-04',
+    ]));
+
+    $response
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Dashboard')
+            ->where('taskContext', 'approver')
+            ->where('tasks', function ($tasks) use ($wasteRecord, $fabaApproval): bool {
+                $taskIds = collect($tasks)->pluck('id');
+                $taskGroups = collect($tasks)->pluck('task_group');
+
+                return $taskIds->contains($wasteRecord->id)
+                    && $taskIds->contains($fabaApproval->id)
+                    && $taskGroups->every(fn (string $group): bool => $group === 'approval');
+            })
+        );
+});
+
+test('dashboard shows only operator follow-up tasks for their own records', function () {
+    $organization = Organization::factory()->create([
+        'code' => 'DASHOPR',
+        'schema_name' => 'tenant_dashboard_operator_tasks',
+    ]);
+    migrateTenantSchema($organization);
+
+    $operatorRole = Role::query()->firstOrCreate(
+        ['slug' => 'operator'],
+        [
+            'name' => 'Operator',
+            'description' => 'Operator role',
+            'level' => 20,
+            'is_active' => true,
+        ],
+    );
+
+    $operator = User::factory()->create([
+        'organization_id' => $organization->id,
+        'role_id' => $operatorRole->id,
+        'email_verified_at' => now(),
+    ]);
+
+    $otherOperator = User::factory()->create([
+        'organization_id' => $organization->id,
+        'role_id' => $operatorRole->id,
+        'email_verified_at' => now(),
+    ]);
+
+    $tenantService = app(TenantService::class);
+    $tenantService->switchToSchema($organization->schema_name);
+
+    $wasteType = createDashboardWasteType(90);
+
+    $rejectedWasteRecord = WasteRecord::factory()->create([
+        'waste_type_id' => $wasteType->id,
+        'status' => 'rejected',
+        'date' => '2026-04-06',
+        'created_by' => $operator->id,
+        'submitted_by' => $operator->id,
+        'submitted_at' => now()->subDays(3),
+    ]);
+
+    WasteRecord::factory()->create([
+        'waste_type_id' => $wasteType->id,
+        'status' => 'rejected',
+        'date' => '2026-04-07',
+        'created_by' => $otherOperator->id,
+        'submitted_by' => $otherOperator->id,
+        'submitted_at' => now()->subDays(2),
+    ]);
+
+    $rejectedFabaApproval = FabaMonthlyApproval::factory()->create([
+        'year' => 2026,
+        'month' => 4,
+        'status' => FabaMonthlyApproval::STATUS_REJECTED,
+        'submitted_by' => $operator->id,
+        'submitted_at' => now()->subDays(2),
+        'rejected_by' => $otherOperator->id,
+        'rejected_at' => now()->subDay(),
+    ]);
+
+    $tenantService->switchToPublic();
+
+    $response = $this->actingAs($operator)->get(route('dashboard', [
+        'month' => '2026-04',
+    ]));
+
+    $response
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Dashboard')
+            ->where('taskContext', 'operator')
+            ->where('tasks', function ($tasks) use ($rejectedWasteRecord, $rejectedFabaApproval): bool {
+                $taskIds = collect($tasks)->pluck('id');
+                $taskGroups = collect($tasks)->pluck('task_group');
+
+                return $taskIds->contains($rejectedWasteRecord->id)
+                    && $taskIds->contains($rejectedFabaApproval->id)
+                    && $taskIds->count() === 2
+                    && $taskGroups->every(fn (string $group): bool => in_array($group, ['revision', 'follow_up'], true));
+            })
         );
 });
 

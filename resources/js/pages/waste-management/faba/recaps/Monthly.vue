@@ -5,10 +5,9 @@ import {
     ClipboardList,
     Database,
     Layers3,
-    Scale
-    
+    Scale,
 } from 'lucide-vue-next';
-import type {LucideIcon} from 'lucide-vue-next';
+import type { LucideIcon } from 'lucide-vue-next';
 import { computed, reactive } from 'vue';
 import Heading from '@/components/Heading.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';

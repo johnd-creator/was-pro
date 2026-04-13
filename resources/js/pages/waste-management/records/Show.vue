@@ -67,6 +67,11 @@ interface WasteRecord {
 
 type Props = {
     wasteRecord: WasteRecord;
+    abilities: {
+        can_edit: boolean;
+        can_submit: boolean;
+        can_return_to_draft: boolean;
+    };
 };
 
 const props = defineProps<Props>();
@@ -122,22 +127,9 @@ const canReject = computed(() => {
     );
 });
 
-const canSubmit = computed(() => {
-    if (currentUser.value?.is_super_admin) {
-        return true;
-    }
-
-    return (
-        currentUser.value?.permissions?.includes('waste_records.submit') ??
-        false
-    );
-});
-
-const canEdit = computed(
-    () =>
-        props.wasteRecord.status === 'draft' ||
-        props.wasteRecord.status === 'rejected',
-);
+const canSubmit = computed(() => props.abilities.can_submit);
+const canEdit = computed(() => props.abilities.can_edit);
+const canReturnToDraft = computed(() => props.abilities.can_return_to_draft);
 
 const workflowSummary = computed(() => {
     const summaries = {
@@ -364,10 +356,7 @@ function returnToDraft(): void {
                                     Ajukan untuk ditinjau
                                 </Button>
                                 <Button
-                                    v-if="
-                                        wasteRecord.status === 'rejected' &&
-                                        canSubmit
-                                    "
+                                    v-if="canReturnToDraft"
                                     variant="secondary"
                                     :disabled="returnForm.processing"
                                     @click="returnToDraft"

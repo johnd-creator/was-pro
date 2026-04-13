@@ -116,7 +116,7 @@ class FabaAdjustmentsController extends Controller
     public function edit(string $adjustment): Response
     {
         $movement = $this->findMovementOrFail($adjustment);
-        $this->abortIfLocked($movement);
+        $this->abortIfCannotModify($movement, 'faba_adjustments.edit', 'mengubah');
 
         return Inertia::render('waste-management/faba/adjustments/Edit', [
             'entry' => $this->transformMovement($movement),
@@ -129,7 +129,7 @@ class FabaAdjustmentsController extends Controller
     public function update(FabaAdjustmentRequest $request, string $adjustment): RedirectResponse
     {
         $movement = $this->findMovementOrFail($adjustment);
-        $this->abortIfLocked($movement);
+        $this->abortIfCannotModify($movement, 'faba_adjustments.edit', 'mengubah');
 
         $validated = $request->validated();
         $year = (int) date('Y', strtotime($validated['transaction_date']));
@@ -187,7 +187,7 @@ class FabaAdjustmentsController extends Controller
     public function destroy(string $adjustment): RedirectResponse
     {
         $movement = $this->findMovementOrFail($adjustment);
-        $this->abortIfLocked($movement);
+        $this->abortIfCannotModify($movement, 'faba_adjustments.delete', 'menghapus');
         $entryData = $this->transformMovement($movement);
         $movementId = $movement->id;
         $year = $movement->period_year;
@@ -238,8 +238,37 @@ class FabaAdjustmentsController extends Controller
             'note' => $movement->note,
             'period_label' => $this->fabaRecapService->formatPeriodLabel($movement->period_year, $movement->period_month),
             'approval_status' => $this->fabaRecapService->getPeriodStatus($movement->period_year, $movement->period_month),
+            'can_edit' => $this->canModifyMovement($movement, 'faba_adjustments.edit'),
             'created_by_user' => $movement->createdByUser,
             'updated_by_user' => $movement->updatedByUser,
         ];
+    }
+
+    protected function abortIfCannotModify(FabaMovement $movement, string $permission, string $action): void
+    {
+        if (! $this->canModifyMovement($movement, $permission)) {
+            abort(403, sprintf('Anda tidak memiliki izin untuk %s adjustment FABA ini.', $action));
+        }
+    }
+
+    protected function canModifyMovement(FabaMovement $movement, string $permission): bool
+    {
+        $user = Auth::user();
+
+        if (! $user?->hasPermission($permission)) {
+            return false;
+        }
+
+        $status = $this->fabaRecapService->getPeriodStatus($movement->period_year, $movement->period_month);
+
+        if (! in_array($status, ['draft', 'rejected'], true)) {
+            return false;
+        }
+
+        if ($user->hasRole('operator')) {
+            return (string) $movement->created_by === (string) $user->id;
+        }
+
+        return true;
     }
 }

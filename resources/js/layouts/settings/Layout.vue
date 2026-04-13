@@ -49,11 +49,19 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
 
 <template>
     <div class="relative space-y-8 overflow-x-hidden px-4 py-6">
-        <div class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px] bg-linear-to-b from-slate-50 via-white to-transparent dark:from-slate-950 dark:via-slate-950" />
-        <div class="pointer-events-none absolute -top-10 left-1/4 -z-10 h-56 w-56 rounded-full bg-cyan-200/18 blur-3xl dark:bg-cyan-500/10" />
-        <div class="pointer-events-none absolute top-24 right-0 -z-10 h-64 w-64 rounded-full bg-amber-200/12 blur-3xl dark:bg-amber-500/8" />
+        <div
+            class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px] bg-linear-to-b from-slate-50 via-white to-transparent dark:from-slate-950 dark:via-slate-950"
+        />
+        <div
+            class="pointer-events-none absolute -top-10 left-1/4 -z-10 h-56 w-56 rounded-full bg-cyan-200/18 blur-3xl dark:bg-cyan-500/10"
+        />
+        <div
+            class="pointer-events-none absolute top-24 right-0 -z-10 h-64 w-64 rounded-full bg-amber-200/12 blur-3xl dark:bg-amber-500/8"
+        />
 
-        <div class="rounded-[30px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-slate-950/88 dark:shadow-[0_22px_45px_-32px_rgba(2,6,23,0.8)]">
+        <div
+            class="rounded-[30px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-slate-950/88 dark:shadow-[0_22px_45px_-32px_rgba(2,6,23,0.8)]"
+        >
             <div
                 class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
             >
@@ -65,7 +73,9 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
                     Area akun & keamanan
                 </Badge>
             </div>
-            <p class="max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+            <p
+                class="max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300"
+            >
                 Gunakan panel ini untuk memperbarui informasi dasar, mengamankan
                 proses masuk, dan menyesuaikan tampilan aplikasi sesuai
                 preferensi kerja Anda.
@@ -74,7 +84,9 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
 
         <div class="grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
             <aside class="space-y-4">
-                <div class="rounded-[26px] border border-slate-200/80 bg-white/90 p-3 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.24)] dark:border-slate-800/80 dark:bg-slate-950/88 dark:shadow-[0_22px_45px_-32px_rgba(2,6,23,0.8)]">
+                <div
+                    class="rounded-[26px] border border-slate-200/80 bg-white/90 p-3 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.24)] dark:border-slate-800/80 dark:bg-slate-950/88 dark:shadow-[0_22px_45px_-32px_rgba(2,6,23,0.8)]"
+                >
                     <nav class="space-y-2" aria-label="Pengaturan akun">
                         <Link
                             v-for="item in sidebarNavItems"
@@ -109,7 +121,9 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
                                         class="h-2 w-2 rounded-full bg-primary"
                                     ></span>
                                 </div>
-                                <p class="mt-1 text-xs text-muted-foreground dark:text-slate-400">
+                                <p
+                                    class="mt-1 text-xs text-muted-foreground dark:text-slate-400"
+                                >
                                     {{ item.description }}
                                 </p>
                             </div>

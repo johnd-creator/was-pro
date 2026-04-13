@@ -364,6 +364,7 @@ const submittedEntries = computed(
                                                 >Detail</Link
                                             >
                                             <Link
+                                                v-if="entry.can_edit"
                                                 :href="
                                                     wasteManagementRoutes.faba.production.edit(
                                                         entry.id,

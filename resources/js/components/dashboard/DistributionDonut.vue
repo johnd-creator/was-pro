@@ -21,28 +21,29 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const chartColors = [
-    '#2563eb',
-    '#10b981',
-    '#f97316',
-    '#8b5cf6',
-    '#eab308',
-    '#ef4444',
+    '#1d4ed8',
+    '#0f766e',
+    '#d97706',
+    '#475569',
+    '#0891b2',
+    '#dc2626',
 ];
 
 const totalValue = computed(() =>
     props.data.reduce((sum, item) => sum + item.value, 0),
 );
 
-const isEmpty = computed(() => totalValue.value <= 0 || props.data.length === 0);
+const isEmpty = computed(
+    () => totalValue.value <= 0 || props.data.length === 0,
+);
 
 const segments = computed(() => {
     let start = 0;
 
     return props.data.map((item, index) => {
         const color = chartColors[index % chartColors.length];
-        const normalizedPercentage = totalValue.value > 0
-            ? (item.value / totalValue.value) * 100
-            : 0;
+        const normalizedPercentage =
+            totalValue.value > 0 ? (item.value / totalValue.value) * 100 : 0;
         const end = start + normalizedPercentage;
         const segment = {
             ...item,
@@ -67,7 +68,10 @@ const donutStyle = computed(() => {
 
     return {
         background: `conic-gradient(${segments.value
-            .map((segment) => `${segment.color} ${segment.start}% ${segment.end}%`)
+            .map(
+                (segment) =>
+                    `${segment.color} ${segment.start}% ${segment.end}%`,
+            )
             .join(', ')})`,
     };
 });
@@ -86,53 +90,72 @@ function formatValue(value: number): string {
 
 <template>
     <div class="space-y-4">
-        <div class="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center">
+        <div
+            class="grid gap-4 lg:grid-cols-[156px_minmax(0,1fr)] lg:items-center"
+        >
             <div class="flex justify-center">
                 <div
-                    class="relative flex h-52 w-52 items-center justify-center rounded-full border border-white/90 shadow-[0_22px_45px_-28px_rgba(15,23,42,0.35)] dark:border-slate-800/80 dark:shadow-[0_22px_45px_-28px_rgba(2,6,23,0.9)]"
+                    class="wm-panel-elevated relative flex h-32 w-32 items-center justify-center rounded-full border"
                     :style="donutStyle"
                 >
-                    <div class="absolute inset-3 rounded-full border border-white/40 dark:border-slate-700/70" />
-                    <div class="flex h-30 w-30 flex-col items-center justify-center rounded-full border border-white/90 bg-white/95 text-center shadow-sm backdrop-blur dark:border-slate-800/80 dark:bg-slate-950/92 dark:shadow-none">
-                        <span class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground dark:text-slate-400">
+                    <div
+                        class="absolute inset-2.5 rounded-full border border-white/70 dark:border-slate-700/70"
+                    />
+                    <div
+                        class="wm-panel flex h-20 w-20 flex-col items-center justify-center rounded-full border text-center"
+                    >
+                        <span
+                            class="wm-text-muted text-[10px] font-semibold tracking-[0.12em] uppercase"
+                        >
                             {{ totalLabel }}
                         </span>
-                        <span class="mt-1 text-3xl font-semibold text-foreground tabular-nums">
+                        <span
+                            class="wm-text-primary mt-1 text-xl font-bold tabular-nums"
+                        >
                             {{ isEmpty ? emptyLabel : formatValue(totalValue) }}
                         </span>
-                        <span class="text-xs text-muted-foreground dark:text-slate-400">
+                        <span class="wm-text-muted text-xs">
                             {{ valueSuffix || '' }}
                         </span>
                     </div>
                 </div>
             </div>
 
-            <div class="space-y-3">
+            <div class="space-y-2.5">
                 <div
                     v-if="isEmpty"
-                    class="rounded-[20px] border border-dashed border-slate-200 bg-white/80 px-4 py-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-400"
+                    class="wm-panel rounded-lg border border-dashed px-4 py-6 text-center text-sm"
                 >
-                    Belum ada komposisi yang dapat ditampilkan pada snapshot ini.
+                    Belum ada komposisi yang dapat ditampilkan pada snapshot
+                    ini.
                 </div>
                 <div
-                    v-for="item in segments"
+                    v-for="(item, index) in segments"
                     :key="item.label"
-                    class="flex items-center gap-3 rounded-[20px] border border-white/90 bg-white/85 px-3.5 py-3 shadow-sm shadow-slate-100/70 transition-all duration-200 hover:-translate-y-0.5 hover:bg-white dark:border-slate-800/80 dark:bg-slate-950/78 dark:shadow-none dark:hover:bg-slate-900/90"
+                    class="wm-panel flex items-center gap-3 rounded-xl border px-3.5 py-3 transition-colors duration-200 hover:bg-white dark:hover:bg-slate-900"
                 >
+                    <div
+                        class="wm-text-muted w-5 text-[11px] font-semibold tabular-nums"
+                    >
+                        {{ index + 1 }}
+                    </div>
                     <div
                         class="h-3.5 w-3.5 shrink-0 rounded-full"
                         :style="{ backgroundColor: item.color }"
                     />
                     <div class="min-w-0 flex-1">
-                        <p class="truncate text-sm font-medium text-foreground">
+                        <p class="wm-text-primary truncate text-sm font-medium">
                             {{ item.label }}
                         </p>
-                        <p class="text-xs text-muted-foreground">
-                            {{ formatValue(item.value) }} {{ valueSuffix }}
+                        <p class="wm-text-secondary text-xs">
+                            {{ formatValue(item.value) }} {{ valueSuffix }} •
+                            {{ item.normalizedPercentage.toFixed(1) }}%
                         </p>
                     </div>
                     <div class="text-right">
-                        <p class="text-sm font-semibold tabular-nums text-foreground">
+                        <p
+                            class="wm-text-primary text-sm font-semibold tabular-nums"
+                        >
                             {{ item.normalizedPercentage.toFixed(1) }}%
                         </p>
                     </div>

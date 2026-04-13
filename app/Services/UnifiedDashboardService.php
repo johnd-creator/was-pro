@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\FabaMonthlyApproval;
 use App\Models\FabaMovement;
 use App\Models\Organization;
+use App\Models\User;
 use App\Models\WasteRecord;
 use App\Models\WasteTransportation;
 use Carbon\CarbonImmutable;
@@ -37,6 +38,7 @@ class UnifiedDashboardService
             return [
                 'waste_stats' => $this->getWasteStats(),
                 'pending_approvals' => $this->getPendingApprovals(),
+                'tasks' => $this->getDashboardTasks(),
                 'waste_by_category' => $this->getWasteByCategory(),
                 'transportation_stats' => $this->getTransportationStats(),
                 'recent_activities' => $this->getRecentActivities(),
@@ -62,6 +64,11 @@ class UnifiedDashboardService
                     ])
                     ->values()
                     ->all(),
+                // NEW: Separate task lists for tab system
+                'waste_tasks' => $this->getWasteTasks(),
+                'faba_tasks' => $this->getFabaTasks(),
+                'waste_pending_count' => $this->getWastePendingCount(),
+                'faba_pending_count' => $this->getFabaPendingCount(),
             ];
         });
     }
@@ -125,6 +132,33 @@ class UnifiedDashboardService
                     'type' => 'waste_record',
                 ];
             })->all();
+    }
+
+    private function getDashboardTasks(): array
+    {
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return [];
+        }
+
+        $tasks = $this->isOperator($user)
+            ? $this->getOperatorTasks($user)
+            : $this->getApproverTasks();
+
+        return collect($tasks)
+            ->sortBy([
+                ['priority_weight', 'desc'],
+                ['submitted_at_timestamp', 'desc'],
+            ])
+            ->take(7)
+            ->map(function (array $task): array {
+                unset($task['priority_weight'], $task['submitted_at_timestamp']);
+
+                return $task;
+            })
+            ->values()
+            ->all();
     }
 
     private function getWasteByCategory(): array
@@ -303,6 +337,162 @@ class UnifiedDashboardService
                 'status' => $approval->status,
                 'type' => 'faba_approval',
             ])->all();
+    }
+
+    private function getApproverTasks(): array
+    {
+        return [
+            ...$this->getApproverWasteTasks(),
+            ...$this->getApproverFabaTasks(),
+        ];
+    }
+
+    private function getApproverWasteTasks(): array
+    {
+        if (! $this->canApproveWasteRecords() && ! $this->canViewAllWasteRecords()) {
+            return [];
+        }
+
+        return WasteRecord::query()
+            ->pendingApproval()
+            ->with(['wasteType.category', 'submittedByUser'])
+            ->orderByDesc('submitted_at')
+            ->limit(5)
+            ->get()
+            ->map(function (WasteRecord $record): array {
+                return [
+                    'id' => $record->id,
+                    'type' => 'waste_record',
+                    'task_group' => 'approval',
+                    'title' => $record->record_number,
+                    'subtitle' => sprintf(
+                        '%s • %s • %s',
+                        $record->wasteType->name,
+                        $record->wasteType->category->name ?? 'N/A',
+                        $this->formatQuantity($record->quantity, $record->unit)
+                    ),
+                    'status' => 'Pending approval',
+                    'priority' => 'warning',
+                    'priority_weight' => 2,
+                    'age_label' => $this->formatAgeLabel($record->submitted_at?->toIso8601String()),
+                    'href' => route('waste-management.records.show', $record),
+                    'submitted_at_timestamp' => $record->submitted_at?->getTimestamp() ?? 0,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function getApproverFabaTasks(): array
+    {
+        return FabaMonthlyApproval::query()
+            ->where('status', FabaMonthlyApproval::STATUS_SUBMITTED)
+            ->orderByDesc('submitted_at')
+            ->limit(5)
+            ->get()
+            ->map(function (FabaMonthlyApproval $approval): array {
+                return [
+                    'id' => $approval->id,
+                    'type' => 'faba_approval',
+                    'task_group' => 'approval',
+                    'title' => $this->fabaRecapService->formatPeriodLabel($approval->year, $approval->month),
+                    'subtitle' => 'Approval FABA menunggu keputusan final untuk periode aktif.',
+                    'status' => 'Submitted',
+                    'priority' => 'warning',
+                    'priority_weight' => 2,
+                    'age_label' => $this->formatAgeLabel($approval->submitted_at?->toIso8601String()),
+                    'href' => route('waste-management.faba.approvals.review', [$approval->year, $approval->month]),
+                    'submitted_at_timestamp' => $approval->submitted_at?->getTimestamp() ?? 0,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function getOperatorTasks(User $user): array
+    {
+        return [
+            ...$this->getOperatorWasteTasks($user),
+            ...$this->getOperatorFabaTasks($user),
+        ];
+    }
+
+    private function getOperatorWasteTasks(User $user): array
+    {
+        return WasteRecord::query()
+            ->byUser($user->id)
+            ->whereIn('status', ['pending_review', 'rejected'])
+            ->with(['wasteType.category'])
+            ->orderByRaw("CASE WHEN status = 'rejected' THEN 0 ELSE 1 END")
+            ->orderByDesc('submitted_at')
+            ->limit(5)
+            ->get()
+            ->map(function (WasteRecord $record): array {
+                $isRejected = $record->status === 'rejected';
+
+                return [
+                    'id' => $record->id,
+                    'type' => 'waste_record',
+                    'task_group' => $isRejected ? 'revision' : 'follow_up',
+                    'title' => $record->record_number,
+                    'subtitle' => $isRejected
+                        ? sprintf(
+                            'Ditolak supervisor. %s • %s',
+                            $record->wasteType->name,
+                            $record->rejection_reason ?: 'Perlu revisi dan submit ulang.'
+                        )
+                        : sprintf(
+                            '%s • %s • Menunggu keputusan supervisor.',
+                            $record->wasteType->name,
+                            $this->formatQuantity($record->quantity, $record->unit)
+                        ),
+                    'status' => $isRejected ? 'Perlu revisi' : 'Menunggu review',
+                    'priority' => $isRejected ? 'danger' : 'warning',
+                    'priority_weight' => $isRejected ? 3 : 2,
+                    'age_label' => $this->formatAgeLabel($record->submitted_at?->toIso8601String()),
+                    'href' => $isRejected
+                        ? route('waste-management.records.edit', $record)
+                        : route('waste-management.records.show', $record),
+                    'submitted_at_timestamp' => $record->submitted_at?->getTimestamp() ?? $record->updated_at?->getTimestamp() ?? 0,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function getOperatorFabaTasks(User $user): array
+    {
+        return FabaMonthlyApproval::query()
+            ->where('submitted_by', $user->id)
+            ->whereIn('status', [FabaMonthlyApproval::STATUS_SUBMITTED, FabaMonthlyApproval::STATUS_REJECTED])
+            ->orderByRaw("CASE WHEN status = 'rejected' THEN 0 ELSE 1 END")
+            ->orderByDesc('submitted_at')
+            ->limit(5)
+            ->get()
+            ->map(function (FabaMonthlyApproval $approval): array {
+                $isRejected = $approval->status === FabaMonthlyApproval::STATUS_REJECTED;
+
+                return [
+                    'id' => $approval->id,
+                    'type' => 'faba_approval',
+                    'task_group' => $isRejected ? 'revision' : 'follow_up',
+                    'title' => $this->fabaRecapService->formatPeriodLabel($approval->year, $approval->month),
+                    'subtitle' => $isRejected
+                        ? sprintf(
+                            'Approval FABA ditolak. %s',
+                            $approval->rejection_note ?: 'Periksa catatan revisi dan perbarui input periode.'
+                        )
+                        : 'Periode FABA sudah diajukan dan menunggu keputusan supervisor.',
+                    'status' => $isRejected ? 'Perlu revisi' : 'Submitted',
+                    'priority' => $isRejected ? 'danger' : 'warning',
+                    'priority_weight' => $isRejected ? 3 : 2,
+                    'age_label' => $this->formatAgeLabel($approval->submitted_at?->toIso8601String()),
+                    'href' => route('waste-management.faba.approvals.review', [$approval->year, $approval->month]),
+                    'submitted_at_timestamp' => $approval->submitted_at?->getTimestamp() ?? $approval->updated_at?->getTimestamp() ?? 0,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     private function getFabaWarnings(): array
@@ -486,6 +676,11 @@ class UnifiedDashboardService
         return Auth::user()?->hasPermission('waste_records.view_all') ?? false;
     }
 
+    private function isOperator(User $user): bool
+    {
+        return ! $user->isSuperAdmin() && $user->role?->slug === 'operator';
+    }
+
     private function wasteRecordsForSelectedMonth()
     {
         return WasteRecord::query()
@@ -608,6 +803,116 @@ class UnifiedDashboardService
     private function formatMonthOptionLabel(int $year, int $month): string
     {
         return CarbonImmutable::create($year, $month, 1)->translatedFormat('F Y');
+    }
+
+    private function formatAgeLabel(?string $submittedAt): string
+    {
+        if (! $submittedAt) {
+            return 'Perlu perhatian';
+        }
+
+        $submittedAtDate = CarbonImmutable::parse($submittedAt);
+        $diffHours = max(0, $submittedAtDate->diffInHours(now()));
+
+        if ($diffHours < 24) {
+            return "{$diffHours} jam";
+        }
+
+        return floor($diffHours / 24).' hari';
+    }
+
+    private function formatQuantity(float|string|null $quantity, ?string $unit): string
+    {
+        $numeric = (float) $quantity;
+        $formatted = fmod($numeric, 1.0) === 0.0
+            ? number_format($numeric, 0, ',', '.')
+            : number_format($numeric, 2, ',', '.');
+
+        return trim("{$formatted} {$unit}");
+    }
+
+    private function getWasteTasks(): array
+    {
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return [];
+        }
+
+        $tasks = $this->isOperator($user)
+            ? $this->getOperatorWasteTasks($user)
+            : $this->getApproverWasteTasks();
+
+        return collect($tasks)
+            ->sortBy([
+                ['priority_weight', 'desc'],
+                ['submitted_at_timestamp', 'desc'],
+            ])
+            ->take(7)
+            ->map(function (array $task): array {
+                unset($task['priority_weight'], $task['submitted_at_timestamp']);
+
+                return $task;
+            })
+            ->values()
+            ->all();
+    }
+
+    private function getFabaTasks(): array
+    {
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return [];
+        }
+
+        $tasks = $this->isOperator($user)
+            ? $this->getOperatorFabaTasks($user)
+            : $this->getApproverFabaTasks();
+
+        return collect($tasks)
+            ->sortBy([
+                ['priority_weight', 'desc'],
+                ['submitted_at_timestamp', 'desc'],
+            ])
+            ->take(7)
+            ->map(function (array $task): array {
+                unset($task['priority_weight'], $task['submitted_at_timestamp']);
+
+                return $task;
+            })
+            ->values()
+            ->all();
+    }
+
+    private function getWastePendingCount(): int
+    {
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return 0;
+        }
+
+        return $this->isOperator($user)
+            ? WasteRecord::byUser($user->id)
+                ->whereIn('status', ['pending_review', 'rejected'])
+                ->count()
+            : WasteRecord::pendingApproval()->count();
+    }
+
+    private function getFabaPendingCount(): int
+    {
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return 0;
+        }
+
+        return $this->isOperator($user)
+            ? FabaMonthlyApproval::where('submitted_by', $user->id)
+                ->whereIn('status', [FabaMonthlyApproval::STATUS_SUBMITTED, FabaMonthlyApproval::STATUS_REJECTED])
+                ->count()
+            : FabaMonthlyApproval::where('status', FabaMonthlyApproval::STATUS_SUBMITTED)->count();
     }
 
     private function withinOrganizationSchema(Organization $organization, callable $callback): array

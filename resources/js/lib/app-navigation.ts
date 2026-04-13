@@ -47,13 +47,17 @@ export const appNavigationItems: NavItem[] = [
             },
             {
                 title: 'Pemanfaatan Internal',
-                href: wasteManagementRoutes.faba.utilization.index.url({ query: { movement_type: 'utilization_internal' } }),
+                href: wasteManagementRoutes.faba.utilization.index.url({
+                    query: { movement_type: 'utilization_internal' },
+                }),
                 icon: Truck,
                 permission: 'faba_utilization.view',
             },
             {
                 title: 'Pemanfaatan Eksternal',
-                href: wasteManagementRoutes.faba.utilization.index.url({ query: { movement_type: 'utilization_external' } }),
+                href: wasteManagementRoutes.faba.utilization.index.url({
+                    query: { movement_type: 'utilization_external' },
+                }),
                 icon: Truck,
                 permission: 'faba_utilization.view',
             },

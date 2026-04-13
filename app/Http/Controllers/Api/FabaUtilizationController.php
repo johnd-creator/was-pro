@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\WasteManagement\FabaUtilizationMovementRequest;
 use App\Models\FabaAuditLog;
 use App\Models\FabaMovement;
+use App\Models\User;
 use App\Services\FabaAuditService;
 use App\Services\FabaRecapService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -161,12 +162,11 @@ class FabaUtilizationController extends ApiController
     public function update(FabaUtilizationMovementRequest $request, string $utilization): JsonResponse
     {
         $user = $request->user();
-
-        if (! $user->hasPermission('faba_utilization.edit')) {
-            return $this->error('Anda tidak memiliki izin untuk mengubah movement pemanfaatan FABA.', 'FORBIDDEN', status: 403);
-        }
-
         $movement = $this->findMovementOrFail($utilization);
+
+        if (! $this->canAccessMovement($movement, $user, 'faba_utilization.edit')) {
+            return $this->error('Anda tidak memiliki izin untuk mengubah movement pemanfaatan FABA ini.', 'FORBIDDEN', status: 403);
+        }
 
         if ($this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month)) {
             return $this->error('Periode transaksi ini sedang terkunci.', 'CONFLICT', status: 409);
@@ -234,12 +234,11 @@ class FabaUtilizationController extends ApiController
     public function destroy(Request $request, string $utilization): JsonResponse
     {
         $user = $request->user();
-
-        if (! $user->hasPermission('faba_utilization.delete')) {
-            return $this->error('Anda tidak memiliki izin untuk menghapus movement pemanfaatan FABA.', 'FORBIDDEN', status: 403);
-        }
-
         $movement = $this->findMovementOrFail($utilization);
+
+        if (! $this->canAccessMovement($movement, $user, 'faba_utilization.delete')) {
+            return $this->error('Anda tidak memiliki izin untuk menghapus movement pemanfaatan FABA ini.', 'FORBIDDEN', status: 403);
+        }
 
         if ($this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month)) {
             return $this->error('Periode transaksi ini sedang terkunci.', 'CONFLICT', status: 409);
@@ -326,11 +325,11 @@ class FabaUtilizationController extends ApiController
             $actions[] = 'view';
         }
 
-        if (! $this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month) && $user->hasPermission('faba_utilization.edit')) {
+        if ($this->canAccessMovement($movement, $user, 'faba_utilization.edit') && ! $this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month)) {
             $actions[] = 'update';
         }
 
-        if (! $this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month) && $user->hasPermission('faba_utilization.delete')) {
+        if ($this->canAccessMovement($movement, $user, 'faba_utilization.delete') && ! $this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month)) {
             $actions[] = 'delete';
         }
 
@@ -340,6 +339,19 @@ class FabaUtilizationController extends ApiController
     protected function resolvePerPage(Request $request): int
     {
         return max(1, min((int) $request->integer('per_page', 15), 100));
+    }
+
+    protected function canAccessMovement(FabaMovement $movement, User $user, string $permission): bool
+    {
+        if (! $user->hasPermission($permission)) {
+            return false;
+        }
+
+        if ($user->hasRole('operator')) {
+            return (string) $movement->created_by === (string) $user->id;
+        }
+
+        return true;
     }
 
     /**

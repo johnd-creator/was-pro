@@ -73,6 +73,54 @@
   color utility to any element that depends on these defaults.
 */
 @layer base {
+    :root {
+        --wm-bg-app: #f3f6fb;
+        --wm-bg-panel: rgba(255, 255, 255, 0.92);
+        --wm-bg-panel-elevated: rgba(255, 255, 255, 0.98);
+        --wm-bg-panel-critical: linear-gradient(
+            135deg,
+            rgba(254, 242, 242, 0.96),
+            rgba(255, 255, 255, 0.98) 58%,
+            rgba(254, 226, 226, 0.78)
+        );
+        --wm-bg-panel-work: rgba(248, 250, 252, 0.96);
+        --wm-text-primary: #0f172a;
+        --wm-text-secondary: #334155;
+        --wm-text-muted: #64748b;
+        --wm-border-default: rgba(203, 213, 225, 0.9);
+        --wm-border-strong: rgba(148, 163, 184, 0.9);
+        --wm-border-danger: rgba(248, 113, 113, 0.55);
+        --wm-border-warning: rgba(251, 191, 36, 0.6);
+        --wm-accent-danger: #dc2626;
+        --wm-accent-warning: #d97706;
+        --wm-accent-success: #059669;
+        --wm-accent-info: #2563eb;
+    }
+
+    .dark {
+        --wm-bg-app: #020817;
+        --wm-bg-panel: rgba(15, 23, 42, 0.88);
+        --wm-bg-panel-elevated: rgba(15, 23, 42, 0.96);
+        --wm-bg-panel-critical: linear-gradient(
+            135deg,
+            rgba(69, 10, 10, 0.52),
+            rgba(15, 23, 42, 0.97) 58%,
+            rgba(127, 29, 29, 0.28)
+        );
+        --wm-bg-panel-work: rgba(30, 41, 59, 0.72);
+        --wm-text-primary: #f8fafc;
+        --wm-text-secondary: #cbd5e1;
+        --wm-text-muted: #94a3b8;
+        --wm-border-default: rgba(51, 65, 85, 0.92);
+        --wm-border-strong: rgba(71, 85, 105, 0.96);
+        --wm-border-danger: rgba(127, 29, 29, 0.82);
+        --wm-border-warning: rgba(120, 53, 15, 0.88);
+        --wm-accent-danger: #f87171;
+        --wm-accent-warning: #f59e0b;
+        --wm-accent-success: #34d399;
+        --wm-accent-info: #60a5fa;
+    }
+
     *,
     ::after,
     ::before,
@@ -93,6 +141,74 @@
 }
 
 @layer components {
+    .wm-bg-app {
+        background-color: var(--wm-bg-app);
+    }
+
+    .wm-panel {
+        background-color: var(--wm-bg-panel);
+        border-color: var(--wm-border-default);
+    }
+
+    .wm-panel-elevated {
+        background-color: var(--wm-bg-panel-elevated);
+        border-color: var(--wm-border-default);
+    }
+
+    .wm-panel-critical {
+        background: var(--wm-bg-panel-critical);
+        border-color: var(--wm-border-danger);
+    }
+
+    .wm-panel-work {
+        background-color: var(--wm-bg-panel-work);
+        border-color: var(--wm-border-strong);
+    }
+
+    .wm-text-primary {
+        color: var(--wm-text-primary);
+    }
+
+    .wm-text-secondary {
+        color: var(--wm-text-secondary);
+    }
+
+    .wm-text-muted {
+        color: var(--wm-text-muted);
+    }
+
+    .wm-border-default {
+        border-color: var(--wm-border-default);
+    }
+
+    .wm-border-strong {
+        border-color: var(--wm-border-strong);
+    }
+
+    .wm-border-danger {
+        border-color: var(--wm-border-danger);
+    }
+
+    .wm-border-warning {
+        border-color: var(--wm-border-warning);
+    }
+
+    .wm-accent-danger {
+        color: var(--wm-accent-danger);
+    }
+
+    .wm-accent-warning {
+        color: var(--wm-accent-warning);
+    }
+
+    .wm-accent-success {
+        color: var(--wm-accent-success);
+    }
+
+    .wm-accent-info {
+        color: var(--wm-accent-info);
+    }
+
     .wm-page-backdrop {
         @apply bg-linear-to-b from-slate-50 via-white to-transparent dark:from-slate-950 dark:via-slate-950/95;
     }

@@ -196,6 +196,75 @@ test('utilization index renders active vendor, destination, and purpose options'
     );
 });
 
+test('operator can view production entries from the same organization but can only edit own entry', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+
+    $operatorEntry = FabaMovement::factory()->create([
+        'transaction_date' => '2026-03-05',
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'period_year' => 2026,
+        'period_month' => 3,
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+    ]);
+
+    $supervisorEntry = FabaMovement::factory()->create([
+        'transaction_date' => '2026-03-06',
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'period_year' => 2026,
+        'period_month' => 3,
+        'created_by' => $this->supervisor->id,
+        'updated_by' => $this->supervisor->id,
+    ]);
+
+    $this->tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->operator)
+        ->get(route('waste-management.faba.production.index'));
+
+    $response->assertSuccessful();
+    $response->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('waste-management/faba/production/Index')
+        ->has('entries', 2)
+        ->where('entries.0.id', $supervisorEntry->id)
+        ->where('entries.0.can_edit', false)
+        ->where('entries.1.id', $operatorEntry->id)
+        ->where('entries.1.can_edit', true)
+    );
+});
+
+test('operator cannot edit production entry created by another user even when period is rejected', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+
+    $entry = FabaMovement::factory()->create([
+        'transaction_date' => '2026-03-06',
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'period_year' => 2026,
+        'period_month' => 3,
+        'created_by' => $this->supervisor->id,
+        'updated_by' => $this->supervisor->id,
+    ]);
+
+    FabaMonthlyApproval::factory()->create([
+        'year' => 2026,
+        'month' => 3,
+        'status' => FabaMonthlyApproval::STATUS_REJECTED,
+        'rejected_by' => $this->supervisor->id,
+        'rejected_at' => now(),
+        'rejection_note' => 'Perlu revisi data pendukung.',
+    ]);
+
+    $this->tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->operator)
+        ->get(route('waste-management.faba.production.edit', $entry));
+
+    $response->assertForbidden();
+});
+
 test('tenant schema drops legacy faba entry tables after cleanup migration', function () {
     $this->tenantService->switchToSchema($this->organization->schema_name);
 
@@ -505,6 +574,8 @@ test('cannot move utilization into locked period', function () {
         'internal_destination_id' => $this->internalDestination->id,
         'period_year' => 2026,
         'period_month' => 2,
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
     ]);
     FabaMonthlyApproval::factory()->create([
         'year' => 2026,

@@ -6,10 +6,9 @@ import {
     Factory,
     PackageCheck,
     Scale,
-    ShieldAlert
-    
+    ShieldAlert,
 } from 'lucide-vue-next';
-import type {LucideIcon} from 'lucide-vue-next';
+import type { LucideIcon } from 'lucide-vue-next';
 import { computed, reactive } from 'vue';
 import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';

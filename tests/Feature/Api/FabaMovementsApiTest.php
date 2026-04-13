@@ -202,3 +202,79 @@ test('locked period rejects production update via api', function () {
     $response->assertStatus(409)
         ->assertJsonPath('error_code', 'CONFLICT');
 });
+
+test('operator api can view organization production entries but cannot update another users rejected entry', function () {
+    $supervisorRole = Role::query()->firstOrCreate(
+        ['slug' => 'supervisor'],
+        [
+            'name' => 'Supervisor',
+            'description' => 'Supervisor role',
+            'level' => 2,
+            'is_active' => true,
+        ],
+    );
+
+    $supervisorPermissionIds = collect([
+        'faba_production.view',
+        'faba_production.edit',
+    ])->map(fn (string $slug) => Permission::query()->where('slug', $slug)->value('id'));
+
+    $supervisorRole->permissions()->syncWithoutDetaching($supervisorPermissionIds->filter()->all());
+
+    $supervisor = User::factory()->create([
+        'organization_id' => $this->organization->id,
+        'role_id' => $supervisorRole->id,
+    ]);
+
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+
+    $operatorEntry = FabaMovement::factory()->create([
+        'transaction_date' => '2026-03-05',
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'period_year' => 2026,
+        'period_month' => 3,
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+    ]);
+
+    $supervisorEntry = FabaMovement::factory()->create([
+        'transaction_date' => '2026-03-06',
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'period_year' => 2026,
+        'period_month' => 3,
+        'created_by' => $supervisor->id,
+        'updated_by' => $supervisor->id,
+    ]);
+
+    FabaMonthlyApproval::query()->create([
+        'year' => 2026,
+        'month' => 3,
+        'status' => FabaMonthlyApproval::STATUS_REJECTED,
+        'rejected_by' => $supervisor->id,
+        'rejected_at' => now(),
+        'rejection_note' => 'Perlu revisi data produksi.',
+    ]);
+
+    $this->tenantService->switchToPublic();
+
+    $indexResponse = $this->withToken($this->token)->getJson('/api/v1/faba/production');
+
+    $indexResponse->assertSuccessful()
+        ->assertJsonPath('data.0.id', $supervisorEntry->id)
+        ->assertJsonPath('data.0.allowed_actions.0', 'view')
+        ->assertJsonCount(1, 'data.0.allowed_actions')
+        ->assertJsonPath('data.1.id', $operatorEntry->id);
+
+    $updateResponse = $this->withToken($this->token)->putJson('/api/v1/faba/production/'.$supervisorEntry->id, [
+        'transaction_date' => '2026-03-06',
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'quantity' => 9,
+        'note' => 'Unauthorized update attempt',
+    ]);
+
+    $updateResponse->assertForbidden()
+        ->assertJsonPath('error_code', 'FORBIDDEN');
+});

@@ -9,7 +9,12 @@ export interface FabaMonthlyApproval {
     month: number;
     period_label?: string;
     status: 'draft' | 'submitted' | 'approved' | 'rejected';
-    operational_status?: 'draft' | 'open' | 'ready_to_submit' | 'submitted' | 'approved';
+    operational_status?:
+        | 'draft'
+        | 'open'
+        | 'ready_to_submit'
+        | 'submitted'
+        | 'approved';
     rejection_note?: string | null;
     submitted_at?: string | null;
     approved_at?: string | null;
@@ -46,6 +51,7 @@ export interface FabaProductionMovement {
     approval_status: 'draft' | 'submitted' | 'approved' | 'rejected';
     period_label?: string;
     created_by_user?: FabaUserRef | null;
+    can_edit?: boolean;
 }
 
 export interface FabaInternalDestination {
@@ -79,6 +85,7 @@ export interface FabaUtilizationMovement {
     approval_status: 'draft' | 'submitted' | 'approved' | 'rejected';
     period_label?: string;
     created_by_user?: FabaUserRef | null;
+    can_edit?: boolean;
 }
 
 export interface FabaMonthlyRecap {
@@ -129,6 +136,7 @@ export interface FabaMovement {
     reference_id: string | null;
     note: string | null;
     display_number?: string | null;
+    can_edit?: boolean;
 }
 
 export interface FabaStockCardRow {

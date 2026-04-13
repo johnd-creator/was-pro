@@ -43,6 +43,7 @@ const props = defineProps<{
         note: string | null;
         period_label: string;
         approval_status: string;
+        can_edit?: boolean;
     }>;
     filters: { materials: string[]; movementTypes: string[] };
 }>();
@@ -349,6 +350,7 @@ const totalQuantity = computed(() =>
                                                 >Detail</Link
                                             >
                                             <Link
+                                                v-if="entry.can_edit"
                                                 :href="
                                                     wasteManagementRoutes.faba.adjustments.edit(
                                                         entry.id,

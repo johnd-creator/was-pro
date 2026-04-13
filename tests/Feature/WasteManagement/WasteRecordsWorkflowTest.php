@@ -678,7 +678,7 @@ test('operator is forbidden from deleting own draft record without delete permis
     ]);
 });
 
-test('operator can only see own records', function () {
+test('operator can see organization waste records in index', function () {
     $tenantService = app(\App\Services\TenantService::class);
     $tenantService->switchToSchema($this->org->schema_name);
 
@@ -696,11 +696,32 @@ test('operator can only see own records', function () {
     $response = $this->actingAs($this->operator)
         ->get(route('waste-management.records.index'));
 
-    $response->assertStatus(200);
+    $response->assertSuccessful();
+    $response->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('waste-management/records/Index')
+        ->has('wasteRecords', 5)
+    );
+});
 
-    // Operator should only see records created by themselves
-    $records = WasteRecord::where('created_by', $this->operator->id)->get();
-    expect($records->count())->toBeGreaterThanOrEqual(3);
+test('operator cannot edit rejected waste record created by another user', function () {
+    $tenantService = app(\App\Services\TenantService::class);
+    $tenantService->switchToSchema($this->org->schema_name);
+
+    $rejectedRecord = WasteRecord::factory()->create([
+        'status' => 'rejected',
+        'waste_type_id' => $this->wasteType->id,
+        'created_by' => $this->supervisor->id,
+        'submitted_by' => $this->supervisor->id,
+        'approved_by' => $this->superAdmin->id,
+        'submitted_at' => now()->subDay(),
+        'approved_at' => now(),
+        'rejection_reason' => 'Revisi diperlukan sebelum catatan dapat diajukan kembali.',
+    ]);
+
+    $response = $this->actingAs($this->operator)
+        ->get(route('waste-management.records.edit', $rejectedRecord));
+
+    $response->assertForbidden();
 });
 
 test('supervisor can see all records', function () {

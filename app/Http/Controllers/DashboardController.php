@@ -33,6 +33,7 @@ class DashboardController extends Controller
             'stats' => $data['waste_stats'],
             'recentActivities' => $data['recent_activities'],
             'pendingApprovals' => $data['pending_approvals'],
+            'tasks' => $data['tasks'],
             'wasteByCategory' => $data['waste_by_category'],
             'fabaProductionMaterialDistribution' => $data['faba_production_material_distribution'],
             'transportationByStatus' => $data['transportation_stats'],
@@ -58,6 +59,7 @@ class DashboardController extends Controller
             'headerRiskTone' => $data['header']['risk_tone'],
             'notificationSummary' => $data['notification_summary'],
             'header' => $data['header'],
+            'taskContext' => $data['header']['user']['role'] === 'operator' ? 'operator' : 'approver',
             'filters' => $data['filters'],
             'availableMonths' => $data['available_months'],
             'availableOrganizations' => $user->isSuperAdmin()
@@ -73,6 +75,12 @@ class DashboardController extends Controller
                     ->values()
                     ->all()
                 : [],
+
+            // NEW: Tab system props
+            'wasteTasks' => $data['waste_tasks'],
+            'fabaTasks' => $data['faba_tasks'],
+            'wastePendingCount' => $data['waste_pending_count'],
+            'fabaPendingCount' => $data['faba_pending_count'],
         ]);
     }
 

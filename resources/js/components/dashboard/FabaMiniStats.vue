@@ -13,7 +13,8 @@ const props = defineProps<Props>();
 
 const balanceStatus = computed(() => {
     if (props.balance < 0) return 'text-red-600 dark:text-red-400';
-    if (props.negativePeriods > 0) return 'text-orange-600 dark:text-orange-400';
+    if (props.negativePeriods > 0)
+        return 'text-orange-600 dark:text-orange-400';
     return 'text-emerald-600 dark:text-emerald-400';
 });
 </script>
@@ -70,7 +71,11 @@ const balanceStatus = computed(() => {
                 </p>
                 <p
                     class="mt-1 text-2xl font-bold tabular-nums"
-                    :class="negativePeriods > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'"
+                    :class="
+                        negativePeriods > 0
+                            ? 'text-red-600 dark:text-red-400'
+                            : 'text-emerald-600 dark:text-emerald-400'
+                    "
                 >
                     {{ negativePeriods }}
                 </p>

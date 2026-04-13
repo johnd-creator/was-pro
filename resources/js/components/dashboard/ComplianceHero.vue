@@ -2,12 +2,12 @@
 import { Link } from '@inertiajs/vue3';
 import {
     AlertTriangle,
+    ArrowRight,
     ShieldAlert,
     ShieldCheck,
-    Timer
-    
+    Timer,
 } from 'lucide-vue-next';
-import type {LucideIcon} from 'lucide-vue-next';
+import type { LucideIcon } from 'lucide-vue-next';
 import { computed } from 'vue';
 import { Button } from '@/components/ui/button';
 import wasteManagementRoutes from '@/routes/waste-management';
@@ -21,16 +21,18 @@ interface Props {
     riskStatus: 'normal' | 'warning' | 'critical';
     riskLabel: string;
     riskTone: 'green' | 'orange' | 'red';
+    showMetricCards?: boolean;
 }
 
 interface HeroTone {
-    shellClass: string;
     badgeClass: string;
-    summaryClass: string;
+    shellClass: string;
+    valueClass: string;
+    statusClass: string;
     buttonClass: string;
-    iconWrapClass: string;
-    iconGlowClass: string;
-    dividerClass: string;
+    iconClass: string;
+    railClass: string;
+    ringClass: string;
 }
 
 interface MetricCard {
@@ -38,16 +40,17 @@ interface MetricCard {
     value: number;
     description: string;
     icon: LucideIcon;
-    cardClass: string;
-    accentClass: string;
+    shellClass: string;
+    valueClass: string;
+    iconWrapClass: string;
     iconClass: string;
+    statusText: string;
+    barClass: string;
 }
 
-const props = defineProps<Props>();
-
-const hasAlerts = computed(
-    () => props.riskStatus === 'critical' || props.expiredWaste > 0,
-);
+const props = withDefaults(defineProps<Props>(), {
+    showMetricCards: false,
+});
 
 const primaryMessage = computed(() => {
     if (props.expiredWaste > 0) {
@@ -59,14 +62,14 @@ const primaryMessage = computed(() => {
     }
 
     if (props.pendingWasteApprovals + props.pendingFabaApprovals > 0) {
-        return `Terdapat ${props.pendingWasteApprovals + props.pendingFabaApprovals} antrian approval yang menunggu keputusan untuk menjaga ritme operasional tetap aman.`;
+        return `Terdapat ${props.pendingWasteApprovals + props.pendingFabaApprovals} antrian approval yang perlu diputuskan untuk menjaga ritme operasional tetap aman.`;
     }
 
     if (props.expiringSoonWaste > 0) {
-        return `${props.expiringSoonWaste} catatan limbah akan mendekati batas simpan dalam 7 hari ke depan.`;
+        return `${props.expiringSoonWaste} catatan limbah mendekati batas simpan dalam tujuh hari ke depan.`;
     }
 
-    return 'Kepatuhan operasional berada dalam kondisi terkendali dan tidak ada anomali utama yang perlu ditindaklanjuti sekarang.';
+    return 'Kepatuhan operasional berada dalam kondisi terkendali dan tidak ada anomali utama yang perlu ditindaklanjuti saat ini.';
 });
 
 const totalRiskCount = computed(
@@ -122,37 +125,46 @@ const summaryDetails = computed(() => {
 
 const toneMap: Record<Props['riskTone'], HeroTone> = {
     red: {
+        badgeClass:
+            'border border-red-300/90 bg-red-100 text-red-800 dark:border-red-900/70 dark:bg-red-950/50 dark:text-red-200',
         shellClass:
-            'border border-red-300/40 bg-gradient-to-br from-red-700 via-red-600 to-rose-600',
-        badgeClass: 'bg-white/16 text-white ring-1 ring-white/20',
-        summaryClass: 'bg-white/14 ring-1 ring-white/16',
+            'border-red-300/80 bg-linear-to-br from-red-50 via-white to-red-50/70 dark:border-red-900/70 dark:from-red-950/45 dark:via-slate-950 dark:to-red-950/20',
+        valueClass: 'text-red-700 dark:text-red-300',
+        statusClass:
+            'border-red-300 bg-red-100 text-red-800 dark:border-red-900/70 dark:bg-red-950/45 dark:text-red-200',
         buttonClass:
-            'bg-white text-red-700 shadow-lg transition-all duration-200 hover:bg-red-50',
-        iconWrapClass: 'bg-white/12 ring-1 ring-white/16',
-        iconGlowClass: 'bg-red-300/20',
-        dividerClass: 'bg-white/14',
+            'border-red-200 bg-red-600 text-white hover:bg-red-700 dark:border-red-900/60 dark:bg-red-700 dark:hover:bg-red-600',
+        iconClass: 'text-red-600 dark:text-red-300',
+        railClass: 'bg-red-600 dark:bg-red-500',
+        ringClass: 'ring-1 ring-red-200/80 dark:ring-red-900/40',
     },
     orange: {
+        badgeClass:
+            'border border-amber-300/90 bg-amber-100 text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/50 dark:text-amber-200',
         shellClass:
-            'border border-amber-300/40 bg-gradient-to-br from-amber-600 via-orange-500 to-amber-500',
-        badgeClass: 'bg-white/16 text-white ring-1 ring-white/20',
-        summaryClass: 'bg-white/14 ring-1 ring-white/16',
+            'border-amber-300/80 bg-linear-to-br from-amber-50 via-white to-orange-50/70 dark:border-amber-900/70 dark:from-amber-950/35 dark:via-slate-950 dark:to-orange-950/20',
+        valueClass: 'text-amber-700 dark:text-amber-300',
+        statusClass:
+            'border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/45 dark:text-amber-200',
         buttonClass:
-            'bg-white text-amber-700 shadow-lg transition-all duration-200 hover:bg-amber-50',
-        iconWrapClass: 'bg-white/12 ring-1 ring-white/16',
-        iconGlowClass: 'bg-amber-200/20',
-        dividerClass: 'bg-white/14',
+            'border-amber-200 bg-amber-600 text-white hover:bg-amber-700 dark:border-amber-900/60 dark:bg-amber-700 dark:hover:bg-amber-600',
+        iconClass: 'text-amber-600 dark:text-amber-300',
+        railClass: 'bg-amber-500 dark:bg-amber-400',
+        ringClass: 'ring-1 ring-amber-200/80 dark:ring-amber-900/40',
     },
     green: {
+        badgeClass:
+            'border border-emerald-300/90 bg-emerald-100 text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/50 dark:text-emerald-200',
         shellClass:
-            'border border-emerald-300/35 bg-gradient-to-br from-teal-700 via-emerald-600 to-cyan-500',
-        badgeClass: 'bg-white/16 text-white ring-1 ring-white/20',
-        summaryClass: 'bg-white/14 ring-1 ring-white/16',
+            'border-emerald-300/80 bg-linear-to-br from-emerald-50 via-white to-teal-50/60 dark:border-emerald-900/70 dark:from-emerald-950/28 dark:via-slate-950 dark:to-teal-950/16',
+        valueClass: 'text-emerald-700 dark:text-emerald-300',
+        statusClass:
+            'border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/45 dark:text-emerald-200',
         buttonClass:
-            'bg-white text-emerald-700 shadow-lg transition-all duration-200 hover:bg-emerald-50',
-        iconWrapClass: 'bg-white/12 ring-1 ring-white/16',
-        iconGlowClass: 'bg-emerald-200/20',
-        dividerClass: 'bg-white/14',
+            'border-emerald-200 bg-emerald-600 text-white hover:bg-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-700 dark:hover:bg-emerald-600',
+        iconClass: 'text-emerald-600 dark:text-emerald-300',
+        railClass: 'bg-emerald-500 dark:bg-emerald-400',
+        ringClass: 'ring-1 ring-emerald-200/80 dark:ring-emerald-900/40',
     },
 };
 
@@ -176,172 +188,250 @@ const metricCards = computed<MetricCard[]>(() => [
         value: props.expiredWaste,
         description: 'Catatan perlu tindakan',
         icon: ShieldAlert,
-        cardClass:
+        shellClass:
+            'border-red-300/90 bg-red-50/90 dark:border-red-900/70 dark:bg-red-950/30',
+        valueClass: 'text-red-700 dark:text-red-300',
+        iconWrapClass:
+            'border-red-200 bg-red-100 dark:border-red-900/60 dark:bg-red-950/50',
+        iconClass: 'text-red-700 dark:text-red-300',
+        statusText:
             props.expiredWaste > 0
-                ? 'border-red-200/45 bg-red-950/20 ring-1 ring-red-200/30'
-                : 'border-white/16 bg-white/8',
-        accentClass: props.expiredWaste > 0 ? 'bg-red-200/28' : 'bg-white/12',
-        iconClass: props.expiredWaste > 0 ? 'text-red-100' : 'text-white/88',
+                ? 'Prioritas tertinggi'
+                : 'Tidak ada catatan kritis',
+        barClass: 'bg-red-600 dark:bg-red-400',
     },
     {
         title: 'Mendekati Batas Simpan',
         value: props.expiringSoonWaste,
         description: 'Dalam 7 hari',
         icon: Timer,
-        cardClass:
+        shellClass:
+            'border-amber-300/90 bg-amber-50/90 dark:border-amber-900/70 dark:bg-amber-950/25',
+        valueClass: 'text-amber-700 dark:text-amber-300',
+        iconWrapClass:
+            'border-amber-200 bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/45',
+        iconClass: 'text-amber-700 dark:text-amber-300',
+        statusText:
             props.expiringSoonWaste > 0
-                ? 'border-amber-200/45 bg-amber-950/18 ring-1 ring-amber-200/25'
-                : 'border-white/16 bg-white/8',
-        accentClass:
-            props.expiringSoonWaste > 0 ? 'bg-amber-200/28' : 'bg-white/12',
-        iconClass:
-            props.expiringSoonWaste > 0 ? 'text-amber-100' : 'text-white/88',
+                ? 'Perlu penjadwalan cepat'
+                : 'Tidak ada catatan mendekati batas',
+        barClass: 'bg-amber-500 dark:bg-amber-400',
     },
     {
         title: 'Pending Approval',
         value: totalApprovalCount.value,
         description: `${props.pendingWasteApprovals} limbah, ${props.pendingFabaApprovals} FABA`,
         icon: AlertTriangle,
-        cardClass:
+        shellClass:
             totalApprovalCount.value > 0
-                ? 'border-sky-200/45 bg-sky-950/18 ring-1 ring-sky-200/25'
-                : 'border-white/16 bg-white/8',
-        accentClass:
-            totalApprovalCount.value > 0 ? 'bg-sky-200/28' : 'bg-white/12',
+                ? 'border-orange-300/90 bg-orange-50/90 dark:border-orange-900/70 dark:bg-orange-950/25'
+                : 'border-slate-200/90 bg-slate-50/90 dark:border-slate-800 dark:bg-slate-900/40',
+        valueClass:
+            totalApprovalCount.value > 0
+                ? 'text-orange-700 dark:text-orange-300'
+                : 'text-slate-900 dark:text-slate-100',
+        iconWrapClass:
+            totalApprovalCount.value > 0
+                ? 'border-orange-200 bg-orange-100 dark:border-orange-900/60 dark:bg-orange-950/45'
+                : 'border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900',
         iconClass:
-            totalApprovalCount.value > 0 ? 'text-sky-100' : 'text-white/88',
+            totalApprovalCount.value > 0
+                ? 'text-orange-700 dark:text-orange-300'
+                : 'text-slate-600 dark:text-slate-300',
+        statusText:
+            totalApprovalCount.value > 0
+                ? 'Keputusan tertunda aktif'
+                : 'Queue approval terkendali',
+        barClass:
+            totalApprovalCount.value > 0
+                ? 'bg-orange-500 dark:bg-orange-400'
+                : 'bg-slate-300 dark:bg-slate-700',
     },
     {
         title: 'Peringatan FABA',
         value: props.fabaWarnings,
         description: 'Periode bermasalah',
         icon: AlertTriangle,
-        cardClass:
+        shellClass:
             props.fabaWarnings > 0
-                ? 'border-rose-200/45 bg-rose-950/18 ring-1 ring-rose-200/25'
-                : 'border-white/16 bg-white/8',
-        accentClass: props.fabaWarnings > 0 ? 'bg-rose-200/28' : 'bg-white/12',
-        iconClass: props.fabaWarnings > 0 ? 'text-rose-100' : 'text-white/88',
+                ? 'border-rose-300/90 bg-rose-50/85 dark:border-rose-900/70 dark:bg-rose-950/25'
+                : 'border-slate-200/90 bg-slate-50/90 dark:border-slate-800 dark:bg-slate-900/40',
+        valueClass:
+            props.fabaWarnings > 0
+                ? 'text-rose-700 dark:text-rose-300'
+                : 'text-slate-900 dark:text-slate-100',
+        iconWrapClass:
+            props.fabaWarnings > 0
+                ? 'border-rose-200 bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/45'
+                : 'border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900',
+        iconClass:
+            props.fabaWarnings > 0
+                ? 'text-rose-700 dark:text-rose-300'
+                : 'text-slate-600 dark:text-slate-300',
+        statusText:
+            props.fabaWarnings > 0
+                ? 'Butuh telaah data FABA'
+                : 'Tidak ada warning aktif',
+        barClass:
+            props.fabaWarnings > 0
+                ? 'bg-rose-500 dark:bg-rose-400'
+                : 'bg-slate-300 dark:bg-slate-700',
     },
 ]);
 </script>
 
 <template>
-    <div
-        :class="[
-            'relative overflow-hidden rounded-[28px] text-white shadow-xl transition-all duration-300',
-            tone.shellClass,
-        ]"
-    >
-        <div class="pointer-events-none absolute -left-12 top-0 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
-        <div class="pointer-events-none absolute bottom-0 right-0 h-40 w-40 rounded-full bg-black/10 blur-3xl" />
-        <div class="flex flex-col gap-5 p-5 lg:p-6">
-            <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-stretch xl:grid-cols-[minmax(0,1fr)_300px]">
-                <div class="space-y-5">
-                    <div
-                        :class="[
-                            'inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold tracking-[0.12em] uppercase backdrop-blur-sm',
-                            tone.badgeClass,
-                        ]"
-                    >
-                        <component :is="statusIcon" class="size-3.5" />
-                        Status Kepatuhan: {{ riskLabel }}
+    <div class="space-y-3">
+        <div
+            :class="[
+                'relative overflow-hidden rounded-2xl border shadow-sm transition-all duration-200',
+                tone.shellClass,
+                tone.ringClass,
+            ]"
+        >
+            <div
+                class="absolute inset-y-0 left-0 w-1.5"
+                :class="tone.railClass"
+            />
+            <div class="flex flex-col gap-3.5 p-4 sm:p-4.5">
+                <div
+                    class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between"
+                >
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2.5">
+                            <div
+                                :class="[
+                                    'inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-[0.12em] uppercase',
+                                    tone.badgeClass,
+                                ]"
+                            >
+                                <component :is="statusIcon" class="size-3.5" />
+                                Kepatuhan Kritis
+                            </div>
+                            <div
+                                :class="[
+                                    'inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-medium',
+                                    tone.statusClass,
+                                ]"
+                            >
+                                <component :is="statusIcon" class="size-3.5" />
+                                {{ riskLabel }}
+                            </div>
+                        </div>
+
+                        <div
+                            class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5"
+                        >
+                            <p
+                                class="wm-text-primary text-[15px] leading-6 font-semibold sm:text-base"
+                            >
+                                {{ primaryMessage }}
+                            </p>
+                            <p class="wm-text-secondary text-xs font-medium">
+                                {{ totalRiskCount }} indikator aktif
+                            </p>
+                        </div>
                     </div>
 
-                    <div class="space-y-2">
-                        <h2 class="text-xl font-bold tracking-tight lg:text-[2rem]">
-                            Tinjau Risiko Kepatuhan
-                        </h2>
-                        <p class="max-w-2xl text-sm leading-6 text-white/82 lg:text-[15px]">
-                            {{ primaryMessage }}
-                        </p>
-                    </div>
-
-                    <div
-                        :class="[
-                            'inline-flex flex-col gap-1 rounded-2xl px-4 py-3 text-left backdrop-blur-sm',
-                            tone.summaryClass,
-                        ]"
-                    >
-                        <p class="text-[11px] font-semibold tracking-[0.14em] uppercase text-white/75">
-                            {{ summaryLabel }}
-                        </p>
-                        <p class="text-2xl font-bold tracking-tight">
-                            {{ totalRiskCount }}
-                        </p>
-                        <p class="text-xs text-white/72">
-                            {{ summaryDetails }}
-                        </p>
+                    <div class="flex shrink-0 items-center gap-2.5">
+                        <Button
+                            as-child
+                            class="h-9 rounded-lg px-4"
+                            :class="tone.buttonClass"
+                        >
+                            <Link
+                                :href="
+                                    wasteManagementRoutes.records.pendingApproval()
+                                        .url
+                                "
+                            >
+                                Tinjau Catatan Kritis
+                                <ArrowRight class="ml-2 size-4" />
+                            </Link>
+                        </Button>
                     </div>
                 </div>
 
-                <div class="hidden lg:flex lg:min-h-full lg:items-end lg:justify-end">
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <div class="wm-panel-elevated rounded-lg border px-3 py-2">
+                        <p
+                            class="wm-text-muted text-[10px] font-semibold tracking-[0.14em] uppercase"
+                        >
+                            Ringkasan
+                        </p>
+                        <p class="wm-text-primary mt-0.5 text-sm font-semibold">
+                            {{ summaryLabel }}
+                        </p>
+                    </div>
                     <div
-                        :class="[
-                            'relative flex size-36 items-center justify-center overflow-hidden rounded-[32px] backdrop-blur-sm xl:size-40',
-                            tone.iconWrapClass,
-                        ]"
+                        v-for="part in summaryDetails.split(' • ')"
+                        :key="part"
+                        class="wm-panel-elevated wm-text-secondary inline-flex items-center rounded-lg border px-3 py-2 text-xs font-medium"
                     >
-                        <div
-                            :class="[
-                                'absolute inset-4 rounded-full blur-2xl',
-                                tone.iconGlowClass,
-                            ]"
-                        />
-                        <component :is="statusIcon" class="relative z-10 size-16 text-white/92 xl:size-20" />
+                        {{ part }}
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div :class="['h-px w-full', tone.dividerClass]" />
-
-            <div class="grid gap-3 sm:grid-cols-2 lg:max-w-[70%] xl:max-w-[72%] xl:grid-cols-4">
-                <div
-                    v-for="card in metricCards"
-                    :key="card.title"
-                    :class="[
-                        'flex min-h-[108px] items-start justify-between gap-3 rounded-2xl border px-3.5 py-3.5 backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/14',
-                        card.cardClass,
-                    ]"
-                >
-                    <div class="min-w-0 space-y-2">
-                        <p class="text-[13px] font-semibold leading-5 text-white/90">
+        <div
+            v-if="showMetricCards"
+            class="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+        >
+            <div
+                v-for="card in metricCards"
+                :key="card.title"
+                :class="['rounded-xl border p-3.5 shadow-sm', card.shellClass]"
+            >
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="wm-text-primary text-sm font-medium">
                             {{ card.title }}
                         </p>
-                        <p class="text-[2rem] leading-none font-bold tracking-tight">
-                            {{ card.value }}
-                        </p>
-                        <p class="text-[11px] leading-4 text-white/72">
+                        <p class="wm-text-secondary mt-1 text-[11px]">
                             {{ card.description }}
                         </p>
                     </div>
-
                     <div
                         :class="[
-                            'flex size-11 shrink-0 items-center justify-center rounded-2xl',
-                            card.accentClass,
+                            'flex size-8 shrink-0 items-center justify-center rounded-lg border',
+                            card.iconWrapClass,
                         ]"
                     >
-                        <component :is="card.icon" :class="['size-5', card.iconClass]" />
+                        <component
+                            :is="card.icon"
+                            class="size-4"
+                            :class="card.iconClass"
+                        />
                     </div>
                 </div>
-            </div>
 
-            <div class="flex items-center justify-between gap-4">
-                <p class="hidden text-sm text-white/72 lg:block">
-                    Ringkasan ini menyorot isu aktif yang paling memengaruhi ritme kepatuhan saat ini.
-                </p>
-                <Button as-child :class="tone.buttonClass">
-                    <Link
-                        :href="
-                            hasAlerts
-                                ? wasteManagementRoutes.records.index().url
-                                : wasteManagementRoutes.records.pendingApproval().url
-                        "
+                <div class="mt-3 flex items-end justify-between gap-3">
+                    <p
+                        :class="[
+                            'text-3xl font-bold tracking-tight tabular-nums',
+                            card.value > 0
+                                ? card.valueClass
+                                : 'text-slate-950 dark:text-slate-100',
+                        ]"
                     >
-                        {{ hasAlerts ? 'Tinjau Catatan Kritis' : 'Lihat Antrian Approval' }}
-                    </Link>
-                </Button>
+                        {{ card.value }}
+                    </p>
+                </div>
+                <p class="wm-text-secondary mt-1.5 text-[11px]">
+                    {{ card.statusText }}
+                </p>
+                <div
+                    class="mt-3 h-1.5 rounded-full bg-white/70 dark:bg-slate-950/70"
+                >
+                    <div
+                        class="h-full rounded-full"
+                        :class="card.barClass"
+                        :style="{
+                            width: `${Math.min(card.value > 0 ? 22 + card.value * 12 : 16, 100)}%`,
+                        }"
+                    />
+                </div>
             </div>
         </div>
     </div>

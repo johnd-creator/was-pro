@@ -47,14 +47,19 @@ const maxValue = computed(() =>
                         <p class="truncate text-xs font-medium text-slate-600">
                             {{ item.label }}
                         </p>
-                        <p class="text-sm font-semibold tabular-nums text-slate-900">
+                        <p
+                            class="text-sm font-semibold text-slate-900 tabular-nums"
+                        >
                             {{ item.value.toLocaleString('id-ID') }}
                         </p>
                     </div>
                     <div class="h-2 w-full rounded-full bg-slate-200">
                         <div
                             class="h-full rounded-full transition-all duration-500"
-                            :class="item.color || fallbackColors[index % fallbackColors.length]"
+                            :class="
+                                item.color ||
+                                fallbackColors[index % fallbackColors.length]
+                            "
                             :style="{
                                 width: `${(item.value / maxValue) * 100}%`,
                             }"

@@ -400,6 +400,7 @@ const externalCount = computed(
                                                 >Detail</Link
                                             >
                                             <Link
+                                                v-if="entry.can_edit"
                                                 :href="
                                                     wasteManagementRoutes.faba.utilization.edit(
                                                         entry.id,
