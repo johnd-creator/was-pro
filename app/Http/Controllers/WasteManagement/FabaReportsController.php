@@ -71,6 +71,8 @@ class FabaReportsController extends Controller
             'purposeRecap' => $this->fabaRecapService->getPurposeRecap($year, $purposeId),
             'stockCard' => $this->fabaRecapService->getStockCard($year, $month, $materialType),
             'anomalyReport' => $this->fabaRecapService->getAnomalyReport($year, $month),
+            'analysisMatrix' => $this->fabaRecapService->getAnalysisMatrix($year),
+            'tpsCapacitySummary' => $this->fabaRecapService->getTpsCapacitySummary($year, $month),
         ]);
     }
 
@@ -183,6 +185,20 @@ class FabaReportsController extends Controller
         return $this->fabaOfficialReportService->downloadPdf('anomalies', [
             'year' => request('year'),
             'month' => request('month'),
+        ]);
+    }
+
+    public function analysisMatrixXlsx(): BinaryFileResponse
+    {
+        return $this->fabaOfficialReportService->downloadExcel('analysis-matrix', [
+            'year' => request('year'),
+        ]);
+    }
+
+    public function analysisMatrixPdf(): HttpResponse
+    {
+        return $this->fabaOfficialReportService->downloadPdf('analysis-matrix', [
+            'year' => request('year'),
         ]);
     }
 }

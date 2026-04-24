@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Vendor;
 use App\Models\WasteCategory;
 use App\Models\WasteRecord;
-use App\Models\WasteTransportation;
 use App\Models\WasteType;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -43,12 +42,6 @@ class DashboardController extends Controller
             'pending_records' => WasteRecord::pendingApproval()->count(),
             'approved_records' => WasteRecord::approved()->count(),
             'rejected_records' => WasteRecord::where('status', 'rejected')->count(),
-
-            // Transportation Statistics
-            'total_transportations' => WasteTransportation::count(),
-            'pending_transportations' => WasteTransportation::pending()->count(),
-            'in_transit_transportations' => WasteTransportation::inTransit()->count(),
-            'delivered_transportations' => WasteTransportation::delivered()->count(),
 
             // Expiry Statistics
             'expired_waste' => WasteRecord::approved()->expired()->count(),
@@ -92,14 +85,6 @@ class DashboardController extends Controller
                 ];
             })->values();
 
-        // Transportation Status Distribution
-        $transportationByStatus = [
-            'pending' => WasteTransportation::pending()->count(),
-            'in_transit' => WasteTransportation::inTransit()->count(),
-            'delivered' => WasteTransportation::delivered()->count(),
-            'cancelled' => WasteTransportation::cancelled()->count(),
-        ];
-
         // Recent Activities (last 10)
         $recentActivities = $this->getRecentActivities();
 
@@ -132,7 +117,6 @@ class DashboardController extends Controller
             'stats' => $stats,
             'wasteByCategory' => $wasteByCategory,
             'wasteTrends' => $wasteTrends,
-            'transportationByStatus' => $transportationByStatus,
             'recentActivities' => $recentActivities,
             'expiringSoon' => $expiringSoon,
             'expiredWaste' => $expiredWaste,
@@ -154,7 +138,7 @@ class DashboardController extends Controller
         // Recent waste records
         $recentRecords = WasteRecord::with(['wasteType', 'createdBy'])
             ->orderBy('created_at', 'desc')
-            ->limit(5)
+            ->limit(10)
             ->get();
 
         foreach ($recentRecords as $record) {
@@ -168,35 +152,6 @@ class DashboardController extends Controller
             ];
         }
 
-        // Recent transportations
-        $recentTransportations = WasteTransportation::with(['vendor', 'createdBy'])
-            ->orderBy('created_at', 'desc')
-            ->limit(5)
-            ->get();
-
-        foreach ($recentTransportations as $transportation) {
-            $statusLabels = [
-                'pending' => 'scheduled',
-                'in_transit' => 'dispatched',
-                'delivered' => 'completed',
-                'cancelled' => 'cancelled',
-            ];
-
-            $activities[] = [
-                'type' => 'transportation',
-                'icon' => '🚚',
-                'title' => "Transportation {$statusLabels[$transportation->status]}",
-                'description' => "{$transportation->quantity} {$transportation->unit} via {$transportation->vendor->name}",
-                'user' => $transportation->createdBy?->name ?? 'System',
-                'created_at' => $transportation->created_at->diffForHumans(),
-            ];
-        }
-
-        // Sort by created_at and limit to 10
-        usort($activities, function ($a, $b) {
-            return strtotime($b['created_at']) - strtotime($a['created_at']);
-        });
-
-        return array_slice($activities, 0, 10);
+        return $activities;
     }
 }

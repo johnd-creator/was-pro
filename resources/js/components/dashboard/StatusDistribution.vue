@@ -60,7 +60,7 @@ function downloadCSV() {
             title="Tidak ada data transportasi"
             description="Belum ada pengiriman limbah yang tercatat. Jadwalkan transportasi pertama Anda."
             action-label="Jadwalkan transportasi"
-            :action-href="wasteManagementRoutes.transportations.create().url"
+            :action-href="wasteManagementRoutes.haulings.create().url"
             size="sm"
         />
     </div>

@@ -4,8 +4,8 @@ use App\Models\Organization;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Models\WasteHauling;
 use App\Models\WasteRecord;
-use App\Models\WasteTransportation;
 use App\Models\WasteType;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
@@ -298,7 +298,7 @@ test('supervisor can view pending approval page', function () {
     );
 });
 
-test('operator can view create transportation page with partially transported approved records', function () {
+test('operator can view hauling backlog index with partially hauled approved records', function () {
     $tenantService = app(\App\Services\TenantService::class);
     $tenantService->switchToSchema($this->org->schema_name);
 
@@ -318,24 +318,20 @@ test('operator can view create transportation page with partially transported ap
         'created_by' => $this->operator->id,
     ]);
 
-    $vendor = Vendor::factory()->create();
-
-    WasteTransportation::factory()->create([
+    WasteHauling::factory()->create([
         'waste_record_id' => $availableRecord->id,
-        'vendor_id' => $vendor->id,
         'quantity' => 40,
         'unit' => 'kg',
-        'status' => 'pending',
+        'status' => 'approved',
         'created_by' => $this->operator->id,
         'updated_by' => $this->operator->id,
     ]);
 
-    WasteTransportation::factory()->create([
+    WasteHauling::factory()->create([
         'waste_record_id' => $fullyTransportedRecord->id,
-        'vendor_id' => $vendor->id,
         'quantity' => 80,
         'unit' => 'kg',
-        'status' => 'pending',
+        'status' => 'approved',
         'created_by' => $this->operator->id,
         'updated_by' => $this->operator->id,
     ]);
@@ -343,15 +339,217 @@ test('operator can view create transportation page with partially transported ap
     $tenantService->switchToPublic();
 
     $response = $this->actingAs($this->operator)
-        ->get(route('waste-management.transportations.create'));
+        ->get(route('waste-management.haulings.index'));
 
     $response->assertSuccessful();
     $response->assertInertia(fn (AssertableInertia $page) => $page
-        ->component('waste-management/transportations/Create')
-        ->has('wasteRecords', 1)
-        ->where('wasteRecords.0.id', $availableRecord->id)
-        ->where('wasteRecords.0.transported_quantity', 40)
-        ->where('wasteRecords.0.remaining_quantity', 60)
+        ->component('waste-management/haulings/Index')
+        ->has('records', 1)
+        ->where('records.0.id', $availableRecord->id)
+        ->where('records.0.approved_hauled_quantity', 40.0)
+        ->where('records.0.remaining_quantity', 60.0)
+    );
+});
+
+test('super admin can approve valid hauling request', function () {
+    $tenantService = app(\App\Services\TenantService::class);
+    $tenantService->switchToSchema($this->org->schema_name);
+
+    $record = WasteRecord::factory()->create([
+        'status' => 'approved',
+        'waste_type_id' => $this->wasteType->id,
+        'quantity' => 120,
+        'unit' => 'kg',
+        'created_by' => $this->operator->id,
+        'submitted_by' => $this->operator->id,
+        'submitted_at' => now()->subDay(),
+        'approved_by' => $this->supervisor->id,
+        'approved_at' => now()->subHours(12),
+    ]);
+
+    $hauling = WasteHauling::factory()->create([
+        'waste_record_id' => $record->id,
+        'quantity' => 60,
+        'unit' => 'kg',
+        'status' => 'pending_approval',
+        'submitted_by' => $this->operator->id,
+        'submitted_at' => now()->subHour(),
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+    ]);
+
+    $tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->superAdmin)
+        ->post(route('waste-management.haulings.approve', $hauling), [
+            'approval_notes' => 'Siap diangkut.',
+        ]);
+
+    $response->assertRedirect(route('waste-management.haulings.pending-approval'));
+    $response->assertSessionHas('success');
+
+    $tenantService->switchToSchema($this->org->schema_name);
+
+    expect($hauling->fresh())
+        ->status->toBe('approved')
+        ->approved_by->toBe($this->superAdmin->id)
+        ->approval_notes->toBe('Siap diangkut.');
+});
+
+test('super admin can approve hauling when remaining quantity matches at two decimals', function () {
+    $tenantService = app(\App\Services\TenantService::class);
+    $tenantService->switchToSchema($this->org->schema_name);
+
+    $record = WasteRecord::factory()->create([
+        'status' => 'approved',
+        'waste_type_id' => $this->wasteType->id,
+        'quantity' => 204,
+        'unit' => 'kg',
+        'created_by' => $this->operator->id,
+        'submitted_by' => $this->operator->id,
+        'submitted_at' => now()->subDay(),
+        'approved_by' => $this->supervisor->id,
+        'approved_at' => now()->subHours(12),
+    ]);
+
+    WasteHauling::factory()->create([
+        'waste_record_id' => $record->id,
+        'quantity' => 142.8,
+        'unit' => 'kg',
+        'status' => 'approved',
+        'submitted_by' => $this->operator->id,
+        'submitted_at' => now()->subHours(4),
+        'approved_by' => $this->supervisor->id,
+        'approved_at' => now()->subHours(3),
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+    ]);
+
+    $hauling = WasteHauling::factory()->create([
+        'waste_record_id' => $record->id,
+        'quantity' => 61.2,
+        'unit' => 'kg',
+        'status' => 'pending_approval',
+        'submitted_by' => $this->operator->id,
+        'submitted_at' => now()->subHour(),
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+    ]);
+
+    $tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->superAdmin)
+        ->post(route('waste-management.haulings.approve', $hauling), [
+            'approval_notes' => 'Sisa dua desimal valid.',
+        ]);
+
+    $response->assertRedirect(route('waste-management.haulings.pending-approval'));
+    $response->assertSessionHas('success');
+
+    $tenantService->switchToSchema($this->org->schema_name);
+
+    expect($hauling->fresh())
+        ->status->toBe('approved')
+        ->approved_by->toBe($this->superAdmin->id);
+});
+
+test('approve hauling returns error when quantity is no longer available', function () {
+    $tenantService = app(\App\Services\TenantService::class);
+    $tenantService->switchToSchema($this->org->schema_name);
+
+    $record = WasteRecord::factory()->create([
+        'status' => 'approved',
+        'waste_type_id' => $this->wasteType->id,
+        'quantity' => 100,
+        'unit' => 'kg',
+        'created_by' => $this->operator->id,
+        'submitted_by' => $this->operator->id,
+        'submitted_at' => now()->subDay(),
+        'approved_by' => $this->supervisor->id,
+        'approved_at' => now()->subHours(12),
+    ]);
+
+    WasteHauling::factory()->create([
+        'waste_record_id' => $record->id,
+        'quantity' => 70,
+        'unit' => 'kg',
+        'status' => 'approved',
+        'submitted_by' => $this->operator->id,
+        'submitted_at' => now()->subHours(4),
+        'approved_by' => $this->supervisor->id,
+        'approved_at' => now()->subHours(3),
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+    ]);
+
+    $hauling = WasteHauling::factory()->create([
+        'waste_record_id' => $record->id,
+        'quantity' => 40,
+        'unit' => 'kg',
+        'status' => 'pending_approval',
+        'submitted_by' => $this->operator->id,
+        'submitted_at' => now()->subHour(),
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+    ]);
+
+    $tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->superAdmin)
+        ->from(route('waste-management.haulings.show', $hauling))
+        ->post(route('waste-management.haulings.approve', $hauling), [
+            'approval_notes' => 'Coba approve.',
+        ]);
+
+    $response->assertRedirect(route('waste-management.haulings.show', $hauling));
+    $response->assertSessionHas('error', 'Jumlah pengangkutan tidak lagi valid karena sisa limbah telah berubah.');
+
+    $tenantService->switchToSchema($this->org->schema_name);
+
+    expect($hauling->fresh()?->status)->toBe('pending_approval');
+});
+
+test('hauling detail page receives flash messages from inertia shared props', function () {
+    $tenantService = app(\App\Services\TenantService::class);
+    $tenantService->switchToSchema($this->org->schema_name);
+
+    $record = WasteRecord::factory()->create([
+        'status' => 'approved',
+        'waste_type_id' => $this->wasteType->id,
+        'quantity' => 100,
+        'unit' => 'kg',
+        'created_by' => $this->operator->id,
+        'submitted_by' => $this->operator->id,
+        'submitted_at' => now()->subDay(),
+        'approved_by' => $this->supervisor->id,
+        'approved_at' => now()->subHours(12),
+    ]);
+
+    $hauling = WasteHauling::factory()->create([
+        'waste_record_id' => $record->id,
+        'quantity' => 40,
+        'unit' => 'kg',
+        'status' => 'pending_approval',
+        'submitted_by' => $this->operator->id,
+        'submitted_at' => now()->subHour(),
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+    ]);
+
+    $tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->superAdmin)
+        ->withSession([
+            'success' => 'Pengajuan pengangkutan berhasil disetujui.',
+            'error' => 'Jumlah pengangkutan tidak lagi valid karena sisa limbah telah berubah.',
+        ])
+        ->get(route('waste-management.haulings.show', $hauling));
+
+    $response->assertSuccessful();
+    $response->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('waste-management/haulings/Show')
+        ->where('flash.success', 'Pengajuan pengangkutan berhasil disetujui.')
+        ->where('flash.error', 'Jumlah pengangkutan tidak lagi valid karena sisa limbah telah berubah.')
     );
 });
 
@@ -772,7 +970,7 @@ test('record number is auto-generated correctly', function () {
 });
 
 test('waste management demo command seeds deterministic data for twelve previous months', function () {
-    \Carbon\CarbonImmutable::setTestNow('2026-03-19 10:00:00');
+    \Carbon\CarbonImmutable::setTestNow('2026-04-16 10:00:00');
 
     $tenantCode = 'TWMSWMDEMO';
     $schemaName = 'tenant_twms_wm_demo';
@@ -797,9 +995,9 @@ test('waste management demo command seeds deterministic data for twelve previous
         ->and(WasteType::query()->count())->toBe(4)
         ->and(Vendor::query()->count())->toBe(3)
         ->and(WasteRecord::query()->count())->toBe(144)
-        ->and(WasteTransportation::query()->count())->toBe(60);
+        ->and(WasteHauling::query()->count())->toBe(60);
 
-    $periods = collect(range(12, 1))
+    $periods = collect(range(11, 0))
         ->map(fn (int $monthsBack) => now()->startOfMonth()->subMonthsNoOverflow($monthsBack));
 
     foreach ($periods as $period) {
@@ -809,16 +1007,23 @@ test('waste management demo command seeds deterministic data for twelve previous
                 ->whereMonth('date', $period->month)
                 ->count()
         )->toBe(12);
+
+        expect(
+            WasteHauling::query()
+                ->whereYear('hauling_date', $period->year)
+                ->whereMonth('hauling_date', $period->month)
+                ->count()
+        )->toBe(5);
     }
 
     expect(WasteRecord::query()->where('status', 'draft')->count())->toBe(36)
         ->and(WasteRecord::query()->where('status', 'pending_review')->count())->toBe(36)
         ->and(WasteRecord::query()->where('status', 'approved')->count())->toBe(48)
         ->and(WasteRecord::query()->where('status', 'rejected')->count())->toBe(24)
-        ->and(WasteTransportation::query()->where('status', 'pending')->count())->toBe(12)
-        ->and(WasteTransportation::query()->where('status', 'in_transit')->count())->toBe(12)
-        ->and(WasteTransportation::query()->where('status', 'delivered')->count())->toBe(24)
-        ->and(WasteTransportation::query()->where('status', 'cancelled')->count())->toBe(12);
+        ->and(WasteHauling::query()->where('status', 'approved')->count())->toBe(57)
+        ->and(WasteHauling::query()->where('status', 'pending_approval')->count())->toBe(1)
+        ->and(WasteHauling::query()->where('status', 'rejected')->count())->toBe(1)
+        ->and(WasteHauling::query()->where('status', 'cancelled')->count())->toBe(1);
 
     $firstThreePeriods = $periods->take(3)->values();
     $categoryDistributionForPeriod = function (\Carbon\CarbonImmutable $period): array {
@@ -845,11 +1050,27 @@ test('waste management demo command seeds deterministic data for twelve previous
         ->and(collect($secondDistribution)->sortDesc()->keys()->first())->toBe('REC')
         ->and(collect($thirdDistribution)->sortDesc()->keys()->first())->toBe('GEN');
 
-    $hasOverflowTransportation = WasteTransportation::query()
+    $hasOverflowHauling = WasteRecord::query()
+        ->with('haulings')
         ->get()
-        ->contains(fn (WasteTransportation $transportation): bool => $transportation->quantityExceedsRecord());
+        ->contains(function (WasteRecord $record): bool {
+            $reservedQuantity = (float) $record->haulings
+                ->whereIn('status', ['pending_approval', 'approved'])
+                ->sum('quantity');
 
-    expect($hasOverflowTransportation)->toBeFalse();
+            return $reservedQuantity > (float) $record->quantity;
+        });
+
+    $criticalMonth = now()->startOfMonth();
+    $previousMonth = $criticalMonth->subMonth();
+
+    expect($hasOverflowHauling)->toBeFalse()
+        ->and(WasteRecord::query()->approved()->whereBetween('expiry_date', [
+            $criticalMonth->toDateString(),
+            now()->toDateString(),
+        ])->count())->toBe(2)
+        ->and(WasteRecord::query()->approved()->whereYear('expiry_date', $previousMonth->year)->whereMonth('expiry_date', $previousMonth->month)->count())->toBe(0)
+        ->and(WasteHauling::query()->whereYear('hauling_date', $criticalMonth->year)->whereMonth('hauling_date', $criticalMonth->month)->pendingApproval()->count())->toBe(1);
 
     \Carbon\CarbonImmutable::setTestNow();
 });
@@ -893,7 +1114,7 @@ test('waste management demo seed can populate an existing tenant without overwri
 });
 
 test('waste management demo seed can run while current search path is a tenant schema', function () {
-    \Carbon\CarbonImmutable::setTestNow('2026-03-19 10:00:00');
+    \Carbon\CarbonImmutable::setTestNow('2026-04-16 10:00:00');
 
     $existingOrganization = Organization::factory()->create([
         'code' => 'TWMSWMSEARCH',
@@ -921,7 +1142,7 @@ test('waste management demo seed can run while current search path is a tenant s
     $tenantService->switchToSchema($existingOrganization->schema_name);
 
     expect(WasteRecord::query()->count())->toBe(144)
-        ->and(WasteTransportation::query()->count())->toBe(60);
+        ->and(WasteHauling::query()->count())->toBe(60);
 
     $tenantService->switchToPublic();
     \Carbon\CarbonImmutable::setTestNow();

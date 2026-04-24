@@ -46,6 +46,7 @@ class FabaOfficialReportService
             'purposes' => $this->buildPurposeContext($filters),
             'stock-card' => $this->buildStockCardContext($filters),
             'anomalies' => $this->buildAnomalyContext($filters),
+            'analysis-matrix' => $this->buildAnalysisMatrixContext($filters),
             default => abort(404),
         };
     }
@@ -304,6 +305,39 @@ class FabaOfficialReportService
                 $item['period_label'],
                 $item['code'],
                 $item['message'],
+            ])->all(),
+            'warnings' => [],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    protected function buildAnalysisMatrixContext(array $filters): array
+    {
+        $year = isset($filters['year']) ? (int) $filters['year'] : $this->fabaRecapService->resolveRequestedOrLatestPeriod(null, null)['year'];
+        $matrix = $this->fabaRecapService->getAnalysisMatrix($year);
+
+        return [
+            'title' => 'Laporan Analysis Matrix FABA',
+            'sheet_title' => 'Analysis Matrix',
+            'file_name' => sprintf('faba-analysis-matrix-%d', $year),
+            'period_label' => (string) $year,
+            'filters' => [
+                'Tahun' => (string) $year,
+            ],
+            'summary_rows' => [
+                ['label' => 'Target Total', 'value' => $this->formatNumber($matrix['summary']['total_target_quantity'])],
+                ['label' => 'Realisasi Total', 'value' => $this->formatNumber($matrix['summary']['total_actual_quantity'])],
+                ['label' => 'Rata-rata Realisasi', 'value' => $this->formatNumber($matrix['summary']['average_achievement_percentage']).'%'],
+            ],
+            'table_columns' => ['Segmen', 'Target', 'Realisasi', '% Realisasi'],
+            'table_rows' => collect($matrix['segments'])->map(fn (array $segment): array => [
+                $segment['label'],
+                $this->formatNumber($segment['target_quantity']),
+                $this->formatNumber($segment['actual_quantity']),
+                $this->formatNumber($segment['achievement_percentage']).'%',
             ])->all(),
             'warnings' => [],
         ];

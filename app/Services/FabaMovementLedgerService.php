@@ -31,6 +31,8 @@ class FabaMovementLedgerService
                 'attachment_path' => null,
                 'period_year' => $balance->year,
                 'period_month' => $balance->month,
+                'approval_status' => FabaMovement::STATUS_APPROVED,
+                'approved_at' => now(),
                 'created_by' => $balance->set_by,
                 'updated_by' => $balance->set_by,
                 'note' => $balance->note,
@@ -54,6 +56,7 @@ class FabaMovementLedgerService
     public function calculateAvailableStock(string $materialType, CarbonInterface $transactionDate, ?string $excludeMovementId = null): float
     {
         $query = FabaMovement::query()
+            ->approved()
             ->where('material_type', $materialType)
             ->whereDate('transaction_date', '<=', $transactionDate->toDateString());
 
@@ -104,5 +107,30 @@ class FabaMovementLedgerService
         }
 
         return $query->get();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getPotentialDuplicateWarning(array $attributes, ?string $excludeMovementId = null): ?array
+    {
+        $duplicates = $this->findPotentialDuplicates($attributes, $excludeMovementId);
+
+        if ($duplicates->isEmpty()) {
+            return null;
+        }
+
+        return [
+            'count' => $duplicates->count(),
+            'message' => sprintf(
+                'Ditemukan %d transaksi lain dengan pola serupa. Mohon review untuk memastikan tidak terjadi input ganda.',
+                $duplicates->count(),
+            ),
+            'duplicate_ids' => $duplicates
+                ->pluck('id')
+                ->map(fn ($id): string => (string) $id)
+                ->values()
+                ->all(),
+        ];
     }
 }

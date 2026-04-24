@@ -27,7 +27,7 @@ class FabaAdjustmentsController extends Controller
     {
         $adjustments = FabaMovement::query()
             ->whereIn('movement_type', [FabaMovement::TYPE_ADJUSTMENT_IN, FabaMovement::TYPE_ADJUSTMENT_OUT])
-            ->with(['createdByUser:id,name', 'updatedByUser:id,name'])
+            ->with(['createdByUser:id,name', 'updatedByUser:id,name', 'submittedByUser:id,name', 'approvedByUser:id,name', 'rejectedByUser:id,name'])
             ->orderByDesc('transaction_date')
             ->orderByDesc('created_at')
             ->get()
@@ -74,6 +74,13 @@ class FabaAdjustmentsController extends Controller
             }
         }
 
+        $duplicateWarning = $this->fabaMovementLedgerService->getPotentialDuplicateWarning([
+            'transaction_date' => $validated['transaction_date'],
+            'material_type' => $validated['material_type'],
+            'movement_type' => $validated['movement_type'],
+            'quantity' => round((float) $validated['quantity'], 2),
+        ]);
+
         $movement = FabaMovement::query()->create([
             'transaction_date' => $validated['transaction_date'],
             'material_type' => $validated['material_type'],
@@ -85,6 +92,9 @@ class FabaAdjustmentsController extends Controller
             'unit' => FabaMovement::DEFAULT_UNIT,
             'period_year' => $year,
             'period_month' => $month,
+            'approval_status' => FabaMovement::STATUS_PENDING_APPROVAL,
+            'submitted_by' => Auth::id(),
+            'submitted_at' => now(),
             'note' => $validated['note'],
             'created_by' => Auth::id(),
             'updated_by' => Auth::id(),
@@ -103,7 +113,8 @@ class FabaAdjustmentsController extends Controller
         );
 
         return Redirect::route('waste-management.faba.adjustments.show', $movement->id)
-            ->with('success', 'Adjustment FABA berhasil dibuat.');
+            ->with('success', 'Adjustment FABA berhasil dibuat.')
+            ->with('warning', $duplicateWarning['message'] ?? null);
     }
 
     public function show(string $adjustment): Response
@@ -153,6 +164,13 @@ class FabaAdjustmentsController extends Controller
             }
         }
 
+        $duplicateWarning = $this->fabaMovementLedgerService->getPotentialDuplicateWarning([
+            'transaction_date' => $validated['transaction_date'],
+            'material_type' => $validated['material_type'],
+            'movement_type' => $validated['movement_type'],
+            'quantity' => round((float) $validated['quantity'], 2),
+        ], $movement->id);
+
         $movement->update([
             'transaction_date' => $validated['transaction_date'],
             'material_type' => $validated['material_type'],
@@ -164,6 +182,14 @@ class FabaAdjustmentsController extends Controller
             'unit' => FabaMovement::DEFAULT_UNIT,
             'period_year' => $year,
             'period_month' => $month,
+            'approval_status' => FabaMovement::STATUS_PENDING_APPROVAL,
+            'submitted_by' => Auth::id(),
+            'submitted_at' => now(),
+            'approved_by' => null,
+            'approved_at' => null,
+            'rejected_by' => null,
+            'rejected_at' => null,
+            'rejection_note' => null,
             'note' => $validated['note'],
             'updated_by' => Auth::id(),
         ]);
@@ -181,7 +207,8 @@ class FabaAdjustmentsController extends Controller
         );
 
         return Redirect::route('waste-management.faba.adjustments.show', $movement->id)
-            ->with('success', 'Adjustment FABA berhasil diperbarui.');
+            ->with('success', 'Adjustment FABA berhasil diperbarui.')
+            ->with('warning', $duplicateWarning['message'] ?? null);
     }
 
     public function destroy(string $adjustment): RedirectResponse
@@ -221,12 +248,20 @@ class FabaAdjustmentsController extends Controller
     {
         return FabaMovement::query()
             ->whereIn('movement_type', [FabaMovement::TYPE_ADJUSTMENT_IN, FabaMovement::TYPE_ADJUSTMENT_OUT])
-            ->with(['createdByUser:id,name', 'updatedByUser:id,name'])
+            ->with(['createdByUser:id,name', 'updatedByUser:id,name', 'submittedByUser:id,name', 'approvedByUser:id,name', 'rejectedByUser:id,name'])
             ->findOrFail($id);
     }
 
     protected function transformMovement(FabaMovement $movement): array
     {
+        $state = $this->fabaRecapService->getMovementState($movement);
+        $duplicateWarning = $this->fabaMovementLedgerService->getPotentialDuplicateWarning([
+            'transaction_date' => $movement->transaction_date->format('Y-m-d'),
+            'material_type' => $movement->material_type,
+            'movement_type' => $movement->movement_type,
+            'quantity' => round((float) $movement->quantity, 2),
+        ], $movement->id);
+
         return [
             'id' => $movement->id,
             'display_number' => sprintf('FAD-%s-%s', $movement->transaction_date->format('Ym'), strtoupper(substr(str_replace('-', '', $movement->id), -4))),
@@ -237,7 +272,21 @@ class FabaAdjustmentsController extends Controller
             'unit' => $movement->unit,
             'note' => $movement->note,
             'period_label' => $this->fabaRecapService->formatPeriodLabel($movement->period_year, $movement->period_month),
-            'approval_status' => $this->fabaRecapService->getPeriodStatus($movement->period_year, $movement->period_month),
+            'approval_status' => $movement->approval_status,
+            'period_status' => $state['period_status'],
+            'period_operational_status' => $state['period_operational_status'],
+            'locked' => $state['locked'],
+            'effective_status' => $state['effective_status'],
+            'submitted_by_user' => $movement->submittedByUser,
+            'approved_by_user' => $movement->approvedByUser,
+            'rejected_by_user' => $movement->rejectedByUser,
+            'submitted_at' => $movement->submitted_at?->format('Y-m-d H:i:s'),
+            'approved_at' => $movement->approved_at?->format('Y-m-d H:i:s'),
+            'rejected_at' => $movement->rejected_at?->format('Y-m-d H:i:s'),
+            'rejection_note' => $movement->rejection_note,
+            'duplicate_warning' => $duplicateWarning,
+            'can_approve' => Auth::user()?->hasPermission('faba_approvals.approve') && $movement->canApprove() && ! $this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month),
+            'can_reject' => Auth::user()?->hasPermission('faba_approvals.reject') && $movement->canReject() && ! $this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month),
             'can_edit' => $this->canModifyMovement($movement, 'faba_adjustments.edit'),
             'created_by_user' => $movement->createdByUser,
             'updated_by_user' => $movement->updatedByUser,
@@ -259,9 +308,11 @@ class FabaAdjustmentsController extends Controller
             return false;
         }
 
-        $status = $this->fabaRecapService->getPeriodStatus($movement->period_year, $movement->period_month);
+        if ($this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month)) {
+            return false;
+        }
 
-        if (! in_array($status, ['draft', 'rejected'], true)) {
+        if (! in_array($movement->approval_status, [FabaMovement::STATUS_PENDING_APPROVAL, FabaMovement::STATUS_REJECTED], true)) {
             return false;
         }
 

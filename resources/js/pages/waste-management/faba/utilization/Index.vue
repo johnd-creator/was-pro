@@ -44,12 +44,7 @@ const movementType = ref(props.initialMovementType ?? 'all');
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
-        title:
-            movementType.value === 'utilization_internal'
-                ? 'Pemanfaatan Internal'
-                : movementType.value === 'utilization_external'
-                  ? 'Pemanfaatan Eksternal'
-                  : 'Pemanfaatan FABA',
+        title: 'Pemanfaatan FABA',
         href: wasteManagementRoutes.faba.utilization.index.url(),
     },
 ];
@@ -90,23 +85,9 @@ const externalCount = computed(
 <template>
     <WasteManagementLayout
         :breadcrumbs="breadcrumbItems"
-        :title="
-            movementType === 'utilization_internal'
-                ? 'Pemanfaatan Internal'
-                : movementType === 'utilization_external'
-                  ? 'Pemanfaatan Eksternal'
-                  : 'Pemanfaatan FABA'
-        "
+        title="Pemanfaatan FABA"
     >
-        <Head
-            :title="
-                movementType === 'utilization_internal'
-                    ? 'Pemanfaatan Internal'
-                    : movementType === 'utilization_external'
-                      ? 'Pemanfaatan Eksternal'
-                      : 'Pemanfaatan FABA'
-            "
-        />
+        <Head title="Pemanfaatan FABA" />
         <div
             class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
         >
@@ -132,25 +113,11 @@ const externalCount = computed(
                                 <p
                                     class="text-[11px] font-semibold tracking-[0.16em] text-emerald-700/70 uppercase"
                                 >
-                                    Utilization Ledger
+                                    Smart Utilization
                                 </p>
                                 <Heading
-                                    :title="
-                                        movementType === 'utilization_internal'
-                                            ? 'Pemanfaatan Internal'
-                                            : movementType ===
-                                                'utilization_external'
-                                              ? 'Pemanfaatan Eksternal'
-                                              : 'Pemanfaatan FABA'
-                                    "
-                                    :description="
-                                        movementType === 'utilization_internal'
-                                            ? 'Kelola movement pemanfaatan untuk tujuan internal.'
-                                            : movementType ===
-                                                'utilization_external'
-                                              ? 'Kelola movement pemanfaatan untuk vendor eksternal.'
-                                              : 'Kelola movement pemanfaatan internal dan eksternal.'
-                                    "
+                                    title="Pemanfaatan FABA"
+                                    description="Kelola pemanfaatan internal dan eksternal dari satu ledger operasional dengan filter mode sesuai kebutuhan review."
                                 />
                             </div>
 
@@ -238,12 +205,9 @@ const externalCount = computed(
                                 "
                             >
                                 {{
-                                    movementType === 'utilization_internal'
-                                        ? 'Tambah internal'
-                                        : movementType ===
-                                            'utilization_external'
-                                          ? 'Tambah eksternal'
-                                          : 'Tambah pemanfaatan'
+                                    movementType === 'all'
+                                        ? 'Tambah pemanfaatan'
+                                        : `Tambah ${formatFabaMovementType(movementType).toLowerCase()}`
                                 }}
                                 <Plus class="h-4 w-4" />
                             </Button>
@@ -341,7 +305,7 @@ const externalCount = computed(
                                     <TableHead>Tipe</TableHead>
                                     <TableHead>Vendor</TableHead>
                                     <TableHead>Qty</TableHead>
-                                    <TableHead>Status Bulan</TableHead>
+                                    <TableHead>Status Approval</TableHead>
                                     <TableHead>Aksi</TableHead>
                                 </TableRow>
                             </TableHeader>

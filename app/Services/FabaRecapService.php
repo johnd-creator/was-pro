@@ -7,6 +7,7 @@ use App\Models\FabaMonthlyApproval;
 use App\Models\FabaMonthlyClosingSnapshot;
 use App\Models\FabaMovement;
 use App\Models\FabaOpeningBalance;
+use App\Models\FabaTpsCapacity;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -20,6 +21,7 @@ class FabaRecapService
     public function getLatestAvailablePeriod(): ?array
     {
         $movementPeriod = FabaMovement::query()
+            ->approved()
             ->select(['period_year as year', 'period_month as month'])
             ->orderByDesc('period_year')
             ->orderByDesc('period_month')
@@ -73,6 +75,7 @@ class FabaRecapService
     public function getAvailablePeriodOptions(): array
     {
         return FabaMovement::query()
+            ->approved()
             ->select(['period_year as year', 'period_month as month'])
             ->groupBy('period_year', 'period_month')
             ->get()
@@ -94,7 +97,7 @@ class FabaRecapService
 
     public function getMonthlyRecap(int $year, int $month): array
     {
-        $movements = FabaMovement::query()->forPeriod($year, $month);
+        $movements = FabaMovement::query()->approved()->forPeriod($year, $month);
 
         $productionFlyAsh = $this->sumMovementTypes((clone $movements), FabaMovement::MATERIAL_FLY_ASH, [
             FabaMovement::TYPE_PRODUCTION,
@@ -148,10 +151,12 @@ class FabaRecapService
             'warning_utilization_without_production' => $totalProduction <= 0 && $totalUtilization > 0,
             'warning_missing_opening_balance' => ! $this->hasOpeningBalanceSource($year, $month),
             'production_movements_count' => FabaMovement::query()
+                ->approved()
                 ->forPeriod($year, $month)
                 ->whereIn('movement_type', [FabaMovement::TYPE_PRODUCTION, FabaMovement::TYPE_WORKSHOP, FabaMovement::TYPE_REJECT, FabaMovement::TYPE_DISPOSAL_POK])
                 ->count(),
             'utilization_movements_count' => FabaMovement::query()
+                ->approved()
                 ->forPeriod($year, $month)
                 ->whereIn('movement_type', [FabaMovement::TYPE_UTILIZATION_EXTERNAL, FabaMovement::TYPE_UTILIZATION_INTERNAL])
                 ->count(),
@@ -193,6 +198,7 @@ class FabaRecapService
             ->values();
 
         $movements = FabaMovement::query()
+            ->approved()
             ->forPeriod($year, $month)
             ->with(['vendor:id,name', 'internalDestination:id,name', 'purpose:id,name'])
             ->orderBy('transaction_date')
@@ -272,6 +278,8 @@ class FabaRecapService
                 'production' => $month['total_production'],
                 'utilization' => $month['total_utilization'],
                 'closing_balance' => $month['closing_balance'],
+                'warning_count' => count($month['warnings']),
+                'has_warning' => count($month['warnings']) > 0,
             ])->values(),
         ];
     }
@@ -279,6 +287,7 @@ class FabaRecapService
     public function getVendorRecap(int $year, ?string $vendorId = null): array
     {
         $baseQuery = FabaMovement::query()
+            ->approved()
             ->with('vendor:id,name')
             ->where('movement_type', FabaMovement::TYPE_UTILIZATION_EXTERNAL)
             ->where('period_year', $year);
@@ -328,6 +337,7 @@ class FabaRecapService
     public function getInternalDestinationRecap(int $year, ?string $internalDestinationId = null): array
     {
         $baseQuery = FabaMovement::query()
+            ->approved()
             ->with('internalDestination:id,name')
             ->where('movement_type', FabaMovement::TYPE_UTILIZATION_INTERNAL)
             ->where('period_year', $year);
@@ -370,6 +380,7 @@ class FabaRecapService
     public function getPurposeRecap(int $year, ?string $purposeId = null): array
     {
         $baseQuery = FabaMovement::query()
+            ->approved()
             ->with('purpose:id,name')
             ->whereNotNull('purpose_id')
             ->where('period_year', $year);
@@ -413,6 +424,7 @@ class FabaRecapService
     public function getStockCard(int $year, ?int $month = null, ?string $materialType = null): array
     {
         $baseQuery = FabaMovement::query()
+            ->approved()
             ->with(['vendor:id,name', 'internalDestination:id,name', 'purpose:id,name'])
             ->where('period_year', $year)
             ->when($month, fn ($query) => $query->where('period_month', $month))
@@ -494,9 +506,212 @@ class FabaRecapService
         return $recap['closing_balance'];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function getTpsCapacitySummary(?int $year = null, ?int $month = null): array
+    {
+        if ($year !== null && $month === null) {
+            $latestYearPeriod = $this->getAvailablePeriods($year)->last();
+
+            $resolvedPeriod = [
+                'year' => $latestYearPeriod['year'] ?? $year,
+                'month' => $latestYearPeriod['month'] ?? (int) now()->month,
+                'resolved_from_latest' => $latestYearPeriod !== null,
+            ];
+        } else {
+            $resolvedPeriod = $this->resolveRequestedOrLatestPeriod($year, $month);
+        }
+
+        $recap = $this->getMonthlyRecap($resolvedPeriod['year'], $resolvedPeriod['month']);
+        $capacitySettings = $this->getTpsCapacitySettings();
+        $warningThreshold = (float) ($capacitySettings['thresholds']['warning'] ?? 80.0);
+        $criticalThreshold = (float) ($capacitySettings['thresholds']['critical'] ?? 95.0);
+
+        $materials = [
+            [
+                'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+                'balance' => $recap['closing_fly_ash'],
+                'capacity' => (float) ($capacitySettings['materials'][FabaMovement::MATERIAL_FLY_ASH]['capacity'] ?? 0.0),
+                'warning_threshold' => (float) ($capacitySettings['materials'][FabaMovement::MATERIAL_FLY_ASH]['warning_threshold'] ?? $warningThreshold),
+                'critical_threshold' => (float) ($capacitySettings['materials'][FabaMovement::MATERIAL_FLY_ASH]['critical_threshold'] ?? $criticalThreshold),
+            ],
+            [
+                'material_type' => FabaMovement::MATERIAL_BOTTOM_ASH,
+                'balance' => $recap['closing_bottom_ash'],
+                'capacity' => (float) ($capacitySettings['materials'][FabaMovement::MATERIAL_BOTTOM_ASH]['capacity'] ?? 0.0),
+                'warning_threshold' => (float) ($capacitySettings['materials'][FabaMovement::MATERIAL_BOTTOM_ASH]['warning_threshold'] ?? $warningThreshold),
+                'critical_threshold' => (float) ($capacitySettings['materials'][FabaMovement::MATERIAL_BOTTOM_ASH]['critical_threshold'] ?? $criticalThreshold),
+            ],
+        ];
+
+        $materials = collect($materials)
+            ->map(function (array $item): array {
+                $utilization = $item['capacity'] > 0
+                    ? round(($item['balance'] / $item['capacity']) * 100, 2)
+                    : 0.0;
+
+                return [
+                    ...$item,
+                    'utilization_percentage' => $utilization,
+                    'status' => $this->resolveCapacityStatus($utilization, $item['warning_threshold'], $item['critical_threshold']),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $totalCapacity = round((float) collect($materials)->sum('capacity'), 2);
+        $totalBalance = round((float) collect($materials)->sum('balance'), 2);
+        $totalUtilization = $totalCapacity > 0
+            ? round(($totalBalance / $totalCapacity) * 100, 2)
+            : 0.0;
+
+        return [
+            'period' => [
+                'year' => $resolvedPeriod['year'],
+                'month' => $resolvedPeriod['month'],
+                'period_label' => $this->formatPeriodLabel($resolvedPeriod['year'], $resolvedPeriod['month']),
+            ],
+            'materials' => $materials,
+            'total' => [
+                'balance' => $totalBalance,
+                'capacity' => $totalCapacity,
+                'utilization_percentage' => $totalUtilization,
+                'status' => $this->resolveCapacityStatus($totalUtilization, $warningThreshold, $criticalThreshold),
+            ],
+            'thresholds' => [
+                'warning' => $warningThreshold,
+                'critical' => $criticalThreshold,
+            ],
+            'settings' => $capacitySettings['materials'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getTpsCapacitySettings(): array
+    {
+        $config = config('faba.tps_capacity', []);
+        $materials = collect($config['materials'] ?? [])
+            ->mapWithKeys(fn ($capacity, string $materialType): array => [
+                $materialType => [
+                    'capacity' => round((float) $capacity, 2),
+                    'warning_threshold' => (float) ($config['thresholds']['warning'] ?? FabaTpsCapacity::DEFAULT_WARNING_THRESHOLD),
+                    'critical_threshold' => (float) ($config['thresholds']['critical'] ?? FabaTpsCapacity::DEFAULT_CRITICAL_THRESHOLD),
+                ],
+            ])
+            ->all();
+
+        if ($this->hasFabaTable('faba_tps_capacities')) {
+            FabaTpsCapacity::query()
+                ->get()
+                ->each(function (FabaTpsCapacity $capacity) use (&$materials): void {
+                    $materials[$capacity->material_type] = [
+                        'capacity' => round((float) $capacity->capacity, 2),
+                        'warning_threshold' => round((float) $capacity->warning_threshold, 2),
+                        'critical_threshold' => round((float) $capacity->critical_threshold, 2),
+                    ];
+                });
+        }
+
+        $warningThreshold = round((float) collect($materials)->min('warning_threshold') ?: ($config['thresholds']['warning'] ?? FabaTpsCapacity::DEFAULT_WARNING_THRESHOLD), 2);
+        $criticalThreshold = round((float) collect($materials)->max('critical_threshold') ?: ($config['thresholds']['critical'] ?? FabaTpsCapacity::DEFAULT_CRITICAL_THRESHOLD), 2);
+
+        return [
+            'materials' => $materials,
+            'thresholds' => [
+                'warning' => $warningThreshold,
+                'critical' => $criticalThreshold,
+            ],
+        ];
+    }
+
+    public function setTpsCapacity(string $materialType, float $capacity, float $warningThreshold, float $criticalThreshold, ?string $updatedBy): FabaTpsCapacity
+    {
+        if (! $this->hasFabaTable('faba_tps_capacities')) {
+            throw new \RuntimeException('Tabel kapasitas TPS FABA belum tersedia.');
+        }
+
+        return FabaTpsCapacity::query()->updateOrCreate(
+            ['material_type' => $materialType],
+            [
+                'capacity' => round($capacity, 2),
+                'warning_threshold' => round($warningThreshold, 2),
+                'critical_threshold' => round($criticalThreshold, 2),
+                'updated_by' => $updatedBy,
+                'updated_at' => now(),
+            ],
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getAnalysisMatrix(int $year): array
+    {
+        $segments = collect(config('faba.analysis_matrix.segments', []))
+            ->map(function (array $segment) use ($year): array {
+                $monthlyActuals = collect(range(1, 12))
+                    ->map(function (int $month) use ($year, $segment): array {
+                        $quantity = $this->calculateAnalysisMatrixActual($year, $month, $segment);
+
+                        return [
+                            'month' => $month,
+                            'label' => $this->formatMonthLabel($month),
+                            'actual_quantity' => $quantity,
+                        ];
+                    })
+                    ->values();
+
+                $actualQuantity = round((float) $monthlyActuals->sum('actual_quantity'), 2);
+                $targetQuantity = round((float) ($segment['target_quantity'] ?? 0), 2);
+                $achievement = $targetQuantity > 0
+                    ? round(($actualQuantity / $targetQuantity) * 100, 2)
+                    : 0.0;
+
+                return [
+                    'key' => (string) ($segment['key'] ?? Str::slug((string) ($segment['label'] ?? 'segment'))),
+                    'label' => (string) ($segment['label'] ?? 'Segment'),
+                    'target_quantity' => $targetQuantity,
+                    'actual_quantity' => $actualQuantity,
+                    'achievement_percentage' => $achievement,
+                    'monthly_actuals' => $monthlyActuals->all(),
+                ];
+            })
+            ->values();
+
+        return [
+            'year' => $year,
+            'segments' => $segments->all(),
+            'summary' => [
+                'total_target_quantity' => round((float) $segments->sum('target_quantity'), 2),
+                'total_actual_quantity' => round((float) $segments->sum('actual_quantity'), 2),
+                'average_achievement_percentage' => round((float) $segments->avg('achievement_percentage'), 2),
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getMovementState(FabaMovement $movement): array
+    {
+        $periodStatus = $this->getPeriodStatus($movement->period_year, $movement->period_month);
+        $locked = $this->isPeriodLocked($movement->period_year, $movement->period_month);
+
+        return [
+            'locked' => $locked,
+            'effective_status' => $locked ? 'locked' : $movement->approval_status,
+            'period_status' => $periodStatus,
+            'period_operational_status' => $this->getPeriodMeta($movement->period_year, $movement->period_month)['operational_status'],
+        ];
+    }
+
     public function hasTransactionsForPeriod(int $year, int $month): bool
     {
         return FabaMovement::query()
+            ->approved()
             ->forPeriod($year, $month)
             ->where('movement_type', '!=', FabaMovement::TYPE_OPENING_BALANCE)
             ->exists();
@@ -536,6 +751,7 @@ class FabaRecapService
     public function getAvailablePeriods(int $year): Collection
     {
         return FabaMovement::query()
+            ->approved()
             ->select(['period_year as year', 'period_month as month'])
             ->where('period_year', $year)
             ->groupBy('period_year', 'period_month')
@@ -546,18 +762,19 @@ class FabaRecapService
                 [, $month] = explode('-', $period);
                 $month = (int) $month;
                 $recap = $this->getMonthlyRecap($year, $month);
-                $approval = $recap['approval'];
+                $periodMeta = $this->getPeriodMeta($year, $month);
 
                 return [
                     'year' => $year,
                     'month' => $month,
                     'period_label' => $this->formatPeriodLabel($year, $month),
-                    'status' => $approval?->status ?? FabaMonthlyApproval::STATUS_DRAFT,
-                    'can_submit' => $approval?->canSubmit() ?? true,
-                    'can_approve' => $approval?->canApprove() ?? false,
-                    'can_reject' => $approval?->canReject() ?? false,
-                    'can_review' => true,
-                    'can_reopen' => $approval?->canReopen() ?? false,
+                    'status' => $periodMeta['status'],
+                    'operational_status' => $periodMeta['operational_status'],
+                    'can_submit' => $periodMeta['can_submit'],
+                    'can_approve' => $periodMeta['can_approve'],
+                    'can_reject' => $periodMeta['can_reject'],
+                    'can_review' => $periodMeta['can_review'],
+                    'can_reopen' => $periodMeta['can_reopen'],
                     'recap' => $recap,
                 ];
             })
@@ -569,6 +786,10 @@ class FabaRecapService
     {
         $approval = $this->getMonthlyApproval($year, $month) ?? FabaMonthlyApproval::draftForPeriod($year, $month);
         $hasTransactions = $this->hasTransactionsForPeriod($year, $month);
+        $hasPendingTransactions = FabaMovement::query()
+            ->forPeriod($year, $month)
+            ->pendingApproval()
+            ->exists();
         $warnings = $this->getMonthlyRecap($year, $month)['warnings'];
         $operationalStatus = 'draft';
 
@@ -576,6 +797,8 @@ class FabaRecapService
             $operationalStatus = 'approved';
         } elseif ($approval->status === FabaMonthlyApproval::STATUS_SUBMITTED) {
             $operationalStatus = 'submitted';
+        } elseif ($hasPendingTransactions) {
+            $operationalStatus = 'open';
         } elseif ($hasTransactions && count($warnings) === 0) {
             $operationalStatus = 'ready_to_submit';
         } elseif ($hasTransactions) {
@@ -596,7 +819,7 @@ class FabaRecapService
             'submitted_by_user' => $approval->submittedByUser,
             'approved_by_user' => $approval->approvedByUser,
             'rejected_by_user' => $approval->rejectedByUser,
-            'can_submit' => $approval->canSubmit(),
+            'can_submit' => ! $hasPendingTransactions && $approval->canSubmit(),
             'can_approve' => $approval->canApprove(),
             'can_reject' => $approval->canReject(),
             'can_review' => true,
@@ -712,6 +935,19 @@ class FabaRecapService
         return $labels[$month] ?? (string) $month;
     }
 
+    protected function resolveCapacityStatus(float $utilization, float $warningThreshold, float $criticalThreshold): string
+    {
+        if ($utilization >= $criticalThreshold) {
+            return 'critical';
+        }
+
+        if ($utilization >= $warningThreshold) {
+            return 'warning';
+        }
+
+        return 'normal';
+    }
+
     protected function hasFabaTable(string $table): bool
     {
         try {
@@ -724,6 +960,7 @@ class FabaRecapService
     protected function getOpeningBalanceForMaterial(int $year, int $month, string $materialType): float
     {
         $explicit = FabaMovement::query()
+            ->approved()
             ->forPeriod($year, $month)
             ->where('material_type', $materialType)
             ->where('movement_type', FabaMovement::TYPE_OPENING_BALANCE)
@@ -746,11 +983,11 @@ class FabaRecapService
                 $materialType,
             )
             + $this->sumInflows(
-                FabaMovement::query()->forPeriod((int) $previousPeriod->format('Y'), (int) $previousPeriod->format('n')),
+                FabaMovement::query()->approved()->forPeriod((int) $previousPeriod->format('Y'), (int) $previousPeriod->format('n')),
                 $materialType
             )
             - $this->sumOutflows(
-                FabaMovement::query()->forPeriod((int) $previousPeriod->format('Y'), (int) $previousPeriod->format('n')),
+                FabaMovement::query()->approved()->forPeriod((int) $previousPeriod->format('Y'), (int) $previousPeriod->format('n')),
                 $materialType
             ),
             2
@@ -762,6 +999,7 @@ class FabaRecapService
         $periodStart = CarbonImmutable::create($year, $month, 1)->startOfDay()->toDateString();
 
         return FabaMovement::query()
+            ->approved()
             ->where('material_type', $materialType)
             ->where('transaction_date', '<', $periodStart)
             ->exists();
@@ -769,7 +1007,7 @@ class FabaRecapService
 
     protected function hasOpeningBalanceSource(int $year, int $month): bool
     {
-        if (FabaMovement::query()->forPeriod($year, $month)->where('movement_type', FabaMovement::TYPE_OPENING_BALANCE)->exists()) {
+        if (FabaMovement::query()->approved()->forPeriod($year, $month)->where('movement_type', FabaMovement::TYPE_OPENING_BALANCE)->exists()) {
             return true;
         }
 
@@ -810,6 +1048,7 @@ class FabaRecapService
         }
 
         $invalidExternalDocuments = FabaMovement::query()
+            ->approved()
             ->forPeriod($year, $month)
             ->where('movement_type', FabaMovement::TYPE_UTILIZATION_EXTERNAL)
             ->where(function ($query) {
@@ -834,6 +1073,7 @@ class FabaRecapService
         }
 
         $duplicateMovementsCount = FabaMovement::query()
+            ->approved()
             ->forPeriod($year, $month)
             ->whereIn('movement_type', [
                 FabaMovement::TYPE_UTILIZATION_EXTERNAL,
@@ -856,6 +1096,37 @@ class FabaRecapService
         }
 
         return $warnings;
+    }
+
+    protected function calculateAnalysisMatrixActual(int $year, int $month, array $segment): float
+    {
+        $query = FabaMovement::query()
+            ->approved()
+            ->forPeriod($year, $month)
+            ->where('stock_effect', FabaMovement::STOCK_EFFECT_OUT)
+            ->with(['purpose:id,slug', 'internalDestination:id,slug']);
+
+        if (! empty($segment['movement_types'])) {
+            $query->whereIn('movement_type', $segment['movement_types']);
+        }
+
+        return round((float) $query
+            ->get()
+            ->filter(function (FabaMovement $movement) use ($segment): bool {
+                $purposeSlugs = collect($segment['purpose_slugs'] ?? []);
+                $destinationSlugs = collect($segment['internal_destination_slugs'] ?? []);
+
+                if ($purposeSlugs->isNotEmpty() && $purposeSlugs->contains($movement->purpose?->slug)) {
+                    return true;
+                }
+
+                if ($destinationSlugs->isNotEmpty() && $destinationSlugs->contains($movement->internalDestination?->slug)) {
+                    return true;
+                }
+
+                return $purposeSlugs->isEmpty() && $destinationSlugs->isEmpty();
+            })
+            ->sum('quantity'), 2);
     }
 
     protected function sumMovementTypes($query, string $materialType, array $movementTypes): float
@@ -901,6 +1172,7 @@ class FabaRecapService
     protected function getVendorBreakdown(int $year, int $month): array
     {
         return FabaMovement::query()
+            ->approved()
             ->forPeriod($year, $month)
             ->where('movement_type', FabaMovement::TYPE_UTILIZATION_EXTERNAL)
             ->with('vendor:id,name')
@@ -918,6 +1190,7 @@ class FabaRecapService
     protected function getInternalDestinationBreakdown(int $year, int $month): array
     {
         return FabaMovement::query()
+            ->approved()
             ->forPeriod($year, $month)
             ->where('movement_type', FabaMovement::TYPE_UTILIZATION_INTERNAL)
             ->with('internalDestination:id,name')
@@ -935,6 +1208,7 @@ class FabaRecapService
     protected function getPurposeBreakdown(int $year, int $month): array
     {
         return FabaMovement::query()
+            ->approved()
             ->forPeriod($year, $month)
             ->with('purpose:id,name')
             ->whereNotNull('purpose_id')

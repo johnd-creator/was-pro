@@ -6,11 +6,10 @@ use App\Models\Organization;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
-use App\Models\Vendor;
 use App\Models\WasteCategory;
 use App\Models\WasteCharacteristic;
+use App\Models\WasteHauling;
 use App\Models\WasteRecord;
-use App\Models\WasteTransportation;
 use App\Models\WasteType;
 use App\Services\TenantService;
 use Carbon\CarbonImmutable;
@@ -71,10 +70,10 @@ test('authenticated users can visit the dashboard', function () {
             ->has('pendingApprovals')
             ->has('tasks')
             ->has('taskContext')
-            ->has('wasteByCategory')
-            ->has('fabaProductionMaterialDistribution')
-            ->has('transportationByStatus')
+            ->has('wasteHaulingStatusDistribution')
+            ->has('wasteBacklogUrgencyDistribution')
             ->has('fabaStats')
+            ->has('fabaHeroStats')
             ->has('fabaChart', 6)
             ->has('wasteChart', 6)
             ->has('notificationSummary')
@@ -86,6 +85,49 @@ test('authenticated users can visit the dashboard', function () {
             ->has('stats.waste_transported_records_snapshot')
             ->has('stats.waste_untransported_records_snapshot')
         );
+});
+
+test('dashboard demo seed shows april as critical and previous month as safe', function () {
+    CarbonImmutable::setTestNow('2026-04-16 10:00:00');
+
+    $tenantCode = 'DASHDEMO';
+    $schemaName = 'tenant_dashboard_demo';
+
+    $this->artisan('waste-management:seed-demo', [
+        '--tenant' => $tenantCode,
+        '--schema' => $schemaName,
+        '--fresh-tenant' => true,
+    ])->assertSuccessful();
+
+    $organization = Organization::query()->where('code', $tenantCode)->firstOrFail();
+    $supervisor = User::query()->where('email', 'wm.supervisor.demo@local.test')
+        ->where('organization_id', $organization->id)
+        ->firstOrFail();
+
+    $criticalResponse = $this->actingAs($supervisor)
+        ->get(route('dashboard', ['month' => '2026-04']));
+
+    $criticalResponse
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Dashboard')
+            ->where('header.risk_status', 'critical')
+            ->where('stats.expired_waste', 2)
+            ->where('haulingAttentionCount', 4)
+        );
+
+    $safeResponse = $this->actingAs($supervisor)
+        ->get(route('dashboard', ['month' => '2026-03']));
+
+    $safeResponse
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Dashboard')
+            ->where('header.risk_status', 'normal')
+            ->where('stats.expired_waste', 0)
+        );
+
+    CarbonImmutable::setTestNow();
 });
 
 test('dashboard shows approval tasks for supervisor users', function () {
@@ -277,10 +319,89 @@ test('dashboard reads movement-based faba data from migrated tenant schema', fun
             ->component('Dashboard')
             ->has('fabaChart', 6)
             ->has('fabaStats')
+            ->has('fabaHeroStats')
         );
 });
 
-test('dashboard waste category percentages are based on approved quantity in the selected month and sum to 100 percent', function () {
+test('dashboard exposes faba hero stats using yearly semantics', function () {
+    $organization = Organization::factory()->create([
+        'code' => 'DASHFABAHERO',
+        'schema_name' => 'tenant_dashboard_faba_hero',
+    ]);
+
+    migrateTenantSchema($organization);
+
+    $tenantService = app(TenantService::class);
+    $tenantService->switchToSchema($organization->schema_name);
+
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-01-10',
+        'period_year' => 2026,
+        'period_month' => 1,
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'approval_status' => FabaMovement::STATUS_APPROVED,
+        'quantity' => 10,
+    ]);
+
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-02-08',
+        'period_year' => 2026,
+        'period_month' => 2,
+        'material_type' => FabaMovement::MATERIAL_BOTTOM_ASH,
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'approval_status' => FabaMovement::STATUS_APPROVED,
+        'quantity' => 15,
+    ]);
+
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-02-14',
+        'period_year' => 2026,
+        'period_month' => 2,
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_UTILIZATION_EXTERNAL,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_OUT,
+        'approval_status' => FabaMovement::STATUS_APPROVED,
+        'quantity' => 4,
+    ]);
+
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-03-11',
+        'period_year' => 2026,
+        'period_month' => 3,
+        'material_type' => FabaMovement::MATERIAL_BOTTOM_ASH,
+        'movement_type' => FabaMovement::TYPE_UTILIZATION_INTERNAL,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_OUT,
+        'approval_status' => FabaMovement::STATUS_APPROVED,
+        'quantity' => 6,
+    ]);
+
+    $tenantService->switchToPublic();
+
+    $user = User::factory()->create([
+        'organization_id' => $organization->id,
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard', [
+        'month' => '2026-03',
+    ]));
+
+    $response
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Dashboard')
+            ->where('fabaStats.total_production', 0)
+            ->where('fabaHeroStats.year', 2026)
+            ->where('fabaHeroStats.total_production', 25)
+            ->where('fabaHeroStats.total_utilization', 10)
+            ->where('fabaHeroStats.current_balance', 15)
+        );
+});
+
+test('dashboard hauling status distribution reflects approved snapshot records', function () {
     $organization = Organization::factory()->create([
         'code' => 'DASHCAT',
         'schema_name' => 'tenant_dashboard_category',
@@ -302,23 +423,51 @@ test('dashboard waste category percentages are based on approved quantity in the
         'characteristic_id' => $characteristic->id,
     ]);
 
-    WasteRecord::factory()->count(3)->create([
+    $notHauled = WasteRecord::factory()->create([
         'waste_type_id' => $typeA->id,
         'status' => 'approved',
         'quantity' => 10,
         'date' => '2026-03-05',
     ]);
-    WasteRecord::factory()->create([
+    $partialRecord = WasteRecord::factory()->create([
         'waste_type_id' => $typeB->id,
         'status' => 'approved',
         'quantity' => 20,
         'date' => '2026-03-06',
     ]);
-    WasteRecord::factory()->count(2)->create([
+    $pendingRecord = WasteRecord::factory()->create([
         'waste_type_id' => $typeB->id,
-        'status' => 'draft',
-        'quantity' => 50,
+        'status' => 'approved',
+        'quantity' => 12,
         'date' => '2026-03-07',
+    ]);
+    $completedRecord = WasteRecord::factory()->create([
+        'waste_type_id' => $typeA->id,
+        'status' => 'approved',
+        'quantity' => 8,
+        'date' => '2026-03-08',
+    ]);
+
+    WasteHauling::factory()->create([
+        'waste_record_id' => $partialRecord->id,
+        'hauling_date' => '2026-03-12',
+        'quantity' => 5,
+        'unit' => 'kg',
+        'status' => 'approved',
+    ]);
+    WasteHauling::factory()->create([
+        'waste_record_id' => $pendingRecord->id,
+        'hauling_date' => '2026-03-13',
+        'quantity' => 6,
+        'unit' => 'kg',
+        'status' => 'pending_approval',
+    ]);
+    WasteHauling::factory()->create([
+        'waste_record_id' => $completedRecord->id,
+        'hauling_date' => '2026-03-14',
+        'quantity' => 8,
+        'unit' => 'kg',
+        'status' => 'approved',
     ]);
 
     $tenantService->switchToPublic();
@@ -335,30 +484,21 @@ test('dashboard waste category percentages are based on approved quantity in the
     $response
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('wasteByCategory', function ($categories): bool {
-                $categories = collect($categories)->map(function ($category): array {
-                    return is_array($category) ? $category : $category->toArray();
-                })->values();
+            ->where('wasteHaulingStatusDistribution', function ($distribution): bool {
+                $distribution = collect($distribution)
+                    ->map(fn ($item): array => is_array($item) ? $item : $item->toArray())
+                    ->keyBy('label');
 
-                if ($categories->count() !== 2) {
-                    return false;
-                }
-
-                $byCategory = $categories->keyBy('label');
-                $percentageTotal = round((float) $categories->sum('percentage'), 2);
-
-                return $byCategory->has('B3')
-                    && $byCategory->has('Daur Ulang')
-                    && round((float) $byCategory->get('B3')['value'], 2) === 30.0
-                    && round((float) $byCategory->get('Daur Ulang')['value'], 2) === 20.0
-                    && round((float) $byCategory->get('B3')['percentage'], 2) === 60.0
-                    && round((float) $byCategory->get('Daur Ulang')['percentage'], 2) === 40.0
-                    && $percentageTotal === 100.0;
+                return $distribution->count() === 4
+                    && $distribution->get('Belum Diangkut')['value'] === 1
+                    && $distribution->get('Sebagian Diangkut')['value'] === 1
+                    && $distribution->get('Menunggu Persetujuan')['value'] === 1
+                    && $distribution->get('Selesai')['value'] === 1;
             })
         );
 });
 
-test('dashboard exposes waste flow chart and faba production material distribution', function () {
+test('dashboard exposes waste flow chart and backlog urgency distribution', function () {
     $organization = Organization::factory()->create([
         'code' => 'DASHFLOW',
         'schema_name' => 'tenant_dashboard_flow',
@@ -373,48 +513,59 @@ test('dashboard exposes waste flow chart and faba production material distributi
     $type = WasteType::factory()->create([
         'category_id' => $category->id,
         'characteristic_id' => $characteristic->id,
+        'storage_period_days' => 90,
+    ]);
+    $expiredType = WasteType::factory()->create([
+        'category_id' => $category->id,
+        'characteristic_id' => $characteristic->id,
+        'storage_period_days' => 5,
     ]);
 
-    $marchRecord = WasteRecord::factory()->approved()->create([
-        'waste_type_id' => $type->id,
-        'date' => '2026-03-05',
-    ]);
-    WasteRecord::factory()->approved()->create([
-        'waste_type_id' => $type->id,
-        'date' => '2026-03-12',
-    ]);
-    WasteRecord::factory()->approved()->create([
+    $februaryRecord = WasteRecord::factory()->approved()->create([
         'waste_type_id' => $type->id,
         'date' => '2026-02-11',
-    ]);
-
-    $vendor = Vendor::factory()->create();
-
-    WasteTransportation::query()->create([
-        'waste_record_id' => $marchRecord->id,
-        'vendor_id' => $vendor->id,
-        'transportation_date' => '2026-03-20',
         'quantity' => 10,
         'unit' => 'kg',
-        'vehicle_number' => 'B 1234 DASH',
-        'driver_name' => 'Driver Dashboard',
-        'driver_phone' => '0812000001',
-        'status' => 'delivered',
-        'dispatched_at' => now()->subDay(),
-        'delivered_at' => now(),
     ]);
-    WasteTransportation::query()->create([
-        'waste_record_id' => $marchRecord->id,
-        'vendor_id' => $vendor->id,
-        'transportation_date' => '2026-02-18',
+    $marchCompletedRecord = WasteRecord::factory()->approved()->create([
+        'waste_type_id' => $type->id,
+        'date' => '2026-03-05',
+        'quantity' => 10,
+        'unit' => 'kg',
+    ]);
+    $marchBacklogRecord = WasteRecord::factory()->approved()->create([
+        'waste_type_id' => $type->id,
+        'date' => '2026-03-12',
+        'quantity' => 12,
+        'unit' => 'kg',
+    ]);
+    $expiredBacklogRecord = WasteRecord::factory()->approved()->create([
+        'waste_type_id' => $expiredType->id,
+        'date' => '2026-03-20',
         'quantity' => 8,
         'unit' => 'kg',
-        'vehicle_number' => 'B 1235 DASH',
-        'driver_name' => 'Driver Dashboard 2',
-        'driver_phone' => '0812000002',
-        'status' => 'delivered',
-        'dispatched_at' => now()->subDays(2),
-        'delivered_at' => now()->subDay(),
+    ]);
+    $expiringSoonType = createDashboardWasteType(15);
+    $expiringSoonBacklogRecord = WasteRecord::factory()->approved()->create([
+        'waste_type_id' => $expiringSoonType->id,
+        'date' => '2026-03-22',
+        'quantity' => 5,
+        'unit' => 'kg',
+    ]);
+
+    WasteHauling::factory()->create([
+        'waste_record_id' => $februaryRecord->id,
+        'hauling_date' => '2026-02-18',
+        'quantity' => 10,
+        'unit' => 'kg',
+        'status' => 'approved',
+    ]);
+    WasteHauling::factory()->create([
+        'waste_record_id' => $marchCompletedRecord->id,
+        'hauling_date' => '2026-03-20',
+        'quantity' => 10,
+        'unit' => 'kg',
+        'status' => 'approved',
     ]);
 
     FabaMovement::factory()->create([
@@ -466,19 +617,30 @@ test('dashboard exposes waste flow chart and faba production material distributi
                 return $chart->count() === 6
                     && $march !== null
                     && $february !== null
-                    && $march['input_count'] === 2
-                    && $march['transported_count'] === 1
-                    && $february['input_count'] === 1
-                    && $february['transported_count'] === 1;
+                    && $march['approved_input_count'] === 4
+                    && $march['completed_count'] === 1
+                    && $march['closing_backlog_count'] === 3
+                    && $february['approved_input_count'] === 1
+                    && $february['completed_count'] === 1
+                    && $february['closing_backlog_count'] === 0;
             })
-            ->where('fabaProductionMaterialDistribution', function ($distribution): bool {
+            ->where('wasteBacklogUrgencyDistribution', function ($distribution): bool {
                 $distribution = collect($distribution)->map(fn ($item): array => is_array($item) ? $item : $item->toArray())->keyBy('label');
 
-                return $distribution->count() === 2
-                    && round((float) $distribution->get('Fly Ash')['value'], 2) === 30.0
-                    && round((float) $distribution->get('Bottom Ash')['value'], 2) === 10.0
-                    && round((float) $distribution->get('Fly Ash')['percentage'], 2) === 75.0
-                    && round((float) $distribution->get('Bottom Ash')['percentage'], 2) === 25.0;
+                return $distribution->count() === 3
+                    && $distribution->get('Expired')['value'] === 1
+                    && $distribution->get('Mendekati Batas Simpan')['value'] === 1
+                    && $distribution->get('Masih Aman')['value'] === 1;
+            })
+            ->where('fabaChart', function ($chart): bool {
+                $chart = collect($chart)->map(fn ($item): array => is_array($item) ? $item : $item->toArray());
+                $march = $chart->first(fn (array $item): bool => $item['year'] === 2026 && $item['month'] === 3);
+
+                return $march !== null
+                    && array_key_exists('has_warning', $march)
+                    && array_key_exists('warning_count', $march)
+                    && is_bool($march['has_warning'])
+                    && is_int($march['warning_count']);
             })
         );
 
@@ -551,7 +713,7 @@ test('dashboard filters metrics by selected month', function () {
             ->where('stats.waste_total_records_snapshot', 1)
             ->where('stats.total_waste_records', 1)
             ->where('fabaStats.total_production', 15)
-            ->where('wasteByCategory.0.value', 15)
+            ->where('wasteChart.5.approved_input_count', 1)
             ->where('fabaChart.5.month', 1)
             ->where('fabaChart.5.year', 2026)
         );
@@ -595,34 +757,20 @@ test('dashboard exposes waste snapshot stats and untransported backlog up to the
         'date' => '2026-03-18',
     ]);
 
-    $vendor = Vendor::factory()->create();
-
-    WasteTransportation::query()->create([
+    WasteHauling::factory()->create([
         'waste_record_id' => $januaryRecord->id,
-        'vendor_id' => $vendor->id,
-        'transportation_date' => '2026-01-18',
+        'hauling_date' => '2026-01-18',
         'quantity' => 10,
         'unit' => 'kg',
-        'vehicle_number' => 'B 4567 YTD',
-        'driver_name' => 'Driver Januari',
-        'driver_phone' => '0812000101',
-        'status' => 'delivered',
-        'dispatched_at' => now()->subDays(10),
-        'delivered_at' => now()->subDays(9),
+        'status' => 'approved',
     ]);
 
-    WasteTransportation::query()->create([
+    WasteHauling::factory()->create([
         'waste_record_id' => $februaryRecord->id,
-        'vendor_id' => $vendor->id,
-        'transportation_date' => '2026-02-20',
+        'hauling_date' => '2026-02-20',
         'quantity' => 5,
         'unit' => 'kg',
-        'vehicle_number' => 'B 4568 YTD',
-        'driver_name' => 'Driver Februari',
-        'driver_phone' => '0812000102',
         'status' => 'cancelled',
-        'dispatched_at' => null,
-        'delivered_at' => null,
     ]);
 
     $tenantService->switchToPublic();
@@ -684,34 +832,20 @@ test('dashboard waste backlog carries over across years until transportation is 
         'date' => '2026-01-20',
     ]);
 
-    $vendor = Vendor::factory()->create();
-
-    WasteTransportation::query()->create([
+    WasteHauling::factory()->create([
         'waste_record_id' => $novemberRecord->id,
-        'vendor_id' => $vendor->id,
-        'transportation_date' => '2025-11-20',
+        'hauling_date' => '2025-11-20',
         'quantity' => 10,
         'unit' => 'kg',
-        'vehicle_number' => 'B 5567 CAR',
-        'driver_name' => 'Driver November',
-        'driver_phone' => '0812000201',
-        'status' => 'delivered',
-        'dispatched_at' => now()->subDays(12),
-        'delivered_at' => now()->subDays(11),
+        'status' => 'approved',
     ]);
 
-    WasteTransportation::query()->create([
+    WasteHauling::factory()->create([
         'waste_record_id' => $decemberRecord->id,
-        'vendor_id' => $vendor->id,
-        'transportation_date' => '2025-12-22',
+        'hauling_date' => '2025-12-22',
         'quantity' => 6,
         'unit' => 'kg',
-        'vehicle_number' => 'B 5568 CAR',
-        'driver_name' => 'Driver Desember',
-        'driver_phone' => '0812000202',
-        'status' => 'delivered',
-        'dispatched_at' => now()->subDays(8),
-        'delivered_at' => now()->subDays(7),
+        'status' => 'approved',
     ]);
 
     $tenantService->switchToPublic();

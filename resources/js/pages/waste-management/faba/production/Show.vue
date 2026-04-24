@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, useForm } from '@inertiajs/vue3';
 import { CalendarClock, FileText, Layers3, PackageOpen } from 'lucide-vue-next';
 import Heading from '@/components/Heading.vue';
+import InputError from '@/components/InputError.vue';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
     formatFabaDate,
@@ -27,6 +31,21 @@ const breadcrumbItems: BreadcrumbItem[] = [
         href: wasteManagementRoutes.faba.production.show(props.entry.id).url,
     },
 ];
+
+const approveForm = useForm({ approval_note: '' });
+const rejectForm = useForm({
+    rejection_note: '',
+});
+
+function approve(): void {
+    approveForm.post(
+        wasteManagementRoutes.faba.movements.approve(props.entry.id).url,
+    );
+}
+
+function reject(): void {
+    rejectForm.post(wasteManagementRoutes.faba.movements.reject(props.entry.id).url);
+}
 </script>
 
 <template>
@@ -71,8 +90,18 @@ const breadcrumbItems: BreadcrumbItem[] = [
                                     class="rounded-full border border-slate-200/80 bg-white/90 text-slate-700 dark:text-slate-200"
                                 >
                                     {{
-                                        formatFabaStatus(entry.approval_status)
+                                        formatFabaStatus(
+                                            entry.effective_status ??
+                                                entry.approval_status,
+                                        )
                                     }}
+                                </Badge>
+                                <Badge
+                                    v-if="entry.locked"
+                                    variant="secondary"
+                                    class="rounded-full border border-amber-200/80 bg-amber-50/90 text-amber-800"
+                                >
+                                    Periode terkunci
                                 </Badge>
                                 <div
                                     class="wm-chip px-3 py-1.5 text-xs font-medium"
@@ -112,6 +141,15 @@ const breadcrumbItems: BreadcrumbItem[] = [
                         </div>
                     </div>
                 </section>
+
+                <Card
+                    v-if="entry.duplicate_warning"
+                    class="rounded-[28px] border-amber-200/80 bg-amber-50/90 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.28)]"
+                >
+                    <CardContent class="p-5 text-sm leading-6 text-amber-950">
+                        {{ entry.duplicate_warning.message }}
+                    </CardContent>
+                </Card>
 
                 <Card
                     class="rounded-[28px] border-slate-200/80 bg-white/90 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.28)] dark:bg-slate-950/85"
@@ -229,6 +267,36 @@ const breadcrumbItems: BreadcrumbItem[] = [
                                 </div>
                             </div>
                         </div>
+                    </CardContent>
+                </Card>
+
+                <Card
+                    v-if="entry.can_approve || entry.can_reject || entry.rejection_note"
+                    class="rounded-[28px] border-slate-200/80 bg-white/90 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.28)] dark:bg-slate-950/85"
+                >
+                    <CardHeader>
+                        <CardTitle>Approval Transaksi</CardTitle>
+                    </CardHeader>
+                    <CardContent class="space-y-4">
+                        <p
+                            v-if="entry.rejection_note"
+                            class="text-sm text-slate-600 dark:text-slate-300"
+                        >
+                            Catatan penolakan: {{ entry.rejection_note }}
+                        </p>
+                        <div v-if="entry.can_approve" class="flex justify-end">
+                            <Button @click="approve">Setujui Transaksi</Button>
+                        </div>
+                        <form v-if="entry.can_reject" class="space-y-3" @submit.prevent="reject">
+                            <div class="grid gap-2">
+                                <Label for="rejection_note">Catatan penolakan</Label>
+                                <Textarea id="rejection_note" v-model="rejectForm.rejection_note" />
+                                <InputError :message="rejectForm.errors.rejection_note" />
+                            </div>
+                            <div class="flex justify-end">
+                                <Button variant="destructive" type="submit">Tolak Transaksi</Button>
+                            </div>
+                        </form>
                     </CardContent>
                 </Card>
             </div>

@@ -46,9 +46,6 @@ class RolePermissionsSeeder extends Seeder
                 // Waste hauling
                 'waste_hauling.view_all', 'waste_hauling.view_own', 'waste_hauling.create', 'waste_hauling.submit',
                 'waste_hauling.approve', 'waste_hauling.reject', 'waste_hauling.cancel',
-                // Transportation
-                'transportation.view_all', 'transportation.create', 'transportation.edit', 'transportation.delete',
-                'transportation.dispatch', 'transportation.deliver', 'transportation.cancel',
                 // Dashboard
                 'dashboard.view',
                 'faba_dashboard.view',
@@ -74,9 +71,6 @@ class RolePermissionsSeeder extends Seeder
                 'waste_records.view_all', 'waste_records.view_own', 'waste_records.create', 'waste_records.edit_own', 'waste_records.submit',
                 // Waste hauling
                 'waste_hauling.view_own', 'waste_hauling.create', 'waste_hauling.submit', 'waste_hauling.cancel',
-                // Transportation
-                'transportation.view_own', 'transportation.create', 'transportation.edit', 'transportation.delete',
-                'transportation.dispatch', 'transportation.deliver', 'transportation.cancel',
                 // Dashboard
                 'dashboard.view',
                 'faba_dashboard.view',

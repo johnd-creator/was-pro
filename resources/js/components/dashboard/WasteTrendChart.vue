@@ -16,27 +16,36 @@ interface Props {
 const props = defineProps<Props>();
 
 const maxValue = computed(() => {
-    const maxRecords = Math.max(...props.data.map((d) => d.records_count), 0);
-    const maxTransport = Math.max(
-        ...props.data.map((d) => d.transport_delivered_count),
+    const maxInput = Math.max(
+        ...props.data.map((d) => d.approved_input_count),
         0,
     );
-    return Math.max(maxRecords, maxTransport, 1);
+    const maxCompleted = Math.max(
+        ...props.data.map((d) => d.completed_count),
+        0,
+    );
+    const maxBacklog = Math.max(
+        ...props.data.map((d) => d.closing_backlog_count),
+        0,
+    );
+
+    return Math.max(maxInput, maxCompleted, maxBacklog, 1);
 });
 
 const recordsBarColor = 'rgb(34, 197, 94, 0.8)';
-const transportBarColor = 'rgb(249, 115, 22, 0.8)';
+const hauledBarColor = 'rgb(249, 115, 22, 0.8)';
+const backlogBarColor = 'rgb(37, 99, 235, 0.8)';
 
 const totalRecords = computed(() =>
-    props.data.reduce((sum, item) => sum + item.records_count, 0),
+    props.data.reduce((sum, item) => sum + item.approved_input_count, 0),
 );
 
 const totalTransported = computed(() =>
-    props.data.reduce((sum, item) => sum + item.transport_delivered_count, 0),
+    props.data.reduce((sum, item) => sum + item.completed_count, 0),
 );
 
-const totalApproved = computed(() =>
-    props.data.reduce((sum, item) => sum + item.approved_count, 0),
+const totalBacklog = computed(() =>
+    props.data.reduce((sum, item) => sum + item.closing_backlog_count, 0),
 );
 </script>
 
@@ -48,8 +57,8 @@ const totalApproved = computed(() =>
                     Pencatatan vs Pengangkutan Limbah
                 </CardTitle>
                 <CardDescription>
-                    Perbandingan volume pencatatan limbah dan transportasi
-                    selesai untuk membaca throughput operasional 6 bulan
+                    Perbandingan volume pencatatan limbah dan pengangkutan
+                    yang disetujui untuk membaca throughput operasional 6 bulan
                     terakhir.
                 </CardDescription>
             </div>
@@ -73,10 +82,10 @@ const totalApproved = computed(() =>
                     <p
                         class="text-[11px] font-semibold tracking-wide text-blue-700 uppercase"
                     >
-                        Total disetujui
+                        Total backlog
                     </p>
                     <p class="mt-1 text-lg font-semibold text-blue-900">
-                        {{ totalApproved.toLocaleString('id-ID') }}
+                        {{ totalBacklog.toLocaleString('id-ID') }}
                     </p>
                 </div>
                 <div
@@ -107,7 +116,7 @@ const totalApproved = computed(() =>
                     <span
                         class="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 shadow-sm"
                     >
-                        {{ item.approved_count }} disetujui
+                        {{ item.closing_backlog_count }} backlog
                     </span>
                 </div>
 
@@ -118,36 +127,7 @@ const totalApproved = computed(() =>
                         >
                             <span>Pencatatan limbah</span>
                             <span>{{
-                                item.records_count.toLocaleString('id-ID')
-                            }}</span>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <div
-                                class="flex-1 overflow-hidden rounded-full bg-muted"
-                            >
-                                <div
-                                    class="h-2.5 rounded-full transition-all duration-500"
-                                    :style="{
-                                        width: `${(item.records_count / maxValue) * 100}%`,
-                                        backgroundColor: recordsBarColor,
-                                    }"
-                                />
-                            </div>
-                            <span
-                                class="w-16 text-right text-xs font-medium text-slate-700"
-                            >
-                                {{ item.records_count }}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="space-y-1">
-                        <div
-                            class="flex items-center justify-between text-[11px] font-medium tracking-wide text-orange-700 uppercase"
-                        >
-                            <span>Transport selesai</span>
-                            <span>{{
-                                item.transport_delivered_count.toLocaleString(
+                                item.approved_input_count.toLocaleString(
                                     'id-ID',
                                 )
                             }}</span>
@@ -159,15 +139,75 @@ const totalApproved = computed(() =>
                                 <div
                                     class="h-2.5 rounded-full transition-all duration-500"
                                     :style="{
-                                        width: `${(item.transport_delivered_count / maxValue) * 100}%`,
-                                        backgroundColor: transportBarColor,
+                                        width: `${(item.approved_input_count / maxValue) * 100}%`,
+                                        backgroundColor: recordsBarColor,
                                     }"
                                 />
                             </div>
                             <span
                                 class="w-16 text-right text-xs font-medium text-slate-700"
                             >
-                                {{ item.transport_delivered_count }}
+                                {{ item.approved_input_count }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1">
+                        <div
+                            class="flex items-center justify-between text-[11px] font-medium tracking-wide text-orange-700 uppercase"
+                        >
+                            <span>Pengangkutan disetujui</span>
+                            <span>{{
+                                item.completed_count.toLocaleString('id-ID')
+                            }}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="flex-1 overflow-hidden rounded-full bg-muted"
+                            >
+                                <div
+                                    class="h-2.5 rounded-full transition-all duration-500"
+                                    :style="{
+                                        width: `${(item.completed_count / maxValue) * 100}%`,
+                                        backgroundColor: hauledBarColor,
+                                    }"
+                                />
+                            </div>
+                            <span
+                                class="w-16 text-right text-xs font-medium text-slate-700"
+                            >
+                                {{ item.completed_count }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1">
+                        <div
+                            class="flex items-center justify-between text-[11px] font-medium tracking-wide text-blue-700 uppercase"
+                        >
+                            <span>Backlog akhir</span>
+                            <span>{{
+                                item.closing_backlog_count.toLocaleString(
+                                    'id-ID',
+                                )
+                            }}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="flex-1 overflow-hidden rounded-full bg-muted"
+                            >
+                                <div
+                                    class="h-2.5 rounded-full transition-all duration-500"
+                                    :style="{
+                                        width: `${(item.closing_backlog_count / maxValue) * 100}%`,
+                                        backgroundColor: backlogBarColor,
+                                    }"
+                                />
+                            </div>
+                            <span
+                                class="w-16 text-right text-xs font-medium text-slate-700"
+                            >
+                                {{ item.closing_backlog_count }}
                             </span>
                         </div>
                     </div>
@@ -185,9 +225,18 @@ const totalApproved = computed(() =>
                 <div class="flex items-center gap-2">
                     <div
                         class="h-2 w-3 rounded-full"
-                        :style="{ backgroundColor: transportBarColor }"
+                        :style="{ backgroundColor: hauledBarColor }"
                     />
-                    <span class="text-muted-foreground">Transport selesai</span>
+                    <span class="text-muted-foreground"
+                        >Pengangkutan disetujui</span
+                    >
+                </div>
+                <div class="flex items-center gap-2">
+                    <div
+                        class="h-2 w-3 rounded-full"
+                        :style="{ backgroundColor: backlogBarColor }"
+                    />
+                    <span class="text-muted-foreground">Backlog akhir</span>
                 </div>
             </div>
         </CardContent>

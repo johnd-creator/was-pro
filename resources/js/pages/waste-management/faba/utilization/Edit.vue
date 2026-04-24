@@ -54,14 +54,9 @@ const props = defineProps<{
 const NO_VENDOR = '__none__';
 const NO_INTERNAL_DESTINATION = '__none__';
 const NO_PURPOSE = '__none__';
-const initialMovementType = props.entry.movement_type;
-
 const breadcrumbItems: BreadcrumbItem[] = [
     {
-        title:
-            initialMovementType === 'utilization_internal'
-                ? 'Pemanfaatan Internal'
-                : 'Pemanfaatan Eksternal',
+        title: 'Pemanfaatan FABA',
         href: wasteManagementRoutes.faba.utilization.index.url(),
     },
     {
@@ -73,7 +68,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
 const form = useForm({
     transaction_date: props.entry.transaction_date,
     material_type: props.entry.material_type,
-    movement_type: initialMovementType,
+    movement_type: props.entry.movement_type,
     vendor_id: props.entry.vendor_id ?? NO_VENDOR,
     internal_destination_id:
         props.entry.internal_destination_id ?? NO_INTERNAL_DESTINATION,
@@ -125,19 +120,9 @@ watch(
 <template>
     <WasteManagementLayout
         :breadcrumbs="breadcrumbItems"
-        :title="
-            form.movement_type === 'utilization_internal'
-                ? 'Edit Pemanfaatan Internal'
-                : 'Edit Pemanfaatan Eksternal'
-        "
+        title="Edit Pemanfaatan FABA"
     >
-        <Head
-            :title="
-                form.movement_type === 'utilization_internal'
-                    ? 'Edit Pemanfaatan Internal'
-                    : 'Edit Pemanfaatan Eksternal'
-            "
-        />
+        <Head title="Edit Pemanfaatan FABA" />
 
         <div
             class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
@@ -163,16 +148,11 @@ watch(
                             <p
                                 class="text-[11px] font-semibold tracking-[0.16em] text-emerald-700/70 uppercase"
                             >
-                                Utilization Revision
+                                Smart Utilization
                             </p>
                             <Heading
-                                :title="
-                                    form.movement_type ===
-                                    'utilization_internal'
-                                        ? 'Edit Pemanfaatan Internal'
-                                        : 'Edit Pemanfaatan Eksternal'
-                                "
-                                description="Perbarui movement pemanfaatan tanpa kehilangan konteks pihak, dokumen, dan tujuan penggunaan."
+                                title="Edit Pemanfaatan FABA"
+                                description="Perbarui transaksi pemanfaatan tanpa kehilangan konteks jalur, pihak tujuan, dokumen, dan kebutuhan stok."
                             />
                         </div>
 

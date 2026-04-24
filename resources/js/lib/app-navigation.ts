@@ -35,16 +35,16 @@ export const appNavigationItems: NavItem[] = [
         permissions: ['waste_hauling.view_all', 'waste_hauling.view_own'],
     },
     {
-        title: 'Transportasi',
-        href: wasteManagementRoutes.transportations.index.url(),
-        icon: Truck,
-        permissions: ['transportation.view_all', 'transportation.view_own'],
-    },
-    {
         title: 'FABA',
         icon: Package,
         labelOnly: true,
         items: [
+            {
+                title: 'Dashboard FABA',
+                href: wasteManagementRoutes.faba.dashboard.url(),
+                icon: LayoutGrid,
+                permission: 'faba_dashboard.view',
+            },
             {
                 title: 'Produksi',
                 href: wasteManagementRoutes.faba.production.index.url(),
@@ -52,18 +52,8 @@ export const appNavigationItems: NavItem[] = [
                 permission: 'faba_production.view',
             },
             {
-                title: 'Pemanfaatan Internal',
-                href: wasteManagementRoutes.faba.utilization.index.url({
-                    query: { movement_type: 'utilization_internal' },
-                }),
-                icon: Truck,
-                permission: 'faba_utilization.view',
-            },
-            {
-                title: 'Pemanfaatan Eksternal',
-                href: wasteManagementRoutes.faba.utilization.index.url({
-                    query: { movement_type: 'utilization_external' },
-                }),
+                title: 'Pemanfaatan',
+                href: wasteManagementRoutes.faba.utilization.index.url(),
                 icon: Truck,
                 permission: 'faba_utilization.view',
             },

@@ -8,8 +8,8 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Models\WasteCategory;
 use App\Models\WasteCharacteristic;
+use App\Models\WasteHauling;
 use App\Models\WasteRecord;
-use App\Models\WasteTransportation;
 use App\Models\WasteType;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Artisan;
@@ -34,7 +34,7 @@ class WasteManagementDemoDataService
      *     waste_types_count: int,
      *     vendors_count: int,
      *     waste_records_count: int,
-     *     transportations_count: int
+     *     haulings_count: int
      * }
      */
     public function seedDemoData(?string $tenantCode = null, ?string $schemaName = null, bool $freshTenant = false): array
@@ -72,7 +72,13 @@ class WasteManagementDemoDataService
             }
 
             $master = $this->seedMasterData($users['supervisor']);
-            $summary = $this->seedWasteRecordsAndTransportations($periods, $users['operator'], $users['supervisor'], $master['waste_types'], $master['vendors'], $tenantCode);
+            $summary = $this->seedWasteRecordsAndHaulings(
+                $periods,
+                $users['operator'],
+                $users['supervisor'],
+                $master['waste_types'],
+                $tenantCode,
+            );
         } finally {
             $this->tenantService->switchToPublic();
         }
@@ -252,7 +258,7 @@ class WasteManagementDemoDataService
     {
         $startOfCurrentMonth = CarbonImmutable::now()->startOfMonth();
 
-        return collect(range(12, 1))
+        return collect(range(11, 0))
             ->map(fn (int $monthsBack): CarbonImmutable => $startOfCurrentMonth->subMonthsNoOverflow($monthsBack))
             ->all();
     }
@@ -268,7 +274,7 @@ class WasteManagementDemoDataService
 
             if (
                 WasteRecord::query()->whereYear('date', $year)->whereMonth('date', $month)->exists()
-                || WasteTransportation::query()->whereYear('transportation_date', $year)->whereMonth('transportation_date', $month)->exists()
+                || WasteHauling::query()->whereYear('hauling_date', $year)->whereMonth('hauling_date', $month)->exists()
             ) {
                 return true;
             }
@@ -477,19 +483,17 @@ class WasteManagementDemoDataService
     /**
      * @param  list<CarbonImmutable>  $periods
      * @param  array<string, \App\Models\WasteType>  $wasteTypes
-     * @param  array<string, \App\Models\Vendor>  $vendors
-     * @return array{waste_records_count: int, transportations_count: int}
+     * @return array{waste_records_count: int, haulings_count: int}
      */
-    protected function seedWasteRecordsAndTransportations(
+    protected function seedWasteRecordsAndHaulings(
         array $periods,
         User $operator,
         User $supervisor,
         array $wasteTypes,
-        array $vendors,
         string $tenantCode,
     ): array {
         $recordCount = 0;
-        $transportationCount = 0;
+        $haulingCount = 0;
         $sourceOptions = [
             'Gudang B3',
             'Workshop Mekanik',
@@ -513,15 +517,20 @@ class WasteManagementDemoDataService
             'rejected',
         ];
         $typeKeys = array_keys($wasteTypes);
+        $currentMonth = CarbonImmutable::now()->startOfMonth();
 
         foreach ($periods as $periodIndex => $period) {
             $monthlyApprovedRecords = [];
             $baseQuantities = $this->baseQuantitiesForMonth($periodIndex);
+            $dayPattern = $period->equalTo($currentMonth)
+                ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+                : null;
 
             foreach ($statusPattern as $index => $status) {
                 $wasteType = $wasteTypes[$typeKeys[$index % count($typeKeys)]];
                 $quantity = $baseQuantities[$index];
-                $date = $period->setDay(min(26, 2 + ($index * 2)));
+                $day = $dayPattern[$index] ?? min(26, 2 + ($index * 2));
+                $date = $period->setDay($day);
 
                 $record = WasteRecord::query()->create([
                     'record_number' => $this->makeRecordNumber($tenantCode, $period, $index + 1),
@@ -538,7 +547,7 @@ class WasteManagementDemoDataService
                     'submitted_at' => in_array($status, ['pending_review', 'approved', 'rejected'], true) ? $date->setTime(10, 0) : null,
                     'approved_by' => in_array($status, ['approved', 'rejected'], true) ? $supervisor->id : null,
                     'approved_at' => $status === 'approved' ? $date->setTime(15, 0) : null,
-                    'approval_notes' => $status === 'approved' ? 'Data limbah lengkap dan siap diangkut.' : null,
+                    'approval_notes' => $status === 'approved' ? 'Data limbah lengkap dan siap diajukan untuk pengangkutan.' : null,
                     'created_by' => $operator->id,
                     'updated_by' => $operator->id,
                 ]);
@@ -550,53 +559,175 @@ class WasteManagementDemoDataService
                 $recordCount++;
             }
 
-            $transportationBlueprints = [
-                ['status' => 'delivered', 'ratio' => 0.55, 'vendor' => 'waste_processor', 'vehicle' => 'B 9101 WM', 'driver' => 'Asep Gunawan', 'phone' => '0812000001'],
-                ['status' => 'in_transit', 'ratio' => 0.45, 'vendor' => 'logistics', 'vehicle' => 'B 9102 WM', 'driver' => 'Rudi Hartono', 'phone' => '0812000002'],
-                ['status' => 'pending', 'ratio' => 0.40, 'vendor' => 'recycler', 'vehicle' => 'B 9103 WM', 'driver' => 'Lina Sari', 'phone' => '0812000003'],
-                ['status' => 'delivered', 'ratio' => 0.35, 'vendor' => 'waste_processor', 'vehicle' => 'B 9104 WM', 'driver' => 'Yusuf Maulana', 'phone' => '0812000004'],
-                ['status' => 'cancelled', 'ratio' => 0.20, 'vendor' => 'logistics', 'vehicle' => 'B 9105 WM', 'driver' => 'Deden Kurnia', 'phone' => '0812000005'],
-            ];
+            if ($period->equalTo($currentMonth)) {
+                [$recordCount, $haulingCount] = $this->seedCriticalCurrentMonthHaulings(
+                    $monthlyApprovedRecords,
+                    $operator,
+                    $supervisor,
+                    $tenantCode,
+                    $period,
+                    $recordCount,
+                    $haulingCount,
+                );
 
-            foreach ($transportationBlueprints as $index => $blueprint) {
-                $record = $monthlyApprovedRecords[$index % count($monthlyApprovedRecords)];
-                $quantity = round((float) $record->quantity * $blueprint['ratio'], 2);
-                $transportDate = $record->date->addDays($index + 1);
-
-                $dispatchedAt = in_array($blueprint['status'], ['in_transit', 'delivered'], true)
-                    ? $transportDate->copy()->setTime(8, 30)
-                    : null;
-                $deliveredAt = $blueprint['status'] === 'delivered'
-                    ? $transportDate->copy()->setTime(15, 15)
-                    : null;
-
-                WasteTransportation::query()->create([
-                    'transportation_number' => $this->makeTransportationNumber($tenantCode, $period, $index + 1),
-                    'waste_record_id' => $record->id,
-                    'vendor_id' => $vendors[$blueprint['vendor']]->id,
-                    'transportation_date' => $transportDate->toDateString(),
-                    'quantity' => $quantity,
-                    'unit' => 'kg',
-                    'vehicle_number' => $blueprint['vehicle'],
-                    'driver_name' => $blueprint['driver'],
-                    'driver_phone' => $blueprint['phone'],
-                    'status' => $blueprint['status'],
-                    'notes' => 'Transportasi demo '.$blueprint['status'].' untuk '.$record->record_number,
-                    'delivery_notes' => $blueprint['status'] === 'delivered' ? 'Barang diterima lengkap di tujuan.' : null,
-                    'dispatched_at' => $dispatchedAt,
-                    'delivered_at' => $deliveredAt,
-                    'created_by' => $operator->id,
-                    'updated_by' => $operator->id,
-                ]);
-
-                $transportationCount++;
+                continue;
             }
+
+            $haulingCount = $this->seedOrderlyHistoricalHaulings(
+                $monthlyApprovedRecords,
+                $operator,
+                $supervisor,
+                $tenantCode,
+                $period,
+                $haulingCount,
+            );
         }
 
         return [
             'waste_records_count' => $recordCount,
-            'transportations_count' => $transportationCount,
+            'haulings_count' => $haulingCount,
         ];
+    }
+
+    /**
+     * @param  list<WasteRecord>  $approvedRecords
+     */
+    protected function seedOrderlyHistoricalHaulings(
+        array $approvedRecords,
+        User $operator,
+        User $supervisor,
+        string $tenantCode,
+        CarbonImmutable $period,
+        int $haulingCount,
+    ): int {
+        $blueprints = [
+            ['record_index' => 0, 'quantity_ratio' => 1.0],
+            ['record_index' => 1, 'quantity_ratio' => 1.0],
+            ['record_index' => 2, 'quantity_ratio' => 0.6],
+            ['record_index' => 2, 'quantity_ratio' => 0.4],
+            ['record_index' => 3, 'quantity_ratio' => 1.0],
+        ];
+
+        foreach ($blueprints as $index => $blueprint) {
+            $record = $approvedRecords[$blueprint['record_index']];
+            $haulingDate = $record->date->addDays($index + 1);
+            $quantity = round((float) $record->quantity * $blueprint['quantity_ratio'], 2);
+
+            WasteHauling::query()->create([
+                'hauling_number' => $this->makeHaulingNumber($tenantCode, $period, $index + 1),
+                'waste_record_id' => $record->id,
+                'hauling_date' => $haulingDate->toDateString(),
+                'quantity' => $quantity,
+                'unit' => $record->unit,
+                'notes' => 'Pengangkutan demo selesai untuk '.$record->record_number,
+                'status' => 'approved',
+                'submitted_by' => $operator->id,
+                'submitted_at' => $haulingDate->setTime(8, 30),
+                'approved_by' => $supervisor->id,
+                'approved_at' => $haulingDate->setTime(15, 30),
+                'approval_notes' => 'Pengangkutan disetujui dan selesai sesuai jadwal.',
+                'created_by' => $operator->id,
+                'updated_by' => $operator->id,
+            ]);
+
+            $haulingCount++;
+        }
+
+        return $haulingCount;
+    }
+
+    /**
+     * @param  list<WasteRecord>  $approvedRecords
+     * @return array{0: int, 1: int}
+     */
+    protected function seedCriticalCurrentMonthHaulings(
+        array $approvedRecords,
+        User $operator,
+        User $supervisor,
+        string $tenantCode,
+        CarbonImmutable $period,
+        int $recordCount,
+        int $haulingCount,
+    ): array {
+        $approvedRecords[0]->forceFill(['expiry_date' => $period->setDay(8)->toDateString()])->saveQuietly();
+        $approvedRecords[1]->forceFill(['expiry_date' => $period->setDay(12)->toDateString()])->saveQuietly();
+
+        $blueprints = [
+            [
+                'record_index' => 0,
+                'quantity_ratio' => 0.5,
+                'status' => 'approved',
+                'day' => 9,
+                'notes' => 'Pengangkutan parsial untuk backlog kritis April.',
+                'approval_notes' => 'Disetujui sebagai pengangkutan parsial tahap pertama.',
+                'rejection_reason' => null,
+            ],
+            [
+                'record_index' => 0,
+                'quantity_ratio' => 0.2,
+                'status' => 'pending_approval',
+                'day' => 11,
+                'notes' => 'Pengajuan tambahan masih menunggu persetujuan supervisor.',
+                'approval_notes' => null,
+                'rejection_reason' => null,
+            ],
+            [
+                'record_index' => 1,
+                'quantity_ratio' => 0.35,
+                'status' => 'approved',
+                'day' => 10,
+                'notes' => 'Pengangkutan parsial untuk record yang sudah mendekati batas simpan.',
+                'approval_notes' => 'Disetujui untuk mengurangi backlog April.',
+                'rejection_reason' => null,
+            ],
+            [
+                'record_index' => 2,
+                'quantity_ratio' => 0.3,
+                'status' => 'rejected',
+                'day' => 12,
+                'notes' => 'Pengajuan ditolak karena dokumen vendor belum lengkap.',
+                'approval_notes' => null,
+                'rejection_reason' => 'Dokumen pendukung pengangkutan belum lengkap.',
+            ],
+            [
+                'record_index' => 3,
+                'quantity_ratio' => 0.25,
+                'status' => 'cancelled',
+                'day' => 13,
+                'notes' => 'Pengajuan dibatalkan untuk penjadwalan ulang armada.',
+                'approval_notes' => null,
+                'rejection_reason' => null,
+            ],
+        ];
+
+        foreach ($blueprints as $index => $blueprint) {
+            $record = $approvedRecords[$blueprint['record_index']];
+            $haulingDate = $period->setDay($blueprint['day']);
+            $submittedAt = $haulingDate->setTime(8, 45);
+            $quantity = round((float) $record->quantity * $blueprint['quantity_ratio'], 2);
+
+            WasteHauling::query()->create([
+                'hauling_number' => $this->makeHaulingNumber($tenantCode, $period, $index + 1),
+                'waste_record_id' => $record->id,
+                'hauling_date' => $haulingDate->toDateString(),
+                'quantity' => $quantity,
+                'unit' => $record->unit,
+                'notes' => $blueprint['notes'],
+                'status' => $blueprint['status'],
+                'submitted_by' => $operator->id,
+                'submitted_at' => $submittedAt,
+                'approved_by' => in_array($blueprint['status'], ['approved', 'rejected'], true) ? $supervisor->id : null,
+                'approved_at' => in_array($blueprint['status'], ['approved', 'rejected'], true) ? $submittedAt->addHours(6) : null,
+                'approval_notes' => $blueprint['approval_notes'],
+                'rejection_reason' => $blueprint['rejection_reason'],
+                'created_by' => $operator->id,
+                'updated_by' => $operator->id,
+            ]);
+
+            $haulingCount++;
+        }
+
+        return [$recordCount, $haulingCount];
     }
 
     /**
@@ -640,8 +771,8 @@ class WasteManagementDemoDataService
         return 'WR-'.$tenantCode.'-'.$period->format('Y-m').'-'.str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
     }
 
-    protected function makeTransportationNumber(string $tenantCode, CarbonImmutable $period, int $sequence): string
+    protected function makeHaulingNumber(string $tenantCode, CarbonImmutable $period, int $sequence): string
     {
-        return 'TR-'.$tenantCode.'-'.$period->format('Y-m').'-'.str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
+        return 'WH-'.$tenantCode.'-'.$period->format('Y-m').'-'.str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
     }
 }

@@ -59,7 +59,7 @@ class SeedDemoData extends Command
         $this->line('- Jenis limbah: '.$wasteSummary['waste_types_count']);
         $this->line('- Vendor aktif: '.$wasteSummary['vendors_count']);
         $this->line('- Catatan limbah: '.$wasteSummary['waste_records_count']);
-        $this->line('- Pengangkutan limbah: '.$wasteSummary['transportations_count']);
+        $this->line('- Pengangkutan limbah: '.$wasteSummary['haulings_count']);
         $this->newLine();
         $this->comment('FABA');
         $this->line('- Vendor aktif: '.$fabaSummary['vendors_count']);

@@ -10,7 +10,9 @@ use App\Models\FabaMovement;
 use App\Models\FabaPurpose;
 use App\Models\Vendor;
 use App\Services\FabaAuditService;
+use App\Services\FabaMovementLedgerService;
 use App\Services\FabaRecapService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -31,7 +33,8 @@ class FabaUtilizationMovementsController extends Controller
 
     public function __construct(
         protected FabaRecapService $fabaRecapService,
-        protected FabaAuditService $fabaAuditService
+        protected FabaAuditService $fabaAuditService,
+        protected FabaMovementLedgerService $fabaMovementLedgerService
     ) {}
 
     public function index(): Response
@@ -44,6 +47,9 @@ class FabaUtilizationMovementsController extends Controller
                 'purpose:id,name',
                 'createdByUser:id,name',
                 'updatedByUser:id,name',
+                'submittedByUser:id,name',
+                'approvedByUser:id,name',
+                'rejectedByUser:id,name',
             ])
             ->orderByDesc('transaction_date')
             ->orderByDesc('created_at')
@@ -92,13 +98,33 @@ class FabaUtilizationMovementsController extends Controller
     public function store(FabaUtilizationMovementRequest $request): RedirectResponse
     {
         $validated = $request->validated();
-        $year = (int) date('Y', strtotime($validated['transaction_date']));
-        $month = (int) date('n', strtotime($validated['transaction_date']));
+        $transactionDate = CarbonImmutable::parse($validated['transaction_date']);
+        $year = (int) $transactionDate->year;
+        $month = (int) $transactionDate->month;
 
         if ($this->fabaRecapService->isPeriodLocked($year, $month)) {
             return Redirect::back()
                 ->with('error', 'Periode bulan ini sedang diajukan atau sudah disetujui, sehingga transaksi tidak bisa ditambah.');
         }
+
+        if ($this->exceedsAvailableStock($validated, $transactionDate)) {
+            return Redirect::back()
+                ->withErrors([
+                    'quantity' => 'Jumlah pemanfaatan melebihi stok FABA yang tersedia pada tanggal transaksi.',
+                ])
+                ->withInput();
+        }
+
+        $duplicateWarning = $this->fabaMovementLedgerService->getPotentialDuplicateWarning([
+            'transaction_date' => $validated['transaction_date'],
+            'material_type' => $validated['material_type'],
+            'movement_type' => $validated['movement_type'],
+            'vendor_id' => $validated['vendor_id'] ?? null,
+            'internal_destination_id' => $validated['internal_destination_id'] ?? null,
+            'document_number' => $validated['document_number'] ?? null,
+            'document_date' => $validated['document_date'] ?? null,
+            'quantity' => round((float) $validated['quantity'], 2),
+        ]);
 
         $attachmentPath = null;
 
@@ -124,6 +150,9 @@ class FabaUtilizationMovementsController extends Controller
             'attachment_path' => $attachmentPath,
             'period_year' => $year,
             'period_month' => $month,
+            'approval_status' => FabaMovement::STATUS_PENDING_APPROVAL,
+            'submitted_by' => Auth::id(),
+            'submitted_at' => now(),
             'note' => $validated['note'] ?? null,
             'created_by' => Auth::id(),
             'updated_by' => Auth::id(),
@@ -135,6 +164,9 @@ class FabaUtilizationMovementsController extends Controller
             'purpose:id,name',
             'createdByUser:id,name',
             'updatedByUser:id,name',
+            'submittedByUser:id,name',
+            'approvedByUser:id,name',
+            'rejectedByUser:id,name',
         ]);
 
         $this->fabaAuditService->log(
@@ -150,7 +182,8 @@ class FabaUtilizationMovementsController extends Controller
         );
 
         return Redirect::route('waste-management.faba.utilization.show', $movement->id)
-            ->with('success', 'Movement pemanfaatan FABA berhasil dibuat.');
+            ->with('success', 'Movement pemanfaatan FABA berhasil dibuat.')
+            ->with('warning', $duplicateWarning['message'] ?? null);
     }
 
     public function show(string $utilization): Response
@@ -196,8 +229,9 @@ class FabaUtilizationMovementsController extends Controller
         $this->abortIfCannotModify($movement, 'faba_utilization.edit', 'mengubah');
 
         $validated = $request->validated();
-        $year = (int) date('Y', strtotime($validated['transaction_date']));
-        $month = (int) date('n', strtotime($validated['transaction_date']));
+        $transactionDate = CarbonImmutable::parse($validated['transaction_date']);
+        $year = (int) $transactionDate->year;
+        $month = (int) $transactionDate->month;
 
         if (
             ($year !== $movement->period_year || $month !== $movement->period_month)
@@ -205,6 +239,25 @@ class FabaUtilizationMovementsController extends Controller
         ) {
             return Redirect::back()->with('error', 'Periode tujuan sedang terkunci.');
         }
+
+        if ($this->exceedsAvailableStock($validated, $transactionDate, $movement->id)) {
+            return Redirect::back()
+                ->withErrors([
+                    'quantity' => 'Jumlah pemanfaatan melebihi stok FABA yang tersedia pada tanggal transaksi.',
+                ])
+                ->withInput();
+        }
+
+        $duplicateWarning = $this->fabaMovementLedgerService->getPotentialDuplicateWarning([
+            'transaction_date' => $validated['transaction_date'],
+            'material_type' => $validated['material_type'],
+            'movement_type' => $validated['movement_type'],
+            'vendor_id' => $validated['vendor_id'] ?? null,
+            'internal_destination_id' => $validated['internal_destination_id'] ?? null,
+            'document_number' => $validated['document_number'] ?? null,
+            'document_date' => $validated['document_date'] ?? null,
+            'quantity' => round((float) $validated['quantity'], 2),
+        ], $movement->id);
 
         $attachmentPath = $movement->attachment_path;
 
@@ -230,6 +283,14 @@ class FabaUtilizationMovementsController extends Controller
             'attachment_path' => $attachmentPath,
             'period_year' => $year,
             'period_month' => $month,
+            'approval_status' => FabaMovement::STATUS_PENDING_APPROVAL,
+            'submitted_by' => Auth::id(),
+            'submitted_at' => now(),
+            'approved_by' => null,
+            'approved_at' => null,
+            'rejected_by' => null,
+            'rejected_at' => null,
+            'rejection_note' => null,
             'note' => $validated['note'] ?? null,
             'updated_by' => Auth::id(),
         ]);
@@ -240,6 +301,9 @@ class FabaUtilizationMovementsController extends Controller
             'purpose:id,name',
             'createdByUser:id,name',
             'updatedByUser:id,name',
+            'submittedByUser:id,name',
+            'approvedByUser:id,name',
+            'rejectedByUser:id,name',
         ]);
 
         $this->fabaAuditService->log(
@@ -255,7 +319,19 @@ class FabaUtilizationMovementsController extends Controller
         );
 
         return Redirect::route('waste-management.faba.utilization.show', $movement->id)
-            ->with('success', 'Movement pemanfaatan FABA berhasil diperbarui.');
+            ->with('success', 'Movement pemanfaatan FABA berhasil diperbarui.')
+            ->with('warning', $duplicateWarning['message'] ?? null);
+    }
+
+    protected function exceedsAvailableStock(array $validated, CarbonImmutable $transactionDate, ?string $excludeMovementId = null): bool
+    {
+        $availableStock = $this->fabaMovementLedgerService->calculateAvailableStock(
+            $validated['material_type'],
+            $transactionDate,
+            $excludeMovementId
+        );
+
+        return round((float) $validated['quantity'], 2) > $availableStock;
     }
 
     public function destroy(string $utilization): RedirectResponse
@@ -346,7 +422,7 @@ class FabaUtilizationMovementsController extends Controller
                     $entry->internalDestination?->name,
                     $entry->purpose?->name,
                     $this->fabaRecapService->formatPeriodLabel($entry->period_year, $entry->period_month),
-                    $this->fabaRecapService->getPeriodStatus($entry->period_year, $entry->period_month),
+                    $entry->approval_status,
                     (float) $entry->quantity,
                     $entry->unit,
                     $entry->document_number,
@@ -370,7 +446,17 @@ class FabaUtilizationMovementsController extends Controller
      */
     protected function transformMovement(FabaMovement $movement): array
     {
-        $approval = $this->fabaRecapService->getMonthlyApproval($movement->period_year, $movement->period_month);
+        $state = $this->fabaRecapService->getMovementState($movement);
+        $duplicateWarning = $this->fabaMovementLedgerService->getPotentialDuplicateWarning([
+            'transaction_date' => $movement->transaction_date->format('Y-m-d'),
+            'material_type' => $movement->material_type,
+            'movement_type' => $movement->movement_type,
+            'vendor_id' => $movement->vendor_id,
+            'internal_destination_id' => $movement->internal_destination_id,
+            'document_number' => $movement->document_number,
+            'document_date' => $movement->document_date?->format('Y-m-d'),
+            'quantity' => round((float) $movement->quantity, 2),
+        ], $movement->id);
 
         return [
             'id' => $movement->id,
@@ -394,7 +480,21 @@ class FabaUtilizationMovementsController extends Controller
             'updated_by_user' => $movement->updatedByUser,
             'created_at' => $movement->created_at?->format('Y-m-d H:i:s'),
             'updated_at' => $movement->updated_at?->format('Y-m-d H:i:s'),
-            'approval_status' => $approval?->status ?? 'draft',
+            'approval_status' => $movement->approval_status,
+            'period_status' => $state['period_status'],
+            'period_operational_status' => $state['period_operational_status'],
+            'locked' => $state['locked'],
+            'effective_status' => $state['effective_status'],
+            'submitted_by_user' => $movement->submittedByUser,
+            'approved_by_user' => $movement->approvedByUser,
+            'rejected_by_user' => $movement->rejectedByUser,
+            'submitted_at' => $movement->submitted_at?->format('Y-m-d H:i:s'),
+            'approved_at' => $movement->approved_at?->format('Y-m-d H:i:s'),
+            'rejected_at' => $movement->rejected_at?->format('Y-m-d H:i:s'),
+            'rejection_note' => $movement->rejection_note,
+            'duplicate_warning' => $duplicateWarning,
+            'can_approve' => Auth::user()?->hasPermission('faba_approvals.approve') && $movement->canApprove() && ! $this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month),
+            'can_reject' => Auth::user()?->hasPermission('faba_approvals.reject') && $movement->canReject() && ! $this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month),
             'can_edit' => $this->canModifyMovement($movement, 'faba_utilization.edit'),
             'period_label' => $this->fabaRecapService->formatPeriodLabel($movement->period_year, $movement->period_month),
         ];
@@ -415,9 +515,11 @@ class FabaUtilizationMovementsController extends Controller
             return false;
         }
 
-        $status = $this->fabaRecapService->getPeriodStatus($movement->period_year, $movement->period_month);
+        if ($this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month)) {
+            return false;
+        }
 
-        if (! in_array($status, ['draft', 'rejected'], true)) {
+        if (! in_array($movement->approval_status, [FabaMovement::STATUS_PENDING_APPROVAL, FabaMovement::STATUS_REJECTED], true)) {
             return false;
         }
 
@@ -438,6 +540,9 @@ class FabaUtilizationMovementsController extends Controller
                 'purpose:id,name',
                 'createdByUser:id,name',
                 'updatedByUser:id,name',
+                'submittedByUser:id,name',
+                'approvedByUser:id,name',
+                'rejectedByUser:id,name',
             ])
             ->findOrFail($id);
     }

@@ -26,6 +26,19 @@ const props = defineProps<{
         year: number;
         totals: { total_production: number; total_utilization: number };
     };
+    tpsCapacitySummary: {
+        materials: Array<{
+            material_type: string;
+            capacity: number;
+            warning_threshold: number;
+            critical_threshold: number;
+            utilization_percentage: number;
+        }>;
+        total: {
+            capacity: number;
+            utilization_percentage: number;
+        };
+    };
     openingBalanceDefaults: {
         year: number;
         month: number;
@@ -38,6 +51,13 @@ const form = useForm({
     material_type: 'fly_ash',
     quantity: '',
     note: '',
+});
+
+const capacityForm = useForm({
+    material_type: props.tpsCapacitySummary.materials[0]?.material_type ?? 'fly_ash',
+    capacity: String(props.tpsCapacitySummary.materials[0]?.capacity ?? 0),
+    warning_threshold: String(props.tpsCapacitySummary.materials[0]?.warning_threshold ?? 80),
+    critical_threshold: String(props.tpsCapacitySummary.materials[0]?.critical_threshold ?? 95),
 });
 
 const breadcrumbItems: BreadcrumbItem[] = [
@@ -56,6 +76,27 @@ const netFlow = computed(
 
 function submit(): void {
     form.post(wasteManagementRoutes.faba.recaps.openingBalance.store.url());
+}
+
+function syncCapacityForm(
+    materialType: string | number | bigint | Record<string, unknown> | null,
+): void {
+    if (typeof materialType !== 'string' || materialType.length === 0) {
+        return;
+    }
+
+    const selected = props.tpsCapacitySummary.materials.find(
+        (item) => item.material_type === materialType,
+    );
+
+    capacityForm.material_type = materialType;
+    capacityForm.capacity = String(selected?.capacity ?? 0);
+    capacityForm.warning_threshold = String(selected?.warning_threshold ?? 80);
+    capacityForm.critical_threshold = String(selected?.critical_threshold ?? 95);
+}
+
+function submitCapacity(): void {
+    capacityForm.post(wasteManagementRoutes.faba.recaps.tpsCapacity.store.url());
 }
 </script>
 
@@ -367,6 +408,140 @@ function submit(): void {
                                 @click="submit"
                             >
                                 Simpan opening balance
+                                <ArrowRight class="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                </section>
+
+                <section
+                    v-if="canManageOpeningBalance"
+                    class="wm-surface-elevated overflow-hidden rounded-[28px]"
+                >
+                    <div
+                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_280px] lg:p-6"
+                    >
+                        <div class="space-y-5">
+                            <div>
+                                <p
+                                    class="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400"
+                                >
+                                    Kapasitas TPS
+                                </p>
+                                <h2
+                                    class="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                                >
+                                    Kelola kapasitas per material
+                                </h2>
+                                <p
+                                    class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300"
+                                >
+                                    Simpan kapasitas aktual dan threshold warning/critical untuk monitoring TPS tenant ini.
+                                </p>
+                            </div>
+
+                            <div class="grid gap-4 md:grid-cols-2">
+                                <div class="grid gap-2">
+                                    <Label>Material</Label>
+                                    <Select
+                                        :model-value="capacityForm.material_type"
+                                        @update:model-value="syncCapacityForm"
+                                    >
+                                        <SelectTrigger class="h-11"
+                                            ><SelectValue
+                                        /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="fly_ash">{{
+                                                formatFabaMaterial('fly_ash')
+                                            }}</SelectItem>
+                                            <SelectItem value="bottom_ash">{{
+                                                formatFabaMaterial('bottom_ash')
+                                            }}</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div class="grid gap-2">
+                                    <Label>Kapasitas</Label>
+                                    <Input
+                                        v-model="capacityForm.capacity"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        class="h-11"
+                                    />
+                                </div>
+                                <div class="grid gap-2">
+                                    <Label>Warning threshold</Label>
+                                    <Input
+                                        v-model="capacityForm.warning_threshold"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        max="100"
+                                        class="h-11"
+                                    />
+                                </div>
+                                <div class="grid gap-2">
+                                    <Label>Critical threshold</Label>
+                                    <Input
+                                        v-model="capacityForm.critical_threshold"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        max="100"
+                                        class="h-11"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="space-y-4 rounded-[24px] border border-slate-200/80 bg-slate-50/90 p-5 dark:bg-slate-900/80"
+                        >
+                            <div>
+                                <p
+                                    class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
+                                >
+                                    Snapshot TPS
+                                </p>
+                                <p
+                                    class="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                                >
+                                    {{ tpsCapacitySummary.total.capacity }} ton
+                                </p>
+                                <p
+                                    class="mt-1 text-sm text-slate-600 dark:text-slate-300"
+                                >
+                                    Utilisasi {{ tpsCapacitySummary.total.utilization_percentage }}%
+                                </p>
+                            </div>
+                            <div
+                                v-for="item in tpsCapacitySummary.materials"
+                                :key="item.material_type"
+                                class="rounded-[20px] border border-white/90 bg-white/90 p-4 dark:bg-slate-950/85"
+                            >
+                                <p
+                                    class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
+                                >
+                                    {{ formatFabaMaterial(item.material_type) }}
+                                </p>
+                                <p
+                                    class="mt-2 text-sm font-medium text-slate-800 dark:text-slate-100"
+                                >
+                                    {{ item.capacity }} ton
+                                </p>
+                                <p
+                                    class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                >
+                                    Warning {{ item.warning_threshold }}% • Critical {{ item.critical_threshold }}%
+                                </p>
+                            </div>
+                            <Button
+                                class="w-full justify-between"
+                                :disabled="capacityForm.processing"
+                                @click="submitCapacity"
+                            >
+                                Simpan kapasitas TPS
                                 <ArrowRight class="h-4 w-4" />
                             </Button>
                         </div>

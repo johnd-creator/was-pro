@@ -13,6 +13,14 @@ class FabaMovement extends Model
 
     public const DEFAULT_UNIT = 'ton';
 
+    public const STATUS_DRAFT = 'draft';
+
+    public const STATUS_PENDING_APPROVAL = 'pending_approval';
+
+    public const STATUS_APPROVED = 'approved';
+
+    public const STATUS_REJECTED = 'rejected';
+
     public const MATERIAL_FLY_ASH = 'fly_ash';
 
     public const MATERIAL_BOTTOM_ASH = 'bottom_ash';
@@ -56,6 +64,14 @@ class FabaMovement extends Model
         'reference_id',
         'period_year',
         'period_month',
+        'approval_status',
+        'submitted_by',
+        'submitted_at',
+        'approved_by',
+        'approved_at',
+        'rejected_by',
+        'rejected_at',
+        'rejection_note',
         'created_by',
         'updated_by',
         'note',
@@ -69,6 +85,9 @@ class FabaMovement extends Model
             'quantity' => 'decimal:2',
             'period_year' => 'integer',
             'period_month' => 'integer',
+            'submitted_at' => 'datetime',
+            'approved_at' => 'datetime',
+            'rejected_at' => 'datetime',
         ];
     }
 
@@ -97,6 +116,21 @@ class FabaMovement extends Model
         return $this->belongsTo(User::class, 'updated_by');
     }
 
+    public function submittedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
+    }
+
+    public function approvedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function rejectedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+
     public function scopeForPeriod($query, int $year, int $month)
     {
         return $query->where('period_year', $year)->where('period_month', $month);
@@ -115,6 +149,21 @@ class FabaMovement extends Model
     public function scopeOutflows($query)
     {
         return $query->where('stock_effect', self::STOCK_EFFECT_OUT);
+    }
+
+    public function scopePendingApproval($query)
+    {
+        return $query->where('approval_status', self::STATUS_PENDING_APPROVAL);
+    }
+
+    public function scopeApproved($query)
+    {
+        return $query->where('approval_status', self::STATUS_APPROVED);
+    }
+
+    public function scopeRejected($query)
+    {
+        return $query->where('approval_status', self::STATUS_REJECTED);
     }
 
     public static function movementTypes(): array
@@ -166,8 +215,28 @@ class FabaMovement extends Model
         ];
     }
 
+    public static function approvalStatusOptions(): array
+    {
+        return [
+            self::STATUS_DRAFT,
+            self::STATUS_PENDING_APPROVAL,
+            self::STATUS_APPROVED,
+            self::STATUS_REJECTED,
+        ];
+    }
+
     public static function isValidProductionTypeForMaterial(string $materialType, string $movementType): bool
     {
         return in_array($movementType, self::productionTypeOptionsByMaterial()[$materialType] ?? [], true);
+    }
+
+    public function canApprove(): bool
+    {
+        return $this->approval_status === self::STATUS_PENDING_APPROVAL;
+    }
+
+    public function canReject(): bool
+    {
+        return $this->approval_status === self::STATUS_PENDING_APPROVAL;
     }
 }

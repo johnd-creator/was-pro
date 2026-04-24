@@ -309,7 +309,7 @@ const submittedEntries = computed(
                                     <TableHead>Material</TableHead>
                                     <TableHead>Tipe</TableHead>
                                     <TableHead>Qty</TableHead>
-                                    <TableHead>Status Bulan</TableHead>
+                                    <TableHead>Status Approval</TableHead>
                                     <TableHead>Aksi</TableHead>
                                 </TableRow>
                             </TableHeader>

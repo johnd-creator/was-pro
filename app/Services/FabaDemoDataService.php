@@ -274,7 +274,7 @@ class FabaDemoDataService
     {
         $startOfCurrentMonth = CarbonImmutable::now()->startOfMonth();
 
-        return collect(range(12, 1))
+        return collect(range(11, 0))
             ->map(fn (int $monthsBack): CarbonImmutable => $startOfCurrentMonth->subMonthsNoOverflow($monthsBack))
             ->all();
     }

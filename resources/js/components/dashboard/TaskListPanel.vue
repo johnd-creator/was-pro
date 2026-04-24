@@ -133,10 +133,10 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
 
 <template>
     <Card
-        class="wm-panel-work flex h-full min-h-[520px] flex-col overflow-hidden border shadow-sm xl:min-h-0"
+        class="wm-panel-work wm-card-overlay-blue relative flex h-full min-h-[520px] flex-col overflow-hidden border shadow-sm xl:min-h-0 dark:border-slate-700/50 dark:bg-slate-900/40"
     >
         <CardHeader
-            class="wm-border-strong shrink-0 border-b bg-slate-50/40 px-3 py-2 dark:bg-slate-900/30"
+            class="wm-border-strong shrink-0 border-b bg-sky-50/40 px-3 py-2 dark:border-slate-700/50 dark:bg-sky-950/25"
         >
             <div class="space-y-0.5">
                 <p
@@ -152,14 +152,14 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
             <!-- Tab Navigation -->
             <div class="mt-3">
                 <div
-                    class="grid grid-cols-3 gap-0 border-b border-slate-200 dark:border-slate-700"
+                    class="grid grid-cols-3 gap-0 border-b border-sky-200/60 dark:border-sky-900/40"
                 >
                     <button
                         :class="[
                             'relative px-3 py-2 text-left transition-all duration-200',
                             activeTab === 'waste'
                                 ? ''
-                                : 'hover:bg-slate-50/50 dark:hover:bg-slate-900/30',
+                                : 'hover:bg-sky-50/45 dark:hover:bg-sky-950/30',
                         ]"
                         @click="activeTab = 'waste'"
                     >
@@ -168,7 +168,7 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                                 :class="[
                                     'text-xs font-medium',
                                     activeTab === 'waste'
-                                        ? 'text-emerald-700 dark:text-emerald-300'
+                                        ? 'text-sky-700 dark:text-sky-300'
                                         : 'wm-text-muted',
                                 ]"
                             >
@@ -178,7 +178,7 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                                 :class="[
                                     'rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
                                     activeTab === 'waste'
-                                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200'
+                                        ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-200'
                                         : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
                                 ]"
                             >
@@ -187,7 +187,7 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                         </div>
                         <div
                             v-if="activeTab === 'waste'"
-                            class="absolute right-0 bottom-0 left-0 h-0.5 bg-emerald-500 dark:bg-emerald-400"
+                            class="absolute right-0 bottom-0 left-0 h-0.5 bg-sky-500 dark:bg-sky-400"
                         />
                     </button>
 
@@ -196,7 +196,7 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                             'relative px-3 py-2 text-left transition-all duration-200',
                             activeTab === 'faba'
                                 ? ''
-                                : 'hover:bg-slate-50/50 dark:hover:bg-slate-900/30',
+                                : 'hover:bg-sky-50/45 dark:hover:bg-sky-950/30',
                         ]"
                         @click="activeTab = 'faba'"
                     >
@@ -205,7 +205,7 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                                 :class="[
                                     'text-xs font-medium',
                                     activeTab === 'faba'
-                                        ? 'text-emerald-700 dark:text-emerald-300'
+                                        ? 'text-sky-700 dark:text-sky-300'
                                         : 'wm-text-muted',
                                 ]"
                             >
@@ -215,7 +215,7 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                                 :class="[
                                     'rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
                                     activeTab === 'faba'
-                                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200'
+                                        ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-200'
                                         : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
                                 ]"
                             >
@@ -224,7 +224,7 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                         </div>
                         <div
                             v-if="activeTab === 'faba'"
-                            class="absolute right-0 bottom-0 left-0 h-0.5 bg-emerald-500 dark:bg-emerald-400"
+                            class="absolute right-0 bottom-0 left-0 h-0.5 bg-sky-500 dark:bg-sky-400"
                         />
                     </button>
 
@@ -233,7 +233,7 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                             'relative px-3 py-2 text-left transition-all duration-200',
                             activeTab === 'hauling_attention'
                                 ? ''
-                                : 'hover:bg-slate-50/50 dark:hover:bg-slate-900/30',
+                                : 'hover:bg-sky-50/45 dark:hover:bg-sky-950/30',
                         ]"
                         @click="activeTab = 'hauling_attention'"
                     >
@@ -242,7 +242,7 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                                 :class="[
                                     'text-xs font-medium',
                                     activeTab === 'hauling_attention'
-                                        ? 'text-emerald-700 dark:text-emerald-300'
+                                        ? 'text-sky-700 dark:text-sky-300'
                                         : 'wm-text-muted',
                                 ]"
                             >
@@ -252,7 +252,7 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                                 :class="[
                                     'rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
                                     activeTab === 'hauling_attention'
-                                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200'
+                                        ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-200'
                                         : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
                                 ]"
                             >
@@ -261,7 +261,7 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                         </div>
                         <div
                             v-if="activeTab === 'hauling_attention'"
-                            class="absolute right-0 bottom-0 left-0 h-0.5 bg-emerald-500 dark:bg-emerald-400"
+                            class="absolute right-0 bottom-0 left-0 h-0.5 bg-sky-500 dark:bg-sky-400"
                         />
                     </button>
                 </div>
@@ -275,7 +275,7 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
             >
                 <div class="space-y-1.5">
                     <CheckCircle2
-                        class="mx-auto size-4 text-emerald-500 dark:text-emerald-300"
+                        class="mx-auto size-4 text-sky-500 dark:text-sky-300"
                     />
                     <p class="wm-text-primary text-xs font-medium">
                         Tidak ada task aktif
@@ -297,7 +297,7 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                         yang perlu ditangani
                     </p>
                     <span
-                        class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                        class="rounded-full bg-sky-100/80 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950/50 dark:text-sky-200"
                     >
                         {{ activePendingCount }} items
                     </span>
@@ -310,7 +310,7 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                             v-for="task in activeTasks"
                             :key="task.id"
                             :href="task.href"
-                            class="wm-panel-elevated block rounded-lg border px-2.5 py-2 transition-colors duration-200 hover:border-slate-300 hover:bg-white dark:hover:border-slate-700 dark:hover:bg-slate-950"
+                            class="wm-panel-elevated block rounded-lg border px-2.5 py-2 transition-colors duration-200 hover:border-sky-300/70 hover:bg-sky-50/40 dark:hover:border-sky-800/70 dark:hover:bg-sky-950/30"
                         >
                             <div class="flex items-start gap-2">
                                 <div
@@ -373,7 +373,7 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
                 <div class="shrink-0 pt-1">
                     <Link
                         :href="viewAllHref"
-                        class="flex items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[10px] font-medium text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                        class="flex items-center justify-center gap-1.5 rounded-md border border-sky-200/80 bg-sky-50 px-2.5 py-1.5 text-[10px] font-medium text-sky-700 transition-colors hover:bg-sky-100 hover:text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/45 dark:text-sky-200 dark:hover:bg-sky-900/45 dark:hover:text-sky-100"
                     >
                         Lihat Semua
                         <ArrowRight class="size-3" />

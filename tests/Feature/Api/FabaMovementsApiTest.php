@@ -11,13 +11,16 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Services\TenantService;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Str;
 
 beforeEach(function () {
     $this->tenantService = app(TenantService::class);
+    $suffix = Str::lower(Str::random(8));
 
     $this->organization = Organization::factory()->create([
-        'code' => 'APIFABA',
-        'schema_name' => 'tenant_api_faba',
+        'code' => 'APIFABA'.$suffix,
+        'schema_name' => 'tenant_api_faba_'.$suffix,
     ]);
 
     if (! $this->tenantService->schemaExists($this->organization->schema_name)) {
@@ -51,6 +54,9 @@ beforeEach(function () {
         'faba_adjustments.create',
         'faba_adjustments.edit',
         'faba_adjustments.delete',
+        'faba_approvals.view',
+        'faba_approvals.approve',
+        'faba_approvals.reject',
     ])->map(function (string $slug) {
         [$module] = explode('.', $slug);
 
@@ -106,11 +112,51 @@ test('operator can create production movement via api', function () {
 
     $response->assertCreated()
         ->assertJsonPath('data.movement_type', FabaMovement::TYPE_PRODUCTION)
-        ->assertJsonPath('data.approval_status', FabaMonthlyApproval::STATUS_DRAFT);
+        ->assertJsonPath('data.approval_status', FabaMovement::STATUS_PENDING_APPROVAL);
+});
+
+test('production movement api returns duplicate warning metadata when pattern already exists', function () {
+    $date = now()->toDateString();
+
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    FabaMovement::factory()->create([
+        'transaction_date' => $date,
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'quantity' => 5,
+        'period_year' => (int) now()->year,
+        'period_month' => (int) now()->month,
+    ]);
+    $this->tenantService->switchToPublic();
+
+    $response = $this->withToken($this->token)->postJson('/api/v1/faba/production', [
+        'transaction_date' => $date,
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'quantity' => 5,
+        'note' => 'Possible duplicate',
+    ]);
+
+    $response->assertCreated()
+        ->assertJsonPath('data.duplicate_warning.count', 1)
+        ->assertJsonPath('data.locked', false);
 });
 
 test('operator can create utilization movement via api', function () {
-    $response = $this->withToken($this->token)->postJson('/api/v1/faba/utilization', [
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    FabaMovement::factory()->create([
+        'transaction_date' => now()->subDay()->toDateString(),
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'quantity' => 10,
+        'period_year' => (int) now()->year,
+        'period_month' => (int) now()->month,
+    ]);
+    $this->tenantService->switchToPublic();
+
+    $response = $this->withToken($this->token)->post('/api/v1/faba/utilization', [
         'transaction_date' => now()->toDateString(),
         'material_type' => FabaMovement::MATERIAL_FLY_ASH,
         'movement_type' => FabaMovement::TYPE_UTILIZATION_EXTERNAL,
@@ -119,12 +165,14 @@ test('operator can create utilization movement via api', function () {
         'quantity' => 2.5,
         'document_number' => 'DOC-001',
         'document_date' => now()->toDateString(),
+        'attachment' => UploadedFile::fake()->create('manifest.pdf', 100),
         'note' => 'External utilization',
     ]);
 
-    $response->assertCreated()
+    $response->assertStatus(201)
         ->assertJsonPath('data.vendor.id', $this->vendor->id)
-        ->assertJsonPath('data.movement_type', FabaMovement::TYPE_UTILIZATION_EXTERNAL);
+        ->assertJsonPath('data.movement_type', FabaMovement::TYPE_UTILIZATION_EXTERNAL)
+        ->assertJsonPath('data.approval_status', FabaMovement::STATUS_PENDING_APPROVAL);
 });
 
 test('adjustment out is rejected when stock is insufficient via api', function () {
@@ -166,6 +214,33 @@ test('adjustment out succeeds when there is enough stock via api', function () {
 
     $response->assertCreated()
         ->assertJsonPath('data.movement_type', FabaMovement::TYPE_ADJUSTMENT_OUT);
+});
+
+test('pending faba movement can be approved via api', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    $movement = FabaMovement::factory()->create([
+        'transaction_date' => now()->toDateString(),
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'quantity' => 4,
+        'unit' => FabaMovement::DEFAULT_UNIT,
+        'period_year' => (int) now()->year,
+        'period_month' => (int) now()->month,
+        'approval_status' => FabaMovement::STATUS_PENDING_APPROVAL,
+        'submitted_by' => $this->operator->id,
+        'submitted_at' => now(),
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+    ]);
+    $this->tenantService->switchToPublic();
+
+    $response = $this->withToken($this->token)->postJson("/api/v1/faba/movements/{$movement->id}/approve", [
+        'approval_note' => 'Valid',
+    ]);
+
+    $response->assertSuccessful()
+        ->assertJsonPath('data.approval_status', FabaMovement::STATUS_APPROVED);
 });
 
 test('locked period rejects production update via api', function () {

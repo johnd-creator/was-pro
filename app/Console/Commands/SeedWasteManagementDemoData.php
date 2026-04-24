@@ -44,7 +44,7 @@ class SeedWasteManagementDemoData extends Command
         $this->line('Jenis limbah: '.$summary['waste_types_count']);
         $this->line('Vendor aktif: '.$summary['vendors_count']);
         $this->line('Catatan limbah: '.$summary['waste_records_count']);
-        $this->line('Pengangkutan limbah: '.$summary['transportations_count']);
+        $this->line('Pengangkutan limbah: '.$summary['haulings_count']);
         $this->newLine();
         $this->comment('Login demo:');
         $this->line('- Supervisor: wm.supervisor.demo@local.test / password');

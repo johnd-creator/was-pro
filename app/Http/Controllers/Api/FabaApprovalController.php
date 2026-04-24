@@ -8,6 +8,7 @@ use App\Http\Requests\WasteManagement\ReopenFabaMonthlyApprovalRequest;
 use App\Http\Requests\WasteManagement\SubmitFabaMonthlyApprovalRequest;
 use App\Models\FabaAuditLog;
 use App\Models\FabaMonthlyApproval;
+use App\Models\FabaMovement;
 use App\Services\FabaAuditService;
 use App\Services\FabaRecapService;
 use Illuminate\Http\JsonResponse;
@@ -117,6 +118,10 @@ class FabaApprovalController extends ApiController
 
         if (! $this->fabaRecapService->hasTransactionsForPeriod($year, $month)) {
             return $this->error('Periode kosong tidak dapat diajukan untuk approval.', 'CONFLICT', status: 409);
+        }
+
+        if (FabaMovement::query()->forPeriod($year, $month)->pendingApproval()->exists()) {
+            return $this->error('Masih ada transaksi FABA harian yang menunggu persetujuan.', 'CONFLICT', status: 409);
         }
 
         $approval = $this->fabaRecapService->getOrCreateMonthlyApproval($year, $month);

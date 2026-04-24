@@ -5,6 +5,7 @@ import { computed } from 'vue';
 import CompactStat from '@/components/dashboard/CompactStat.vue';
 import ComplianceHero from '@/components/dashboard/ComplianceHero.vue';
 import DistributionDonut from '@/components/dashboard/DistributionDonut.vue';
+import FabaHeroKpiCards from '@/components/dashboard/FabaHeroKpiCards.vue';
 import FabaTrendChart from '@/components/dashboard/FabaTrendChart.vue';
 import TaskListPanel from '@/components/dashboard/TaskListPanel.vue';
 import WasteFlowChart from '@/components/dashboard/WasteFlowChart.vue';
@@ -30,8 +31,6 @@ interface Stats {
     total_waste_records: number;
     approved_records: number;
     pending_records: number;
-    total_transportations: number;
-    in_transit_transportations: number;
     expired_waste: number;
     expiring_soon_waste: number;
 }
@@ -102,9 +101,12 @@ interface Props {
     }>;
     stats: Stats;
     pendingApprovals: ApprovalItem[];
-    wasteByCategory: CategoryData[];
-    fabaProductionMaterialDistribution: CategoryData[];
+    wasteHaulingStatusDistribution: CategoryData[];
+    wasteBacklogUrgencyDistribution: CategoryData[];
     fabaStats: FabaStats;
+    fabaHeroStats: FabaStats & {
+        year: number;
+    };
     fabaChart: Array<{
         label: string;
         month: number;
@@ -112,7 +114,21 @@ interface Props {
         production: number;
         utilization: number;
         closing_balance: number;
+        production_fly_ash: number;
+        production_bottom_ash: number;
+        utilization_fly_ash: number;
+        utilization_bottom_ash: number;
+        closing_fly_ash: number;
+        closing_bottom_ash: number;
+        capacity_utilization_percentage: number;
+        capacity_status: 'normal' | 'warning' | 'critical';
+        capacity_warning_threshold: number;
+        capacity_critical_threshold: number;
+        warning_count: number;
+        has_warning: boolean;
     }>;
+    fabaMaterialBalanceDistribution: CategoryData[];
+    fabaUtilizationDistribution: CategoryData[];
     fabaPendingApprovals: ApprovalItem[];
     fabaWarnings: Array<{
         month: number;
@@ -124,8 +140,16 @@ interface Props {
         label: string;
         month: number;
         year: number;
-        input_count: number;
-        transported_count: number;
+        approved_input_count: number;
+        completed_count: number;
+        closing_backlog_count: number;
+        approved_input_quantity: number;
+        hauled_quantity: number;
+        closing_backlog_quantity: number;
+        expired_backlog_quantity: number;
+        expiring_soon_backlog_quantity: number;
+        unit: string;
+        other_units_count: number;
     }>;
     tasks: DashboardTaskItem[];
     taskContext: 'operator' | 'approver';
@@ -156,18 +180,8 @@ const wasteStatsContext = computed(() => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div
-            class="wm-bg-app relative overflow-x-hidden px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6"
+            class="relative overflow-x-hidden px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6"
         >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] dark:from-slate-950 dark:via-slate-950"
-            />
-            <div
-                class="pointer-events-none absolute -top-16 left-1/2 -z-10 h-64 w-64 -translate-x-[55%] rounded-full bg-blue-200/20 blur-3xl dark:bg-blue-500/10"
-            />
-            <div
-                class="pointer-events-none absolute top-36 right-0 -z-10 h-56 w-56 rounded-full bg-emerald-200/15 blur-3xl dark:bg-emerald-500/8"
-            />
-
             <div class="space-y-4 lg:space-y-5">
                 <section
                     class="grid gap-4 xl:grid-cols-6 xl:grid-rows-[auto_auto] xl:items-stretch"
@@ -238,33 +252,10 @@ const wasteStatsContext = computed(() => {
                                     stats.expired_waste > 0 ? 'red' : 'emerald'
                                 "
                             />
-                            <CompactStat
-                                title="FABA Produksi"
-                                :value="fabaStats.total_production"
-                                unit="ton"
-                                :context-label="wasteStatsContext.fabaLabel"
-                                hint="Output periode aktif"
-                                color="blue"
-                            />
-                            <CompactStat
-                                title="FABA Pemanfaatan"
-                                :value="fabaStats.total_utilization"
-                                unit="ton"
-                                :context-label="wasteStatsContext.fabaLabel"
-                                hint="Serapan periode aktif"
-                                color="emerald"
-                            />
-                            <CompactStat
-                                title="Saldo FABA"
-                                :value="fabaStats.current_balance"
-                                unit="ton"
-                                :context-label="wasteStatsContext.fabaLabel"
-                                hint="Posisi saldo berjalan"
-                                :color="
-                                    fabaStats.current_balance < 0
-                                        ? 'red'
-                                        : 'emerald'
-                                "
+                            <FabaHeroKpiCards
+                                :year="fabaHeroStats.year"
+                                :stats="fabaHeroStats"
+                                variant="summary"
                             />
                         </div>
                     </div>
@@ -285,7 +276,7 @@ const wasteStatsContext = computed(() => {
                 </section>
 
                 <section class="space-y-3 lg:space-y-4">
-                    <div class="flex items-end justify-between gap-4">
+                    <div class="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(340px,1fr)]">
                         <div>
                             <p
                                 class="wm-text-muted text-[11px] font-semibold tracking-[0.12em] uppercase"
@@ -297,22 +288,13 @@ const wasteStatsContext = computed(() => {
                             >
                                 Trend 6 Bulan
                             </h3>
+                            <p class="wm-text-secondary mt-2 text-sm">
+                                Pantau intake limbah approved, backlog
+                                pengangkutan, produksi FABA, dan warning
+                                periodenya dari satu area baca.
+                            </p>
                         </div>
-                        <p class="wm-text-secondary hidden text-sm lg:block">
-                            Bandingkan ritme input, pengangkutan, produksi, dan
-                            pemanfaatan dalam satu area baca.
-                        </p>
-                    </div>
-
-                    <div class="grid gap-6 xl:grid-cols-2">
-                        <WasteFlowChart :data="wasteChart" />
-                        <FabaTrendChart :data="fabaChart" />
-                    </div>
-                </section>
-
-                <section class="space-y-4">
-                    <div class="flex items-end justify-between gap-4">
-                        <div>
+                        <div class="xl:justify-self-start">
                             <p
                                 class="wm-text-muted text-[11px] font-semibold tracking-[0.12em] uppercase"
                             >
@@ -321,53 +303,98 @@ const wasteStatsContext = computed(() => {
                             <h3
                                 class="wm-text-primary mt-1 text-base font-semibold tracking-tight"
                             >
-                                Distribusi
+                                Donut Distribusi
                             </h3>
                         </div>
-                        <p class="wm-text-secondary hidden text-sm lg:block">
-                            Baca komposisi kategori dan material tanpa
-                            kehilangan konteks angka total.
-                        </p>
                     </div>
 
-                    <div class="grid gap-6 xl:grid-cols-2">
-                        <Card
-                            class="wm-panel-elevated overflow-hidden rounded-2xl border shadow-sm"
-                        >
-                            <CardHeader
-                                class="wm-border-default border-b bg-slate-50/40 pb-3 dark:bg-slate-900/30"
-                            >
-                                <CardTitle class="wm-text-primary text-base">
-                                    Distribusi Kategori Limbah
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <DistributionDonut
-                                    :data="wasteByCategory"
-                                    total-label="Total"
-                                    value-suffix="kg"
-                                />
-                            </CardContent>
-                        </Card>
+                    <div
+                        class="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(340px,1fr)]"
+                    >
+                        <div class="space-y-6">
+                            <WasteFlowChart :data="wasteChart" />
+                            <FabaTrendChart :data="fabaChart" />
+                        </div>
 
-                        <Card
-                            class="wm-panel-elevated overflow-hidden rounded-2xl border shadow-sm"
-                        >
-                            <CardHeader
-                                class="wm-border-default border-b bg-slate-50/40 pb-3 dark:bg-slate-900/30"
-                            >
-                                <CardTitle class="wm-text-primary text-base">
-                                    Distribusi Material Produksi FABA
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <DistributionDonut
-                                    :data="fabaProductionMaterialDistribution"
-                                    total-label="Total"
-                                    value-suffix="ton"
-                                />
-                            </CardContent>
-                        </Card>
+                        <div class="space-y-4">
+                            <div class="grid gap-4 grid-cols-1">
+                                <Card
+                                    class="wm-panel-elevated wm-card-overlay-blue overflow-hidden rounded-2xl border shadow-sm dark:border-slate-700/50 dark:bg-slate-900/40"
+                                >
+                                    <CardHeader
+                                        class="wm-border-default border-b bg-slate-50/40 pb-3 dark:bg-slate-900/60 dark:border-slate-700/50"
+                                    >
+                                        <CardTitle class="wm-text-primary text-base">
+                                            Distribusi Status Pengangkutan Limbah
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <DistributionDonut
+                                            :data="wasteHaulingStatusDistribution"
+                                            total-label="Catatan"
+                                            value-suffix="catatan"
+                                        />
+                                    </CardContent>
+                                </Card>
+
+                                <Card
+                                    class="wm-panel-elevated wm-card-overlay-blue overflow-hidden rounded-2xl border shadow-sm dark:border-slate-700/50 dark:bg-slate-900/40"
+                                >
+                                    <CardHeader
+                                        class="wm-border-default border-b bg-slate-50/40 pb-3 dark:bg-slate-900/60 dark:border-slate-700/50"
+                                    >
+                                        <CardTitle class="wm-text-primary text-base">
+                                            Distribusi Urgensi Backlog Limbah
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <DistributionDonut
+                                            :data="wasteBacklogUrgencyDistribution"
+                                            total-label="Backlog"
+                                            value-suffix="record"
+                                        />
+                                    </CardContent>
+                                </Card>
+
+                                <Card
+                                    class="wm-panel-elevated wm-card-overlay-blue overflow-hidden rounded-2xl border shadow-sm dark:border-slate-700/50 dark:bg-slate-900/40"
+                                >
+                                    <CardHeader
+                                        class="wm-border-default border-b bg-slate-50/40 pb-3 dark:bg-slate-900/60 dark:border-slate-700/50"
+                                    >
+                                        <CardTitle class="wm-text-primary text-base">
+                                            Komposisi Saldo FABA
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <DistributionDonut
+                                            :data="fabaMaterialBalanceDistribution"
+                                            total-label="Saldo"
+                                            value-suffix="ton"
+                                        />
+                                    </CardContent>
+                                </Card>
+
+                                <Card
+                                    class="wm-panel-elevated wm-card-overlay-blue overflow-hidden rounded-2xl border shadow-sm dark:border-slate-700/50 dark:bg-slate-900/40"
+                                >
+                                    <CardHeader
+                                        class="wm-border-default border-b bg-slate-50/40 pb-3 dark:bg-slate-900/60 dark:border-slate-700/50"
+                                    >
+                                        <CardTitle class="wm-text-primary text-base">
+                                            Komposisi Pemanfaatan FABA
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <DistributionDonut
+                                            :data="fabaUtilizationDistribution"
+                                            total-label="Pemanfaatan"
+                                            value-suffix="ton"
+                                        />
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </div>
                     </div>
                 </section>
             </div>

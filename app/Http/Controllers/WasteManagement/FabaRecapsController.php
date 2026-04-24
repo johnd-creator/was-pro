@@ -4,6 +4,7 @@ namespace App\Http\Controllers\WasteManagement;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\WasteManagement\StoreFabaOpeningBalanceRequest;
+use App\Http\Requests\WasteManagement\StoreFabaTpsCapacityRequest;
 use App\Models\FabaAuditLog;
 use App\Models\Vendor;
 use App\Services\FabaAuditService;
@@ -17,7 +18,7 @@ class FabaRecapsController extends Controller
 {
     public function __construct(
         protected FabaRecapService $fabaRecapService,
-        protected FabaAuditService $fabaAuditService
+        protected FabaAuditService $fabaAuditService,
     ) {}
 
     public function monthly(): Response
@@ -70,6 +71,7 @@ class FabaRecapsController extends Controller
             'currentBalance' => $this->fabaRecapService->getCurrentBalance(),
             'yearlyRecap' => $this->fabaRecapService->getYearlyRecap($resolvedPeriod['year']),
             'canManageOpeningBalance' => Auth::user()?->hasPermission('faba_opening_balance.manage') ?? false,
+            'tpsCapacitySummary' => $this->fabaRecapService->getTpsCapacitySummary($resolvedPeriod['year'], $resolvedPeriod['month']),
             'openingBalanceDefaults' => [
                 'year' => $resolvedPeriod['year'],
                 'month' => $resolvedPeriod['month'],
@@ -125,5 +127,36 @@ class FabaRecapsController extends Controller
         );
 
         return back()->with('success', 'Opening balance berhasil disimpan.');
+    }
+
+    public function storeTpsCapacity(StoreFabaTpsCapacityRequest $request): RedirectResponse
+    {
+        $validated = $request->validated();
+        $capacity = $this->fabaRecapService->setTpsCapacity(
+            (string) $validated['material_type'],
+            (float) $validated['capacity'],
+            (float) $validated['warning_threshold'],
+            (float) $validated['critical_threshold'],
+            Auth::id(),
+        );
+
+        $this->fabaAuditService->log(
+            Auth::id(),
+            'set_tps_capacity',
+            FabaAuditLog::MODULE_BALANCE,
+            get_class($capacity),
+            $capacity->id,
+            (int) now()->year,
+            (int) now()->month,
+            'Kapasitas TPS FABA diperbarui.',
+            [
+                'material_type' => $capacity->material_type,
+                'capacity' => (float) $capacity->capacity,
+                'warning_threshold' => (float) $capacity->warning_threshold,
+                'critical_threshold' => (float) $capacity->critical_threshold,
+            ]
+        );
+
+        return back()->with('success', 'Kapasitas TPS berhasil disimpan.');
     }
 }

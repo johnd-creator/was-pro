@@ -6,8 +6,8 @@ use App\Models\FabaMonthlyApproval;
 use App\Models\FabaMovement;
 use App\Models\Organization;
 use App\Models\User;
+use App\Models\WasteHauling;
 use App\Models\WasteRecord;
-use App\Models\WasteTransportation;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 
@@ -39,18 +39,20 @@ class UnifiedDashboardService
                 'waste_stats' => $this->getWasteStats(),
                 'pending_approvals' => $this->getPendingApprovals(),
                 'tasks' => $this->getDashboardTasks(),
-                'waste_by_category' => $this->getWasteByCategory(),
-                'transportation_stats' => $this->getTransportationStats(),
+                'waste_hauling_status_distribution' => $this->getWasteHaulingStatusDistribution(),
                 'recent_activities' => $this->getRecentActivities(),
                 'faba_stats' => $this->getFabaStats(),
+                'faba_hero_stats' => $this->getFabaHeroStats(),
                 'faba_balance' => $this->getFabaStats()['current_balance'],
                 'faba_chart' => $this->getFabaChartData(),
+                'faba_material_balance_distribution' => $this->getFabaMaterialBalanceDistribution(),
+                'faba_utilization_distribution' => $this->getFabaUtilizationDistribution(),
                 'faba_pending' => $this->getFabaPendingApprovals(),
                 'faba_warnings' => $this->getFabaWarnings(),
                 'faba_latest' => $this->getLatestFabaPeriod(),
                 'top_vendors' => $this->getTopVendors(),
                 'waste_chart' => $this->getWasteChartData(),
-                'faba_production_material_distribution' => $this->getFabaProductionMaterialDistribution(),
+                'waste_backlog_urgency_distribution' => $this->getWasteBacklogUrgencyDistribution(),
                 'notification_summary' => $this->getNotificationSummary(),
                 'header' => $this->getHeaderMetadata($organization),
                 'filters' => [
@@ -78,32 +80,32 @@ class UnifiedDashboardService
     private function getWasteStats(): array
     {
         $snapshotDate = $this->snapshotDate();
-        $monthStart = $snapshotDate->startOfMonth();
         $wasteRecordsUntilSnapshot = $this->wasteRecordsUntilSnapshot();
-        $wasteTransportationsUntilSnapshot = $this->wasteTransportationsUntilSnapshot();
+        $wasteHaulingsUntilSnapshot = $this->wasteHaulingsUntilSnapshot();
+        $wasteHaulingsForSelectedMonth = $this->wasteHaulingsForSelectedMonth();
+        $backlogRecords = $this->approvedRecordsWithHaulingsUntilDate($snapshotDate)
+            ->filter(fn (WasteRecord $record): bool => $this->remainingQuantityAtDate($record, $snapshotDate) > 0);
 
         return [
             'waste_total_records_snapshot' => (clone $wasteRecordsUntilSnapshot)->count(),
-            'waste_transported_records_snapshot' => (clone $wasteTransportationsUntilSnapshot)
-                ->where('status', '!=', 'cancelled')
+            'waste_transported_records_snapshot' => (clone $wasteHaulingsUntilSnapshot)
+                ->approved()
                 ->distinct('waste_record_id')
                 ->count('waste_record_id'),
-            'waste_untransported_records_snapshot' => $this->approvedWasteRecordsAwaitingTransportationCount(),
+            'waste_untransported_records_snapshot' => $this->approvedWasteRecordsAwaitingHaulingCount(),
             'total_waste_records' => $this->wasteRecordsForSelectedMonth()->count(),
             'approved_records' => $this->wasteRecordsForSelectedMonth()->approved()->count(),
             'pending_records' => $this->wasteRecordsForSelectedMonth()->pendingApproval()->count(),
-            'total_transportations' => $this->wasteTransportationsForSelectedMonth()->count(),
-            'in_transit_transportations' => $this->wasteTransportationsForSelectedMonth()->inTransit()->count(),
-            'expired_waste' => WasteRecord::query()
-                ->approved()
-                ->whereBetween('expiry_date', [$monthStart->toDateString(), $snapshotDate->toDateString()])
+            'total_transportations' => (clone $wasteHaulingsForSelectedMonth)->count(),
+            'in_transit_transportations' => (clone $wasteHaulingsForSelectedMonth)->pendingApproval()->count(),
+            'expired_waste' => $backlogRecords
+                ->filter(fn (WasteRecord $record): bool => $record->expiry_date !== null && $record->expiry_date->lt($snapshotDate))
                 ->count(),
-            'expiring_soon_waste' => WasteRecord::query()
-                ->approved()
-                ->whereBetween('expiry_date', [
-                    $snapshotDate->toDateString(),
-                    $snapshotDate->addDays(7)->toDateString(),
-                ])
+            'expiring_soon_waste' => $backlogRecords
+                ->filter(fn (WasteRecord $record): bool => $record->expiry_date !== null && $record->expiry_date->between(
+                    $snapshotDate,
+                    $snapshotDate->copy()->addDays(7)->endOfDay()
+                ))
                 ->count(),
         ];
     }
@@ -163,70 +165,51 @@ class UnifiedDashboardService
             ->all();
     }
 
-    private function getWasteByCategory(): array
+    private function getWasteHaulingStatusDistribution(): array
     {
-        $totalApprovedQuantity = (float) $this->wasteRecordsForSelectedMonth()
+        $snapshotDate = $this->snapshotDate()->toDateString();
+
+        $records = WasteRecord::query()
             ->approved()
-            ->sum('quantity');
+            ->whereDate('date', '<=', $snapshotDate)
+            ->with([
+                'haulings' => fn ($query) => $query->whereDate('hauling_date', '<=', $snapshotDate),
+            ])
+            ->get();
 
-        return $this->wasteRecordsForSelectedMonth()
-            ->approved()
-            ->join('waste_types', 'waste_records.waste_type_id', '=', 'waste_types.id')
-            ->join('waste_categories', 'waste_types.category_id', '=', 'waste_categories.id')
-            ->selectRaw('waste_categories.name as category, SUM(waste_records.quantity) as total_quantity')
-            ->groupBy('waste_categories.name')
-            ->orderByDesc('total_quantity')
-            ->get()
-            ->map(function ($item) use ($totalApprovedQuantity) {
-                return [
-                    'label' => $item->category,
-                    'value' => round((float) $item->total_quantity, 2),
-                    'percentage' => $totalApprovedQuantity > 0
-                        ? round((((float) $item->total_quantity) / $totalApprovedQuantity) * 100, 2)
-                        : 0,
-                ];
-            })->all();
-    }
-
-    private function getTransportationStats(): array
-    {
-        $baseQuery = $this->wasteTransportationsForSelectedMonth();
-        $total = (clone $baseQuery)->count();
-
-        return [
-            [
-                'status' => 'pending',
-                'count' => (clone $baseQuery)->pending()->count(),
-                'color' => 'bg-yellow-500',
-                'percentage' => $total > 0
-                    ? ((clone $baseQuery)->pending()->count() / $total) * 100
-                    : 0,
-            ],
-            [
-                'status' => 'in_transit',
-                'count' => (clone $baseQuery)->inTransit()->count(),
-                'color' => 'bg-blue-500',
-                'percentage' => $total > 0
-                    ? ((clone $baseQuery)->inTransit()->count() / $total) * 100
-                    : 0,
-            ],
-            [
-                'status' => 'delivered',
-                'count' => (clone $baseQuery)->delivered()->count(),
-                'color' => 'bg-green-500',
-                'percentage' => $total > 0
-                    ? ((clone $baseQuery)->delivered()->count() / $total) * 100
-                    : 0,
-            ],
-            [
-                'status' => 'cancelled',
-                'count' => (clone $baseQuery)->cancelled()->count(),
-                'color' => 'bg-red-500',
-                'percentage' => $total > 0
-                    ? ((clone $baseQuery)->cancelled()->count() / $total) * 100
-                    : 0,
-            ],
+        $distribution = [
+            'Belum Diangkut' => 0,
+            'Menunggu Persetujuan' => 0,
+            'Sebagian Diangkut' => 0,
+            'Selesai' => 0,
         ];
+
+        foreach ($records as $record) {
+            $approvedQuantity = $record->getApprovedHauledQuantity();
+            $reservedQuantity = $record->getReservedHaulingQuantity();
+            $remainingQuantity = $record->getRemainingQuantity();
+
+            $label = match (true) {
+                $remainingQuantity <= 0 => 'Selesai',
+                $reservedQuantity > $approvedQuantity => 'Menunggu Persetujuan',
+                $approvedQuantity > 0 => 'Sebagian Diangkut',
+                default => 'Belum Diangkut',
+            };
+
+            $distribution[$label]++;
+        }
+
+        $total = array_sum($distribution);
+
+        return collect($distribution)
+            ->filter(fn (int $value): bool => $value > 0)
+            ->map(fn (int $value, string $label): array => [
+                'label' => $label,
+                'value' => $value,
+                'percentage' => $total > 0 ? round(($value / $total) * 100, 2) : 0,
+            ])
+            ->values()
+            ->all();
     }
 
     private function getRecentActivities(): array
@@ -253,30 +236,31 @@ class UnifiedDashboardService
             ];
         }
 
-        // Recent transportations
-        $recentTransportations = WasteTransportation::with(['wasteRecord.wasteType', 'createdBy'])
-            ->whereYear('transportation_date', $this->selectedYear)
-            ->whereMonth('transportation_date', $this->selectedMonth)
+        // Recent haulings
+        $recentHaulings = WasteHauling::with(['wasteRecord.wasteType', 'createdBy'])
+            ->whereYear('hauling_date', $this->selectedYear)
+            ->whereMonth('hauling_date', $this->selectedMonth)
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get();
 
-        foreach ($recentTransportations as $transportation) {
+        foreach ($recentHaulings as $hauling) {
             $actions = [
-                'pending' => 'scheduled',
-                'in_transit' => 'dispatched',
-                'delivered' => 'completed',
+                'pending_approval' => 'submitted',
+                'approved' => 'approved',
+                'rejected' => 'rejected',
                 'cancelled' => 'cancelled',
             ];
+            $actionLabel = $actions[$hauling->status] ?? $hauling->status;
 
             $activities[] = [
-                'id' => $transportation->id,
-                'type' => 'transportation',
-                'action' => $transportation->status === 'pending' ? 'created' : $transportation->status,
-                'description' => "Transportation {$transportation->transportation_number}: {$actions[$transportation->status]}",
-                'user_name' => $transportation->createdBy?->name ?? 'System',
-                'created_at' => $transportation->created_at->toIso8601String(),
-                'link' => "/waste-management/transportations/{$transportation->id}",
+                'id' => $hauling->id,
+                'type' => 'waste_hauling',
+                'action' => $hauling->status,
+                'description' => "Hauling {$hauling->hauling_number}: {$actionLabel}",
+                'user_name' => $hauling->createdBy?->name ?? 'System',
+                'created_at' => $hauling->created_at->toIso8601String(),
+                'link' => "/waste-management/haulings/{$hauling->id}",
             ];
         }
 
@@ -300,6 +284,21 @@ class UnifiedDashboardService
         ];
     }
 
+    private function getFabaHeroStats(): array
+    {
+        $yearlyRecap = $this->fabaRecapService->getYearlyRecap($this->selectedYear);
+
+        return [
+            'year' => $this->selectedYear,
+            'total_production' => $yearlyRecap['totals']['total_production'],
+            'total_utilization' => $yearlyRecap['totals']['total_utilization'],
+            'current_balance' => $this->fabaRecapService->getCurrentBalance(),
+            'negative_periods' => collect($yearlyRecap['months'])
+                ->filter(fn (array $month): bool => (bool) $month['warning_negative_balance'])
+                ->count(),
+        ];
+    }
+
     private function getFabaChartData(): array
     {
         $anchorDate = CarbonImmutable::create($this->selectedYear, $this->selectedMonth, 1);
@@ -308,6 +307,9 @@ class UnifiedDashboardService
             ->map(function (int $offset) use ($anchorDate): array {
                 $date = $anchorDate->subMonths($offset);
                 $monthlyRecap = $this->fabaRecapService->getMonthlyRecap($date->year, $date->month);
+                $capacitySummary = $this->fabaRecapService->getTpsCapacitySummary($date->year, $date->month);
+                $hasPeriodActivity = $this->hasFabaPeriodActivity($date->year, $date->month);
+                $warningCount = $hasPeriodActivity ? count($monthlyRecap['warnings']) : 0;
 
                 return [
                     'label' => $this->fabaRecapService->formatMonthLabel($date->month),
@@ -316,8 +318,69 @@ class UnifiedDashboardService
                     'production' => $monthlyRecap['total_production'],
                     'utilization' => $monthlyRecap['total_utilization'],
                     'closing_balance' => $monthlyRecap['closing_balance'],
+                    'production_fly_ash' => $monthlyRecap['production_fly_ash'],
+                    'production_bottom_ash' => $monthlyRecap['production_bottom_ash'],
+                    'utilization_fly_ash' => $monthlyRecap['utilization_fly_ash'],
+                    'utilization_bottom_ash' => $monthlyRecap['utilization_bottom_ash'],
+                    'closing_fly_ash' => $monthlyRecap['closing_fly_ash'],
+                    'closing_bottom_ash' => $monthlyRecap['closing_bottom_ash'],
+                    'capacity_utilization_percentage' => $capacitySummary['total']['utilization_percentage'],
+                    'capacity_status' => $capacitySummary['total']['status'],
+                    'capacity_warning_threshold' => $capacitySummary['thresholds']['warning'],
+                    'capacity_critical_threshold' => $capacitySummary['thresholds']['critical'],
+                    'warning_count' => $warningCount,
+                    'has_warning' => $warningCount > 0,
                 ];
             })
+            ->values()
+            ->all();
+    }
+
+    private function getFabaMaterialBalanceDistribution(): array
+    {
+        $monthlyRecap = $this->fabaRecapService->getMonthlyRecap($this->selectedYear, $this->selectedMonth);
+        $distribution = [
+            'Fly Ash' => max(0, (float) $monthlyRecap['closing_fly_ash']),
+            'Bottom Ash' => max(0, (float) $monthlyRecap['closing_bottom_ash']),
+        ];
+        $total = array_sum($distribution);
+
+        return collect($distribution)
+            ->filter(fn (float $value): bool => $value > 0)
+            ->map(fn (float $value, string $label): array => [
+                'label' => $label,
+                'value' => round($value, 2),
+                'percentage' => $total > 0 ? round(($value / $total) * 100, 2) : 0,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function getFabaUtilizationDistribution(): array
+    {
+        $movements = FabaMovement::query()
+            ->approved()
+            ->forPeriod($this->selectedYear, $this->selectedMonth);
+
+        $external = (clone $movements)
+            ->where('movement_type', FabaMovement::TYPE_UTILIZATION_EXTERNAL)
+            ->sum('quantity');
+        $internal = (clone $movements)
+            ->where('movement_type', FabaMovement::TYPE_UTILIZATION_INTERNAL)
+            ->sum('quantity');
+        $distribution = [
+            'Pemanfaatan Eksternal' => round((float) $external, 2),
+            'Pemanfaatan Internal' => round((float) $internal, 2),
+        ];
+        $total = array_sum($distribution);
+
+        return collect($distribution)
+            ->filter(fn (float $value): bool => $value > 0)
+            ->map(fn (float $value, string $label): array => [
+                'label' => $label,
+                'value' => $value,
+                'percentage' => $total > 0 ? round(($value / $total) * 100, 2) : 0,
+            ])
             ->values()
             ->all();
     }
@@ -623,6 +686,10 @@ class UnifiedDashboardService
 
     private function getFabaWarnings(): array
     {
+        if (! $this->hasFabaPeriodActivity($this->selectedYear, $this->selectedMonth)) {
+            return [];
+        }
+
         $monthlyRecap = $this->fabaRecapService->getMonthlyRecap($this->selectedYear, $this->selectedMonth);
 
         return collect($monthlyRecap['warnings'])
@@ -637,6 +704,17 @@ class UnifiedDashboardService
             ->all();
     }
 
+    private function hasFabaPeriodActivity(int $year, int $month): bool
+    {
+        return FabaMovement::query()
+            ->forPeriod($year, $month)
+            ->exists()
+            || FabaMonthlyApproval::query()
+                ->where('year', $year)
+                ->where('month', $month)
+                ->exists();
+    }
+
     private function getTopVendors(): array
     {
         $vendorRecap = $this->fabaRecapService->getVendorRecap($this->selectedYear);
@@ -647,70 +725,139 @@ class UnifiedDashboardService
     private function getWasteChartData(): array
     {
         $anchorDate = CarbonImmutable::create($this->selectedYear, $this->selectedMonth, 1);
+        $chartUnit = $this->resolveWasteChartUnit($anchorDate);
 
         return collect(range(5, 0))
-            ->map(function (int $offset) use ($anchorDate): array {
+            ->map(function (int $offset) use ($anchorDate, $chartUnit): array {
                 $date = $anchorDate->subMonths($offset);
                 $year = $date->year;
                 $month = $date->month;
+                $periodEnd = $this->periodSnapshotDate($date);
+                $previousPeriodEnd = $date->startOfMonth()->subDay();
 
-                $recordsCreatedCount = WasteRecord::query()
-                    ->whereYear('date', $year)
-                    ->whereMonth('date', $month)
-                    ->count();
-
-                $approvedCount = WasteRecord::query()
+                $approvedInputCount = WasteRecord::query()
                     ->whereYear('date', $year)
                     ->whereMonth('date', $month)
                     ->approved()
                     ->count();
+                $approvedInputQuantity = WasteRecord::query()
+                    ->whereYear('date', $year)
+                    ->whereMonth('date', $month)
+                    ->approved()
+                    ->where('unit', $chartUnit)
+                    ->sum('quantity');
+                $hauledQuantity = WasteHauling::query()
+                    ->approved()
+                    ->whereYear('hauling_date', $year)
+                    ->whereMonth('hauling_date', $month)
+                    ->where('unit', $chartUnit)
+                    ->sum('quantity');
+                $otherUnitsCount = WasteRecord::query()
+                    ->whereYear('date', $year)
+                    ->whereMonth('date', $month)
+                    ->approved()
+                    ->where('unit', '!=', $chartUnit)
+                    ->distinct('unit')
+                    ->count('unit');
 
-                $transportDeliveredCount = WasteTransportation::query()
-                    ->whereYear('transportation_date', $year)
-                    ->whereMonth('transportation_date', $month)
-                    ->delivered()
+                $records = $this->approvedRecordsWithHaulingsUntilDate($periodEnd);
+
+                $completedCount = $records
+                    ->filter(function (WasteRecord $record) use ($periodEnd, $previousPeriodEnd): bool {
+                        return $this->remainingQuantityAtDate($record, $previousPeriodEnd) > 0
+                            && $this->remainingQuantityAtDate($record, $periodEnd) <= 0;
+                    })
                     ->count();
+
+                $closingBacklogCount = $records
+                    ->filter(fn (WasteRecord $record): bool => $this->remainingQuantityAtDate($record, $periodEnd) > 0)
+                    ->count();
+                $unitRecords = $records
+                    ->filter(fn (WasteRecord $record): bool => $record->unit === $chartUnit);
+                $closingBacklogQuantity = $unitRecords
+                    ->sum(fn (WasteRecord $record): float => $this->remainingQuantityAtDate($record, $periodEnd));
+                $expiredBacklogQuantity = $unitRecords
+                    ->filter(fn (WasteRecord $record): bool => $this->remainingQuantityAtDate($record, $periodEnd) > 0)
+                    ->filter(fn (WasteRecord $record): bool => $this->backlogUrgencyLabel($record, $periodEnd) === 'Expired')
+                    ->sum(fn (WasteRecord $record): float => $this->remainingQuantityAtDate($record, $periodEnd));
+                $expiringSoonBacklogQuantity = $unitRecords
+                    ->filter(fn (WasteRecord $record): bool => $this->remainingQuantityAtDate($record, $periodEnd) > 0)
+                    ->filter(fn (WasteRecord $record): bool => $this->backlogUrgencyLabel($record, $periodEnd) === 'Mendekati Batas Simpan')
+                    ->sum(fn (WasteRecord $record): float => $this->remainingQuantityAtDate($record, $periodEnd));
 
                 return [
                     'label' => $date->translatedFormat('M y'),
                     'month' => $month,
                     'year' => $year,
-                    'input_count' => $recordsCreatedCount,
-                    'transported_count' => $transportDeliveredCount,
-                    'records_count' => $recordsCreatedCount,
-                    'approved_count' => $approvedCount,
-                    'transport_delivered_count' => $transportDeliveredCount,
+                    'approved_input_count' => $approvedInputCount,
+                    'completed_count' => $completedCount,
+                    'closing_backlog_count' => $closingBacklogCount,
+                    'approved_input_quantity' => round((float) $approvedInputQuantity, 2),
+                    'hauled_quantity' => round((float) $hauledQuantity, 2),
+                    'closing_backlog_quantity' => round((float) $closingBacklogQuantity, 2),
+                    'expired_backlog_quantity' => round((float) $expiredBacklogQuantity, 2),
+                    'expiring_soon_backlog_quantity' => round((float) $expiringSoonBacklogQuantity, 2),
+                    'unit' => $chartUnit,
+                    'other_units_count' => $otherUnitsCount,
                 ];
             })
             ->values()
             ->all();
     }
 
-    private function getFabaProductionMaterialDistribution(): array
+    private function resolveWasteChartUnit(CarbonImmutable $anchorDate): string
     {
-        $monthlyRecap = $this->fabaRecapService->getMonthlyRecap($this->selectedYear, $this->selectedMonth);
-        $flyAshTotal = round((float) $monthlyRecap['production_fly_ash'], 2);
-        $bottomAshTotal = round((float) $monthlyRecap['production_bottom_ash'], 2);
-        $total = round($flyAshTotal + $bottomAshTotal, 2);
+        $startDate = $anchorDate->subMonths(5)->startOfMonth()->toDateString();
+        $endDate = $this->periodSnapshotDate($anchorDate)->toDateString();
 
-        return [
-            [
-                'label' => 'Fly Ash',
-                'value' => $flyAshTotal,
-                'percentage' => $total > 0 ? round(($flyAshTotal / $total) * 100, 2) : 0,
-            ],
-            [
-                'label' => 'Bottom Ash',
-                'value' => $bottomAshTotal,
-                'percentage' => $total > 0 ? round(($bottomAshTotal / $total) * 100, 2) : 0,
-            ],
+        $unit = WasteRecord::query()
+            ->approved()
+            ->whereBetween('date', [$startDate, $endDate])
+            ->selectRaw('unit, SUM(quantity) as total_quantity')
+            ->groupBy('unit')
+            ->orderByDesc('total_quantity')
+            ->value('unit');
+
+        return $unit ?: 'ton';
+    }
+
+    private function getWasteBacklogUrgencyDistribution(): array
+    {
+        $snapshotDate = $this->snapshotDate();
+        $records = $this->approvedRecordsWithHaulingsUntilDate($snapshotDate);
+
+        $distribution = [
+            'Expired' => 0,
+            'Mendekati Batas Simpan' => 0,
+            'Masih Aman' => 0,
         ];
+
+        foreach ($records as $record) {
+            if ($this->remainingQuantityAtDate($record, $snapshotDate) <= 0) {
+                continue;
+            }
+
+            $distribution[$this->backlogUrgencyLabel($record, $snapshotDate)]++;
+        }
+
+        $total = array_sum($distribution);
+
+        return collect($distribution)
+            ->filter(fn (int $value): bool => $value > 0)
+            ->map(fn (int $value, string $label): array => [
+                'label' => $label,
+                'value' => $value,
+                'percentage' => $total > 0 ? round(($value / $total) * 100, 2) : 0,
+            ])
+            ->values()
+            ->all();
     }
 
     private function getNotificationSummary(): array
     {
         $wasteStats = $this->getWasteStats();
         $fabaWarnings = $this->getFabaWarnings();
+        $criticalFabaWarnings = $this->getCriticalFabaWarnings($fabaWarnings);
         $fabaPending = $this->getFabaPendingApprovals();
 
         return [
@@ -718,13 +865,21 @@ class UnifiedDashboardService
             'expiring_soon_waste_count' => $wasteStats['expiring_soon_waste'],
             'pending_waste_approvals_count' => count($this->getPendingApprovals()),
             'pending_faba_approvals_count' => count($fabaPending),
-            'faba_warnings_count' => count($fabaWarnings),
+            'faba_warnings_count' => count($criticalFabaWarnings),
             'total_count' => $wasteStats['expired_waste'] +
                             $wasteStats['expiring_soon_waste'] +
                             count($this->getPendingApprovals()) +
                             count($fabaPending) +
-                            count($fabaWarnings),
+                            count($criticalFabaWarnings),
         ];
+    }
+
+    private function getCriticalFabaWarnings(array $warnings): array
+    {
+        return collect($warnings)
+            ->reject(fn (array $warning): bool => ($warning['code'] ?? null) === 'missing_opening_balance')
+            ->values()
+            ->all();
     }
 
     private function getHeaderMetadata(Organization $organization): array
@@ -840,20 +995,20 @@ class UnifiedDashboardService
             ->whereDate('date', '<=', $this->snapshotDate()->toDateString());
     }
 
-    private function wasteTransportationsForSelectedMonth()
+    private function wasteHaulingsForSelectedMonth()
     {
-        return WasteTransportation::query()
-            ->whereYear('transportation_date', $this->selectedYear)
-            ->whereMonth('transportation_date', $this->selectedMonth);
+        return WasteHauling::query()
+            ->whereYear('hauling_date', $this->selectedYear)
+            ->whereMonth('hauling_date', $this->selectedMonth);
     }
 
-    private function wasteTransportationsUntilSnapshot()
+    private function wasteHaulingsUntilSnapshot()
     {
-        return WasteTransportation::query()
-            ->whereDate('transportation_date', '<=', $this->snapshotDate()->toDateString());
+        return WasteHauling::query()
+            ->whereDate('hauling_date', '<=', $this->snapshotDate()->toDateString());
     }
 
-    private function approvedWasteRecordsAwaitingTransportationCount(): int
+    private function approvedWasteRecordsAwaitingHaulingCount(): int
     {
         $snapshotDate = $this->snapshotDate()->toDateString();
 
@@ -861,13 +1016,13 @@ class UnifiedDashboardService
             ->approved()
             ->whereRaw(
                 'COALESCE((
-                    SELECT SUM(waste_transportations.quantity)
-                    FROM waste_transportations
-                    WHERE waste_transportations.waste_record_id = waste_records.id
-                        AND waste_transportations.status != ?
-                        AND waste_transportations.transportation_date <= ?
+                    SELECT SUM(waste_haulings.quantity)
+                    FROM waste_haulings
+                    WHERE waste_haulings.waste_record_id = waste_records.id
+                        AND waste_haulings.status = ?
+                        AND waste_haulings.hauling_date <= ?
                 ), 0) < waste_records.quantity',
-                ['cancelled', $snapshotDate],
+                ['approved', $snapshotDate],
             )
             ->count();
     }
@@ -884,10 +1039,10 @@ class UnifiedDashboardService
                 ->groupByRaw("to_char(date, 'YYYY-MM')")
                 ->pluck('period')
                 ->all(),
-            ...WasteTransportation::query()
-                ->selectRaw("to_char(transportation_date, 'YYYY-MM') as period")
-                ->whereNotNull('transportation_date')
-                ->groupByRaw("to_char(transportation_date, 'YYYY-MM')")
+            ...WasteHauling::query()
+                ->selectRaw("to_char(hauling_date, 'YYYY-MM') as period")
+                ->whereNotNull('hauling_date')
+                ->groupByRaw("to_char(hauling_date, 'YYYY-MM')")
                 ->pluck('period')
                 ->all(),
             ...FabaMovement::query()
@@ -944,6 +1099,59 @@ class UnifiedDashboardService
         }
 
         return $selectedDate->endOfMonth();
+    }
+
+    private function periodSnapshotDate(CarbonImmutable $date): CarbonImmutable
+    {
+        if ($date->year === $this->selectedYear && $date->month === $this->selectedMonth) {
+            return $this->snapshotDate();
+        }
+
+        return $date->endOfMonth();
+    }
+
+    private function approvedRecordsWithHaulingsUntilDate(CarbonImmutable $date)
+    {
+        $snapshotDate = $date->toDateString();
+
+        return WasteRecord::query()
+            ->approved()
+            ->whereDate('date', '<=', $snapshotDate)
+            ->with([
+                'haulings' => fn ($query) => $query
+                    ->approved()
+                    ->whereDate('hauling_date', '<=', $snapshotDate),
+            ])
+            ->get();
+    }
+
+    private function remainingQuantityAtDate(WasteRecord $record, CarbonImmutable $date): float
+    {
+        $approvedQuantity = (float) $record->haulings
+            ->filter(fn (WasteHauling $hauling): bool => $hauling->hauling_date !== null && $hauling->hauling_date->lte($date))
+            ->sum('quantity');
+
+        return max(0, (float) $record->quantity - $approvedQuantity);
+    }
+
+    private function backlogUrgencyLabel(WasteRecord $record, CarbonImmutable $snapshotDate): string
+    {
+        if (! $record->expiry_date) {
+            return 'Masih Aman';
+        }
+
+        $expiryDate = $record->expiry_date->copy()->startOfDay();
+        $referenceDate = $snapshotDate->copy()->startOfDay();
+
+        if ($expiryDate->lt($referenceDate)) {
+            return 'Expired';
+        }
+
+        if ($expiryDate->lte($referenceDate->copy()->addDays(7))) {
+            return 'Mendekati Batas Simpan';
+        }
+
+        return 'Masih Aman';
     }
 
     private function formatMonthOptionLabel(int $year, int $month): string

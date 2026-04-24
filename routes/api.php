@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BootstrapController;
 use App\Http\Controllers\Api\FabaAdjustmentController;
 use App\Http\Controllers\Api\FabaApprovalController;
+use App\Http\Controllers\Api\FabaMovementApprovalController;
 use App\Http\Controllers\Api\FabaOptionsController;
 use App\Http\Controllers\Api\FabaProductionController;
 use App\Http\Controllers\Api\FabaRecapController;
@@ -11,7 +12,6 @@ use App\Http\Controllers\Api\FabaUtilizationController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\WasteHaulingController;
 use App\Http\Controllers\Api\WasteRecordController;
-use App\Http\Controllers\Api\WasteTransportationController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -59,18 +59,6 @@ Route::prefix('v1')->group(function () {
             Route::post('/{wasteHauling}/cancel', [WasteHaulingController::class, 'cancel'])->name('api.v1.waste-haulings.cancel');
         });
 
-        Route::prefix('transportations')->group(function () {
-            Route::get('/', [WasteTransportationController::class, 'index'])->name('api.v1.transportations.index');
-            Route::get('/options', [WasteTransportationController::class, 'options'])->name('api.v1.transportations.options');
-            Route::post('/', [WasteTransportationController::class, 'store'])->name('api.v1.transportations.store');
-            Route::get('/{wasteTransportation}', [WasteTransportationController::class, 'show'])->name('api.v1.transportations.show');
-            Route::put('/{wasteTransportation}', [WasteTransportationController::class, 'update'])->name('api.v1.transportations.update');
-            Route::delete('/{wasteTransportation}', [WasteTransportationController::class, 'destroy'])->name('api.v1.transportations.destroy');
-            Route::post('/{wasteTransportation}/dispatch', [WasteTransportationController::class, 'dispatch'])->name('api.v1.transportations.dispatch');
-            Route::post('/{wasteTransportation}/deliver', [WasteTransportationController::class, 'deliver'])->name('api.v1.transportations.deliver');
-            Route::post('/{wasteTransportation}/cancel', [WasteTransportationController::class, 'cancel'])->name('api.v1.transportations.cancel');
-        });
-
         Route::prefix('faba')->group(function () {
             Route::get('/options', FabaOptionsController::class)->name('api.v1.faba.options');
             Route::get('/dashboard', [FabaRecapController::class, 'dashboard'])->name('api.v1.faba.dashboard');
@@ -106,6 +94,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('/balance', [FabaRecapController::class, 'balance'])->name('api.v1.faba.recaps.balance');
                 Route::get('/stock-card', [FabaRecapController::class, 'stockCard'])->name('api.v1.faba.recaps.stock-card');
                 Route::post('/opening-balance', [FabaRecapController::class, 'storeOpeningBalance'])->name('api.v1.faba.recaps.opening-balance.store');
+                Route::post('/tps-capacity', [FabaRecapController::class, 'storeTpsCapacity'])->name('api.v1.faba.recaps.tps-capacity.store');
             });
 
             Route::prefix('approvals')->group(function () {
@@ -116,6 +105,12 @@ Route::prefix('v1')->group(function () {
                 Route::post('/{year}/{month}/approve', [FabaApprovalController::class, 'approve'])->name('api.v1.faba.approvals.approve');
                 Route::post('/{year}/{month}/reject', [FabaApprovalController::class, 'reject'])->name('api.v1.faba.approvals.reject');
                 Route::post('/{year}/{month}/reopen', [FabaApprovalController::class, 'reopen'])->name('api.v1.faba.approvals.reopen');
+            });
+
+            Route::prefix('movements')->group(function () {
+                Route::get('/pending-approval', [FabaMovementApprovalController::class, 'pending'])->name('api.v1.faba.movements.pending-approval');
+                Route::post('/{movement}/approve', [FabaMovementApprovalController::class, 'approve'])->name('api.v1.faba.movements.approve');
+                Route::post('/{movement}/reject', [FabaMovementApprovalController::class, 'reject'])->name('api.v1.faba.movements.reject');
             });
         });
     });

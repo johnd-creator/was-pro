@@ -165,7 +165,7 @@ const hasPendingApprovals = computed(() => {
                             class="focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                             @click="
                                 router.get(
-                                    wasteManagementRoutes.transportations.create(),
+                                    wasteManagementRoutes.haulings.create(),
                                 )
                             "
                         >
@@ -560,7 +560,7 @@ const hasPendingApprovals = computed(() => {
                                 class="min-h-[44px] w-full justify-start focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                                 @click="
                                     router.get(
-                                        wasteManagementRoutes.transportations.create(),
+                                        wasteManagementRoutes.haulings.create(),
                                     )
                                 "
                             >

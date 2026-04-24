@@ -119,14 +119,6 @@ class WasteRecord extends Model
     }
 
     /**
-     * Get the transportations for the waste record.
-     */
-    public function transportations(): HasMany
-    {
-        return $this->hasMany(WasteTransportation::class, 'waste_record_id');
-    }
-
-    /**
      * Get the hauling requests for the waste record.
      */
     public function haulings(): HasMany

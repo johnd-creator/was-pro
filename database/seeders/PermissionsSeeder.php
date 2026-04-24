@@ -70,16 +70,6 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Reject Waste Haulings', 'slug' => 'waste_hauling.reject', 'module' => 'waste_hauling', 'description' => 'Reject waste hauling requests'],
             ['name' => 'Cancel Waste Haulings', 'slug' => 'waste_hauling.cancel', 'module' => 'waste_hauling', 'description' => 'Cancel waste hauling requests'],
 
-            // Waste transportation permissions
-            ['name' => 'View All Transportation', 'slug' => 'transportation.view_all', 'module' => 'transportation', 'description' => 'View all transportation records'],
-            ['name' => 'View Own Transportation', 'slug' => 'transportation.view_own', 'module' => 'transportation', 'description' => 'View own transportation records'],
-            ['name' => 'Create Transportation', 'slug' => 'transportation.create', 'module' => 'transportation', 'description' => 'Create waste transportation'],
-            ['name' => 'Edit Transportation', 'slug' => 'transportation.edit', 'module' => 'transportation', 'description' => 'Edit waste transportation'],
-            ['name' => 'Delete Transportation', 'slug' => 'transportation.delete', 'module' => 'transportation', 'description' => 'Delete waste transportation'],
-            ['name' => 'Dispatch Transportation', 'slug' => 'transportation.dispatch', 'module' => 'transportation', 'description' => 'Dispatch waste transportation'],
-            ['name' => 'Deliver Transportation', 'slug' => 'transportation.deliver', 'module' => 'transportation', 'description' => 'Mark waste transportation as delivered'],
-            ['name' => 'Cancel Transportation', 'slug' => 'transportation.cancel', 'module' => 'transportation', 'description' => 'Cancel waste transportation'],
-
             // Dashboard permissions
             ['name' => 'View Dashboard', 'slug' => 'dashboard.view', 'module' => 'dashboard', 'description' => 'View dashboard and statistics'],
 

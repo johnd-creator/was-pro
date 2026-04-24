@@ -3,13 +3,9 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     ArrowRight,
-    Factory,
-    PackageCheck,
-    Scale,
-    ShieldAlert,
 } from 'lucide-vue-next';
-import type { LucideIcon } from 'lucide-vue-next';
 import { computed, reactive } from 'vue';
+import FabaHeroKpiCards from '@/components/dashboard/FabaHeroKpiCards.vue';
 import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,18 +13,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
-import { formatFabaStatus } from '@/lib/faba';
+import {
+    formatFabaMaterial,
+    formatFabaMovementType,
+    formatFabaStatus,
+} from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
-
-interface StatCard {
-    title: string;
-    value: number;
-    tone: 'blue' | 'emerald' | 'orange' | 'red';
-    icon: LucideIcon;
-    hint: string;
-    unit: string;
-}
+import type {
+    FabaCapacitySummary,
+    FabaPendingTransactionApprovalItem,
+    FabaVerificationMovementItem,
+    FabaVerificationQueueItem,
+} from '@/types/faba';
 
 const props = defineProps<{
     year: number;
@@ -52,6 +49,7 @@ const props = defineProps<{
         period_label: string;
         status: string;
     }>;
+    readyClosingPeriods: FabaVerificationQueueItem[];
     warnings: Array<{
         month: number;
         period_label: string;
@@ -65,11 +63,14 @@ const props = defineProps<{
         status: string;
         period_label: string;
     } | null;
+    pendingTransactionApprovals: FabaPendingTransactionApprovalItem[];
+    latestMovements: FabaVerificationMovementItem[];
     topVendors: Array<{
         vendor_id: string | null;
         vendor_name: string;
         total_quantity: number;
     }>;
+    tpsCapacitySummary: FabaCapacitySummary;
 }>();
 
 const filterForm = reactive({
@@ -82,44 +83,6 @@ const breadcrumbItems: BreadcrumbItem[] = [
         href: wasteManagementRoutes.faba.dashboard.url(),
     },
 ];
-
-const statCards = computed<StatCard[]>(() => [
-    {
-        title: 'Total Produksi',
-        value: props.stats.total_production,
-        tone: 'blue',
-        icon: Factory,
-        hint: `Produksi sepanjang ${props.year}`,
-        unit: 'ton',
-    },
-    {
-        title: 'Total Pemanfaatan',
-        value: props.stats.total_utilization,
-        tone: 'emerald',
-        icon: PackageCheck,
-        hint: 'Serapan material terverifikasi',
-        unit: 'ton',
-    },
-    {
-        title: 'Saldo TPS',
-        value: props.stats.current_balance,
-        tone: props.stats.current_balance < 0 ? 'red' : 'blue',
-        icon: Scale,
-        hint: 'Posisi stok terbaru',
-        unit: 'ton',
-    },
-    {
-        title: 'Periode Negatif',
-        value: props.stats.negative_periods,
-        tone: props.stats.negative_periods > 0 ? 'orange' : 'emerald',
-        icon: ShieldAlert,
-        hint:
-            props.stats.negative_periods > 0
-                ? 'Perlu rekonsiliasi'
-                : 'Tidak ada anomali',
-        unit: 'periode',
-    },
-]);
 
 const latestPeriodTone = computed(() => {
     if (!props.latestApprovedPeriod) {
@@ -134,6 +97,10 @@ const dashboardHealthLabel = computed(() => {
         return 'Butuh tindak lanjut';
     }
 
+    if (props.readyClosingPeriods.length > 0) {
+        return 'Siap closing';
+    }
+
     if (props.pendingApprovals.length > 0) {
         return 'Review operasional';
     }
@@ -145,7 +112,13 @@ const dashboardHealthCount = computed(
     () =>
         props.warnings.length +
         props.pendingApprovals.length +
+        props.pendingTransactionApprovals.length +
+        props.readyClosingPeriods.length +
         props.stats.negative_periods,
+);
+
+const latestOperationalMovements = computed(() =>
+    props.latestMovements.slice(0, 6),
 );
 
 const strongestTrendMonth = computed(
@@ -170,27 +143,11 @@ function formatNumber(value: number): string {
     return value.toLocaleString('id-ID');
 }
 
-function toneClasses(tone: StatCard['tone']): string {
-    const map = {
-        blue: 'border-sky-200/70 bg-linear-to-br from-white via-sky-50/70 to-blue-100/60 dark:border-sky-900/70 dark:from-slate-950 dark:via-sky-950/35 dark:to-blue-950/35',
-        emerald:
-            'border-emerald-200/70 bg-linear-to-br from-white via-emerald-50/70 to-teal-100/55 dark:border-emerald-900/70 dark:from-slate-950 dark:via-emerald-950/35 dark:to-teal-950/35',
-        orange: 'border-orange-200/70 bg-linear-to-br from-white via-orange-50/75 to-amber-100/60 dark:border-orange-900/70 dark:from-slate-950 dark:via-orange-950/35 dark:to-amber-950/35',
-        red: 'border-rose-200/70 bg-linear-to-br from-white via-rose-50/70 to-red-100/60 dark:border-rose-900/70 dark:from-slate-950 dark:via-rose-950/35 dark:to-red-950/35',
-    };
-
-    return map[tone];
-}
-
-function iconWrapClasses(tone: StatCard['tone']): string {
-    const map = {
-        blue: 'bg-sky-600 text-white shadow-sky-500/20',
-        emerald: 'bg-emerald-600 text-white shadow-emerald-500/20',
-        orange: 'bg-orange-600 text-white shadow-orange-500/20',
-        red: 'bg-rose-600 text-white shadow-rose-500/20',
-    };
-
-    return map[tone];
+function formatPercentage(value: number): string {
+    return `${value.toLocaleString('id-ID', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    })}%`;
 }
 </script>
 
@@ -256,54 +213,11 @@ function iconWrapClasses(tone: StatCard['tone']): string {
                             <div
                                 class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
                             >
-                                <div
-                                    v-for="card in statCards"
-                                    :key="card.title"
-                                    :class="[
-                                        'group relative overflow-hidden rounded-[26px] border p-4 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_50px_-28px_rgba(15,23,42,0.45)]',
-                                        toneClasses(card.tone),
-                                    ]"
-                                >
-                                    <div
-                                        class="mb-4 flex items-start justify-between gap-3"
-                                    >
-                                        <div
-                                            :class="[
-                                                'rounded-2xl p-3 shadow-sm',
-                                                iconWrapClasses(card.tone),
-                                            ]"
-                                        >
-                                            <component
-                                                :is="card.icon"
-                                                class="size-4.5"
-                                            />
-                                        </div>
-                                        <span
-                                            class="rounded-full border border-white/90 bg-white/85 px-2.5 py-1 text-[10px] font-bold tracking-[0.14em] text-slate-600 uppercase dark:text-slate-300"
-                                        >
-                                            {{ year }}
-                                        </span>
-                                    </div>
-                                    <p
-                                        class="text-sm font-semibold tracking-tight text-slate-800 dark:text-slate-100"
-                                    >
-                                        {{ card.title }}
-                                    </p>
-                                    <p
-                                        class="mt-2 text-3xl font-black tracking-tight text-slate-950 dark:text-slate-100"
-                                    >
-                                        {{ formatNumber(card.value) }}
-                                        <span
-                                            class="ml-1 text-sm font-medium text-slate-400"
-                                            >{{ card.unit }}</span
-                                        >
-                                    </p>
-                                    <p
-                                        class="mt-2 text-[12px] leading-5 text-slate-600 dark:text-slate-300"
-                                    >
-                                        {{ card.hint }}
-                                    </p>
-                                </div>
+                                <FabaHeroKpiCards
+                                    :year="year"
+                                    :stats="stats"
+                                    variant="full"
+                                />
                             </div>
                         </div>
 
@@ -389,6 +303,90 @@ function iconWrapClasses(tone: StatCard['tone']): string {
                                 </p>
                             </div>
                         </div>
+                    </div>
+                </section>
+
+                <section class="space-y-4">
+                    <div class="flex items-end justify-between gap-4">
+                        <div>
+                            <p
+                                class="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400"
+                            >
+                                Kapasitas TPS
+                            </p>
+                            <h3
+                                class="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                            >
+                                Monitoring utilisasi penyimpanan
+                            </h3>
+                        </div>
+                        <Badge
+                            variant="secondary"
+                            class="rounded-full border border-slate-200/80 bg-white/90 text-slate-700"
+                        >
+                            {{ tpsCapacitySummary.period.period_label }}
+                        </Badge>
+                    </div>
+
+                    <div class="grid gap-4 lg:grid-cols-3">
+                        <Card
+                            class="rounded-[28px] border-slate-200/80 bg-white/90 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.28)] dark:bg-slate-950/85 lg:col-span-2"
+                        >
+                            <CardHeader>
+                                <CardTitle>Utilisasi per material</CardTitle>
+                            </CardHeader>
+                            <CardContent class="grid gap-3 md:grid-cols-2">
+                                <div
+                                    v-for="item in tpsCapacitySummary.materials"
+                                    :key="item.material_type"
+                                    class="wm-surface-subtle rounded-[22px] p-4"
+                                >
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p class="text-sm font-semibold text-slate-950 dark:text-slate-100">
+                                                {{ formatFabaMaterial(item.material_type) }}
+                                            </p>
+                                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                {{ formatNumber(item.balance) }} / {{ formatNumber(item.capacity) }} ton
+                                            </p>
+                                        </div>
+                                        <Badge
+                                            variant="secondary"
+                                            class="rounded-full"
+                                            :class="{
+                                                'border border-emerald-200 bg-emerald-50 text-emerald-700': item.status === 'normal',
+                                                'border border-amber-200 bg-amber-50 text-amber-700': item.status === 'warning',
+                                                'border border-rose-200 bg-rose-50 text-rose-700': item.status === 'critical',
+                                            }"
+                                        >
+                                            {{ formatPercentage(item.utilization_percentage) }}
+                                        </Badge>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card
+                            class="rounded-[28px] border-slate-200/80 bg-white/90 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.28)] dark:bg-slate-950/85"
+                        >
+                            <CardHeader>
+                                <CardTitle>Utilisasi Total</CardTitle>
+                            </CardHeader>
+                            <CardContent class="space-y-4">
+                                <div>
+                                    <p class="text-3xl font-semibold tracking-tight text-slate-950 dark:text-slate-100">
+                                        {{ formatPercentage(tpsCapacitySummary.total.utilization_percentage) }}
+                                    </p>
+                                    <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                                        {{ formatNumber(tpsCapacitySummary.total.balance) }} dari {{ formatNumber(tpsCapacitySummary.total.capacity) }} ton kapasitas.
+                                    </p>
+                                </div>
+                                <div class="wm-surface-subtle rounded-[20px] p-4 text-sm text-slate-600 dark:text-slate-300">
+                                    Threshold warning {{ formatPercentage(tpsCapacitySummary.thresholds.warning) }}
+                                    dan critical {{ formatPercentage(tpsCapacitySummary.thresholds.critical) }}.
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
                 </section>
 
@@ -549,6 +547,123 @@ function iconWrapClasses(tone: StatCard['tone']): string {
 
                         <div class="space-y-6">
                             <Card
+                                class="overflow-hidden rounded-[30px] border-slate-200/70 bg-linear-to-br from-white via-slate-50/60 to-sky-50/20 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800/80 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950/18 dark:shadow-[0_24px_60px_-36px_rgba(2,6,23,0.9)]"
+                            >
+                                <CardHeader class="space-y-2">
+                                    <p
+                                        class="text-[11px] font-semibold tracking-[0.16em] text-sky-700/70 uppercase"
+                                    >
+                                        Approval Harian
+                                    </p>
+                                    <CardTitle class="text-lg tracking-tight">
+                                        Transaksi menunggu persetujuan
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div
+                                        v-if="pendingTransactionApprovals.length === 0"
+                                        class="rounded-[22px] border border-dashed border-slate-200 bg-white/80 px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400"
+                                    >
+                                        Tidak ada transaksi harian yang menunggu persetujuan.
+                                    </div>
+                                    <div v-else class="space-y-3">
+                                        <Link
+                                            v-for="item in pendingTransactionApprovals"
+                                            :key="item.id"
+                                            :href="
+                                                item.movement_type.startsWith('adjustment')
+                                                    ? wasteManagementRoutes.faba.adjustments.show(item.id).url
+                                                    : item.movement_type.startsWith('utilization')
+                                                      ? wasteManagementRoutes.faba.utilization.show(item.id).url
+                                                      : wasteManagementRoutes.faba.production.show(item.id).url
+                                            "
+                                            class="group block rounded-[22px] border border-white/90 bg-white/90 px-4 py-3 shadow-sm shadow-slate-100/70 transition-all hover:-translate-y-0.5 hover:border-sky-200 hover:bg-white dark:bg-slate-950 dark:bg-slate-950/85"
+                                        >
+                                            <div class="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <p class="font-semibold text-slate-950 dark:text-slate-100">
+                                                        {{ item.display_number }}
+                                                    </p>
+                                                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                        {{ formatFabaMovementType(item.movement_type) }} •
+                                                        {{ formatFabaMaterial(item.material_type) }} •
+                                                        {{ item.period_label }}
+                                                    </p>
+                                                </div>
+                                                <div class="text-right">
+                                                    <p class="text-sm font-semibold text-slate-950 dark:text-slate-100">
+                                                        {{ formatNumber(item.quantity) }} {{ item.unit }}
+                                                    </p>
+                                                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                        {{ item.created_by_user?.name ?? 'Sistem' }}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card
+                                class="overflow-hidden rounded-[30px] border-slate-200/70 bg-linear-to-br from-white via-slate-50/60 to-emerald-50/20 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800/80 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950/18 dark:shadow-[0_24px_60px_-36px_rgba(2,6,23,0.9)]"
+                            >
+                                <CardHeader class="space-y-2">
+                                    <p
+                                        class="text-[11px] font-semibold tracking-[0.16em] text-emerald-700/70 uppercase"
+                                    >
+                                        Readiness Closing
+                                    </p>
+                                    <CardTitle class="text-lg tracking-tight">
+                                        Periode siap diajukan
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div
+                                        v-if="readyClosingPeriods.length === 0"
+                                        class="rounded-[22px] border border-dashed border-slate-200 bg-white/80 px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400"
+                                    >
+                                        Belum ada periode yang siap diajukan untuk closing.
+                                    </div>
+                                    <div v-else class="space-y-3">
+                                        <Link
+                                            v-for="item in readyClosingPeriods"
+                                            :key="`${item.year}-${item.month}`"
+                                            :href="
+                                                wasteManagementRoutes.faba.approvals.index.url({
+                                                    query: { year: item.year },
+                                                })
+                                            "
+                                            class="group block rounded-[22px] border border-white/90 bg-white/90 px-4 py-3 shadow-sm shadow-slate-100/70 transition-all hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-white dark:bg-slate-950 dark:bg-slate-950/85"
+                                        >
+                                            <div
+                                                class="flex items-start justify-between gap-3"
+                                            >
+                                                <div>
+                                                    <p
+                                                        class="font-semibold text-slate-950 dark:text-slate-100"
+                                                    >
+                                                        {{ item.period_label }}
+                                                    </p>
+                                                    <p
+                                                        class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                                    >
+                                                        Saldo akhir {{ formatNumber(item.closing_balance) }} ton
+                                                        dengan {{ item.warning_count }} warning aktif.
+                                                    </p>
+                                                </div>
+                                                <Badge
+                                                    variant="secondary"
+                                                    class="rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700"
+                                                >
+                                                    Siap submit
+                                                </Badge>
+                                            </div>
+                                        </Link>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card
                                 class="overflow-hidden rounded-[30px] border-slate-200/70 bg-linear-to-br from-white via-slate-50/60 to-orange-50/20 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800/80 dark:from-slate-950 dark:via-slate-900 dark:to-orange-950/18 dark:shadow-[0_24px_60px_-36px_rgba(2,6,23,0.9)]"
                             >
                                 <CardHeader class="space-y-2">
@@ -665,6 +780,95 @@ function iconWrapClasses(tone: StatCard['tone']): string {
                             </Card>
                         </div>
                     </div>
+                </section>
+
+                <section class="space-y-4">
+                    <div class="flex items-end justify-between gap-4">
+                        <div>
+                            <p
+                                class="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400"
+                            >
+                                Verification Feed
+                            </p>
+                            <h3
+                                class="mt-2 flex items-center gap-3 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                            >
+                                <span class="h-px w-8 bg-slate-300" />
+                                Transaksi terbaru untuk supervisor
+                            </h3>
+                        </div>
+                    </div>
+
+                    <Card
+                        class="overflow-hidden rounded-[30px] border-slate-200/70 bg-linear-to-br from-white via-slate-50/60 to-sky-50/20 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800/80 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950/18 dark:shadow-[0_24px_60px_-36px_rgba(2,6,23,0.9)]"
+                    >
+                        <CardContent class="p-5">
+                            <div
+                                v-if="latestOperationalMovements.length === 0"
+                                class="rounded-[24px] border border-dashed border-slate-200 bg-white/80 px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
+                            >
+                                Belum ada transaksi FABA pada periode yang tersedia.
+                            </div>
+                            <div v-else class="space-y-3">
+                                <div
+                                    v-for="item in latestOperationalMovements"
+                                    :key="item.id"
+                                    class="rounded-[22px] border border-white/90 bg-white/90 px-4 py-4 shadow-sm shadow-slate-100/70 dark:bg-slate-950/85"
+                                >
+                                    <div
+                                        class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"
+                                    >
+                                        <div class="space-y-1">
+                                            <p
+                                                class="text-sm font-semibold text-slate-950 dark:text-slate-100"
+                                            >
+                                                {{ item.display_number }}
+                                            </p>
+                                            <p
+                                                class="text-sm text-slate-600 dark:text-slate-300"
+                                            >
+                                                {{
+                                                    formatFabaMovementType(
+                                                        item.movement_type,
+                                                    )
+                                                }}
+                                                •
+                                                {{
+                                                    formatFabaMaterial(
+                                                        item.material_type,
+                                                    )
+                                                }}
+                                                • {{ item.period_label }}
+                                            </p>
+                                            <p
+                                                class="text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                {{ item.transaction_date }} •
+                                                {{ item.created_by_user?.name ?? 'Sistem' }}
+                                            </p>
+                                        </div>
+                                        <div class="text-left lg:text-right">
+                                            <p
+                                                class="text-base font-semibold text-slate-950 dark:text-slate-100"
+                                            >
+                                                {{ formatNumber(item.quantity) }} {{ item.unit }}
+                                            </p>
+                                            <p
+                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                {{
+                                                    item.vendor_name ??
+                                                    item.internal_destination_name ??
+                                                    item.purpose_name ??
+                                                    'Tanpa tujuan tambahan'
+                                                }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </section>
 
                 <section class="space-y-4">

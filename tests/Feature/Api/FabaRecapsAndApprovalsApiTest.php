@@ -5,18 +5,21 @@ use App\Models\FabaMonthlyApproval;
 use App\Models\FabaMonthlyClosingSnapshot;
 use App\Models\FabaMovement;
 use App\Models\FabaOpeningBalance;
+use App\Models\FabaPurpose;
 use App\Models\Organization;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\TenantService;
+use Illuminate\Support\Str;
 
 beforeEach(function () {
     $this->tenantService = app(TenantService::class);
+    $suffix = Str::lower(Str::random(8));
 
     $this->organization = Organization::factory()->create([
-        'code' => 'APIFABA4',
-        'schema_name' => 'tenant_api_faba4',
+        'code' => 'APIFABA4'.$suffix,
+        'schema_name' => 'tenant_api_faba4_'.$suffix,
     ]);
 
     if (! $this->tenantService->schemaExists($this->organization->schema_name)) {
@@ -114,6 +117,46 @@ test('monthly recap endpoint returns mobile-ready payload with approval actions'
         ->assertJsonFragment(['submit']);
 });
 
+test('faba dashboard endpoint returns capacity summary for mobile', function () {
+    seedFabaPeriod($this->tenantService, $this->organization->schema_name, $this->supervisor->id, 2026, 4);
+
+    $response = $this->withToken($this->token)
+        ->getJson('/api/v1/faba/dashboard?year=2026&month=4');
+
+    $response->assertSuccessful()
+        ->assertJsonPath('data.capacity_summary.total.capacity', 200)
+        ->assertJsonPath('data.capacity_summary.materials.0.capacity', 120);
+});
+
+test('yearly recap endpoint returns analysis matrix payload', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+
+    $purpose = FabaPurpose::factory()->create([
+        'name' => 'Semen',
+        'slug' => 'semen',
+    ]);
+
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-03-10',
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_UTILIZATION_EXTERNAL,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_OUT,
+        'purpose_id' => $purpose->id,
+        'quantity' => 22,
+        'period_year' => 2026,
+        'period_month' => 3,
+    ]);
+
+    $this->tenantService->switchToPublic();
+
+    $response = $this->withToken($this->token)
+        ->getJson('/api/v1/faba/recaps/yearly?year=2026');
+
+    $response->assertSuccessful()
+        ->assertJsonPath('data.analysis_matrix.summary.total_actual_quantity', 22)
+        ->assertJsonPath('data.analysis_matrix.segments.0.label', 'Semen dan Batako');
+});
+
 test('opening balance endpoint stores balance for mobile', function () {
     $response = $this->withToken($this->token)
         ->postJson('/api/v1/faba/recaps/opening-balance', [
@@ -137,6 +180,21 @@ test('opening balance endpoint stores balance for mobile', function () {
         ->exists())->toBeTrue();
 
     $this->tenantService->switchToPublic();
+});
+
+test('tps capacity endpoint stores tenant-specific settings for mobile', function () {
+    $response = $this->withToken($this->token)
+        ->postJson('/api/v1/faba/recaps/tps-capacity', [
+            'material_type' => FabaMovement::MATERIAL_BOTTOM_ASH,
+            'capacity' => 88.75,
+            'warning_threshold' => 70,
+            'critical_threshold' => 90,
+        ]);
+
+    $response->assertSuccessful()
+        ->assertJsonPath('data.material_type', FabaMovement::MATERIAL_BOTTOM_ASH)
+        ->assertJsonPath('data.capacity', 88.75)
+        ->assertJsonPath('data.capacity_summary.materials.1.capacity', 88.75);
 });
 
 test('supervisor can submit and approve monthly faba period via api', function () {

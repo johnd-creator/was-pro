@@ -57,10 +57,7 @@ const NO_PURPOSE = '__none__';
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
-        title:
-            props.initialMovementType === 'utilization_internal'
-                ? 'Pemanfaatan Internal'
-                : 'Pemanfaatan Eksternal',
+        title: 'Pemanfaatan FABA',
         href: wasteManagementRoutes.faba.utilization.index.url(),
     },
     {
@@ -123,19 +120,9 @@ watch(
 <template>
     <WasteManagementLayout
         :breadcrumbs="breadcrumbItems"
-        :title="
-            form.movement_type === 'utilization_internal'
-                ? 'Tambah Pemanfaatan Internal'
-                : 'Tambah Pemanfaatan Eksternal'
-        "
+        title="Tambah Pemanfaatan FABA"
     >
-        <Head
-            :title="
-                form.movement_type === 'utilization_internal'
-                    ? 'Tambah Pemanfaatan Internal'
-                    : 'Tambah Pemanfaatan Eksternal'
-            "
-        />
+        <Head title="Tambah Pemanfaatan FABA" />
 
         <div
             class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
@@ -161,21 +148,11 @@ watch(
                             <p
                                 class="text-[11px] font-semibold tracking-[0.16em] text-emerald-700/70 uppercase"
                             >
-                                Utilization Entry
+                                Smart Utilization
                             </p>
                             <Heading
-                                :title="
-                                    form.movement_type ===
-                                    'utilization_internal'
-                                        ? 'Tambah Pemanfaatan Internal'
-                                        : 'Tambah Pemanfaatan Eksternal'
-                                "
-                                :description="
-                                    form.movement_type ===
-                                    'utilization_internal'
-                                        ? 'Catat movement pemanfaatan untuk tujuan internal.'
-                                        : 'Catat movement pemanfaatan untuk vendor eksternal.'
-                                "
+                                title="Tambah Pemanfaatan FABA"
+                                description="Catat pemanfaatan internal atau eksternal dari satu form dinamis agar kebutuhan pihak, tujuan, dan dokumen tetap sinkron."
                             />
 
                             <div class="grid gap-3 sm:grid-cols-3">

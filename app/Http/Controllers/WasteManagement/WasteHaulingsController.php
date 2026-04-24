@@ -99,10 +99,12 @@ class WasteHaulingsController extends Controller
             abort(403);
         }
 
-        $quantity = (float) $request->validated('quantity');
-        $availableQuantity = max(0, (float) $record->quantity - $record->getReservedHaulingQuantity());
+        $quantity = $this->normalizeQuantity((float) $request->validated('quantity'));
+        $availableQuantity = $this->normalizeQuantity(
+            max(0, (float) $record->quantity - $record->getReservedHaulingQuantity())
+        );
 
-        if ($quantity > $availableQuantity) {
+        if ($this->quantityExceedsAvailable($quantity, $availableQuantity)) {
             return Redirect::back()
                 ->with('error', "Jumlah angkut melebihi sisa yang bisa diajukan. Tersedia {$availableQuantity} {$record->unit}.")
                 ->withInput();
@@ -182,9 +184,12 @@ class WasteHaulingsController extends Controller
         abort_unless($this->canApproveHaulings(), 403);
 
         $record = $hauling->wasteRecord;
-        $availableQuantity = max(0, (float) $record->quantity - $record->getReservedHaulingQuantity($hauling->id));
+        $requestedQuantity = $this->normalizeQuantity((float) $hauling->quantity);
+        $availableQuantity = $this->normalizeQuantity(
+            max(0, (float) $record->quantity - $record->getReservedHaulingQuantity($hauling->id))
+        );
 
-        if ((float) $hauling->quantity > $availableQuantity) {
+        if ($this->quantityExceedsAvailable($requestedQuantity, $availableQuantity)) {
             return Redirect::back()->with('error', 'Jumlah pengangkutan tidak lagi valid karena sisa limbah telah berubah.');
         }
 
@@ -261,6 +266,16 @@ class WasteHaulingsController extends Controller
             'operational_status_label' => $record->getOperationalStatusLabel(),
             'hauling_history' => $record->haulings->map(fn (WasteHauling $hauling): array => $this->serializeHauling($hauling))->all(),
         ];
+    }
+
+    protected function normalizeQuantity(float $quantity): float
+    {
+        return round($quantity, 2);
+    }
+
+    protected function quantityExceedsAvailable(float $quantity, float $availableQuantity): bool
+    {
+        return $this->normalizeQuantity($quantity - $availableQuantity) > 0;
     }
 
     protected function serializeHauling(WasteHauling $hauling): array

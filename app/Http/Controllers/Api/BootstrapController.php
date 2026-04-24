@@ -8,8 +8,8 @@ use App\Models\FabaPurpose;
 use App\Models\Vendor;
 use App\Models\WasteCategory;
 use App\Models\WasteCharacteristic;
+use App\Models\WasteHauling;
 use App\Models\WasteRecord;
-use App\Models\WasteTransportation;
 use App\Models\WasteType;
 use App\Services\FabaRecapService;
 use Illuminate\Http\JsonResponse;
@@ -43,9 +43,9 @@ class BootstrapController extends ApiController
                 'draft_records' => WasteRecord::query()->draft()->count(),
                 'pending_records' => WasteRecord::query()->pendingApproval()->count(),
                 'approved_records' => WasteRecord::query()->approved()->count(),
-                'total_transportations' => WasteTransportation::query()->count(),
-                'pending_transportations' => WasteTransportation::query()->pending()->count(),
-                'in_transit_transportations' => WasteTransportation::query()->inTransit()->count(),
+                'total_transportations' => WasteHauling::query()->count(),
+                'pending_transportations' => WasteHauling::query()->pendingApproval()->count(),
+                'in_transit_transportations' => 0,
             ],
             'faba' => [
                 'current_balance' => $this->fabaRecapService->getCurrentBalance(),
@@ -53,6 +53,9 @@ class BootstrapController extends ApiController
                 'total_utilization' => $fabaYearlyRecap['totals']['total_utilization'],
                 'pending_approvals' => FabaMonthlyApproval::query()
                     ->where('status', FabaMonthlyApproval::STATUS_SUBMITTED)
+                    ->count(),
+                'pending_transaction_approvals' => FabaMovement::query()
+                    ->pendingApproval()
                     ->count(),
                 'negative_periods' => collect($fabaYearlyRecap['months'])
                     ->filter(fn (array $month): bool => (bool) $month['warning_negative_balance'])

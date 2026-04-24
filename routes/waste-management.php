@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\WasteManagement\DashboardController;
 use App\Http\Controllers\WasteManagement\FabaAdjustmentsController;
+use App\Http\Controllers\WasteManagement\FabaDashboardController;
 use App\Http\Controllers\WasteManagement\FabaMonthlyApprovalsController;
+use App\Http\Controllers\WasteManagement\FabaMovementApprovalsController;
 use App\Http\Controllers\WasteManagement\FabaProductionMovementsController;
 use App\Http\Controllers\WasteManagement\FabaRecapsController;
 use App\Http\Controllers\WasteManagement\FabaReportsController;
@@ -13,7 +15,6 @@ use App\Http\Controllers\WasteManagement\MasterData\TypesController;
 use App\Http\Controllers\WasteManagement\MasterData\VendorsController;
 use App\Http\Controllers\WasteManagement\WasteHaulingsController;
 use App\Http\Controllers\WasteManagement\WasteRecordsController;
-use App\Http\Controllers\WasteManagement\WasteTransportationsController;
 use Illuminate\Support\Facades\Route;
 
 // Waste Management Routes
@@ -25,11 +26,8 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
         ->name('dashboard');
 
     Route::prefix('faba')->name('faba.')->group(function () {
-        // Redirect old FABA dashboard to unified dashboard
         Route::middleware(['permission:faba_dashboard.view'])
-            ->get('/dashboard', function () {
-                return redirect()->to('/dashboard');
-            })
+            ->get('/dashboard', [FabaDashboardController::class, 'index'])
             ->name('dashboard');
 
         Route::prefix('production')->name('production.')->group(function () {
@@ -129,6 +127,9 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
             Route::middleware(['permission:faba_opening_balance.manage'])
                 ->post('/opening-balance', [FabaRecapsController::class, 'storeOpeningBalance'])
                 ->name('openingBalance.store');
+            Route::middleware(['permission:faba_opening_balance.manage'])
+                ->post('/tps-capacity', [FabaRecapsController::class, 'storeTpsCapacity'])
+                ->name('tpsCapacity.store');
         });
 
         Route::prefix('approvals')->name('approvals.')->group(function () {
@@ -153,6 +154,15 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
             Route::middleware(['permission:faba_approvals.reopen'])
                 ->post('/{year}/{month}/reopen', [FabaMonthlyApprovalsController::class, 'reopen'])
                 ->name('reopen');
+        });
+
+        Route::prefix('movements')->name('movements.')->group(function () {
+            Route::middleware(['permission:faba_approvals.approve'])
+                ->post('/{movement}/approve', [FabaMovementApprovalsController::class, 'approve'])
+                ->name('approve');
+            Route::middleware(['permission:faba_approvals.reject'])
+                ->post('/{movement}/reject', [FabaMovementApprovalsController::class, 'reject'])
+                ->name('reject');
         });
 
         Route::prefix('reports')->name('reports.')->group(function () {
@@ -201,6 +211,12 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
             Route::middleware(['permission:faba_reports.export'])
                 ->get('/anomalies.pdf', [FabaReportsController::class, 'anomaliesPdf'])
                 ->name('anomalies.pdf');
+            Route::middleware(['permission:faba_reports.export'])
+                ->get('/analysis-matrix.xlsx', [FabaReportsController::class, 'analysisMatrixXlsx'])
+                ->name('analysis-matrix.xlsx');
+            Route::middleware(['permission:faba_reports.export'])
+                ->get('/analysis-matrix.pdf', [FabaReportsController::class, 'analysisMatrixPdf'])
+                ->name('analysis-matrix.pdf');
         });
     });
 
@@ -370,60 +386,5 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
         Route::middleware(['permission:waste_hauling.cancel'])
             ->post('/{wasteHauling}/cancel', [WasteHaulingsController::class, 'cancel'])
             ->name('cancel');
-    });
-
-    // Waste Transportations Routes
-    Route::prefix('transportations')->name('transportations.')->group(function () {
-        // Index
-        Route::middleware(['permission:transportation.view_all|transportation.view_own'])
-            ->get('/', [WasteTransportationsController::class, 'index'])
-            ->name('index');
-
-        // Create
-        Route::middleware(['permission:transportation.create'])
-            ->get('/create', [WasteTransportationsController::class, 'create'])
-            ->name('create');
-
-        Route::middleware(['permission:transportation.create'])
-            ->post('/', [WasteTransportationsController::class, 'store'])
-            ->name('store');
-
-        // Export
-        Route::middleware(['permission:transportation.view_all|transportation.view_own'])
-            ->get('/export/csv', [WasteTransportationsController::class, 'exportCsv'])
-            ->name('export.csv');
-
-        // Show
-        Route::middleware(['permission:transportation.view_all|transportation.view_own'])
-            ->get('/{wasteTransportation}', [WasteTransportationsController::class, 'show'])
-            ->name('show');
-
-        // Edit
-        Route::middleware(['permission:transportation.edit'])
-            ->get('/{wasteTransportation}/edit', [WasteTransportationsController::class, 'edit'])
-            ->name('edit');
-
-        Route::middleware(['permission:transportation.edit'])
-            ->put('/{wasteTransportation}', [WasteTransportationsController::class, 'update'])
-            ->name('update');
-
-        // Delete
-        Route::middleware(['permission:transportation.delete'])
-            ->delete('/{wasteTransportation}', [WasteTransportationsController::class, 'destroy'])
-            ->name('destroy');
-
-        // Workflow Actions
-        Route::middleware(['permission:transportation.dispatch'])
-            ->post('/{wasteTransportation}/dispatch', [WasteTransportationsController::class, 'dispatch'])
-            ->name('dispatch');
-
-        Route::middleware(['permission:transportation.deliver'])
-            ->post('/{wasteTransportation}/deliver', [WasteTransportationsController::class, 'deliver'])
-            ->name('deliver');
-
-        Route::middleware(['permission:transportation.cancel'])
-            ->post('/{wasteTransportation}/cancel', [WasteTransportationsController::class, 'cancel'])
-            ->name('cancel');
-
     });
 });

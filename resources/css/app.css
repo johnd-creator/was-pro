@@ -434,3 +434,36 @@
         @apply h-full;
     }
 }
+
+/* Card Overlay Utilities for Dark Mode */
+@layer components {
+    /* Neutralize blue dashboard overlays in dark mode to keep the surface fully slate */
+    .wm-card-overlay-blue {
+        @apply dark:before:hidden;
+    }
+
+    /* Orange overlay for FABA Trend Chart */
+    .wm-card-overlay-orange {
+        @apply dark:before:pointer-events-none dark:before:absolute dark:before:inset-0 dark:before:bg-gradient-to-br dark:before:from-orange-500/3 dark:before:to-amber-500/3 dark:before:content-[''];
+    }
+
+    /* Violet overlay for Hauling Status Distribution */
+    .wm-card-overlay-violet {
+        @apply dark:before:pointer-events-none dark:before:absolute dark:before:inset-0 dark:before:bg-gradient-to-br dark:before:from-violet-500/3 dark:before:to-purple-500/3 dark:before:content-[''];
+    }
+
+    /* Pink overlay for Backlog Distribution */
+    .wm-card-overlay-pink {
+        @apply dark:before:pointer-events-none dark:before:absolute dark:before:inset-0 dark:before:bg-gradient-to-br dark:before:from-pink-500/3 dark:before:to-rose-500/3 dark:before:content-[''];
+    }
+
+    /* Emerald overlay for Task List Panel */
+    .wm-card-overlay-emerald {
+        @apply dark:before:pointer-events-none dark:before:absolute dark:before:inset-0 dark:before:bg-gradient-to-br dark:before:from-emerald-500/3 dark:before:to-teal-500/3 dark:before:content-[''];
+    }
+
+    /* Sky blue overlay for general panels */
+    .wm-card-overlay-sky {
+        @apply dark:before:pointer-events-none dark:before:absolute dark:before:inset-0 dark:before:bg-gradient-to-br dark:before:from-sky-500/3 dark:before:to-blue-500/3 dark:before:content-[''];
+    }
+}

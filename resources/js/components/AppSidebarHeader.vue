@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { router, usePage } from '@inertiajs/vue3';
-import { Bell, ChevronDown, AlertTriangle, Shield } from 'lucide-vue-next';
+import {
+    AlertTriangle,
+    Bell,
+    ChevronDown,
+    Moon,
+    Shield,
+    Sun,
+} from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -21,12 +28,14 @@ import {
 } from '@/components/ui/select';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import UserMenuContent from '@/components/UserMenuContent.vue';
+import { useAppearance } from '@/composables/useAppearance';
 import { getInitials } from '@/composables/useInitials';
 import { dashboard as dashboardRoute } from '@/routes';
 import type { BreadcrumbItem, User } from '@/types';
 
 const page = usePage();
 const props = page.props;
+const { resolvedAppearance, updateAppearance } = useAppearance();
 
 withDefaults(
     defineProps<{
@@ -108,6 +117,15 @@ const user = computed(() => props?.auth?.user as User | undefined);
 
 const isDashboardPage = computed(() => page.component === 'Dashboard');
 const isSuperAdmin = computed(() => user.value?.is_super_admin === true);
+const isDarkAppearance = computed(() => resolvedAppearance.value === 'dark');
+const appearanceToggleLabel = computed(() =>
+    isDarkAppearance.value
+        ? 'Ubah ke mode terang'
+        : 'Ubah ke mode gelap',
+);
+const appearanceToggleIcon = computed(() =>
+    isDarkAppearance.value ? Sun : Moon,
+);
 
 const dashboardFilters = computed(
     () =>
@@ -286,6 +304,10 @@ function monthButtonClass(isSelected: boolean, isAvailable: boolean): string {
 
     return 'cursor-not-allowed bg-slate-50 text-slate-300 dark:bg-slate-950 dark:text-slate-700';
 }
+
+function toggleAppearance(): void {
+    updateAppearance(isDarkAppearance.value ? 'light' : 'dark');
+}
 </script>
 
 <template>
@@ -415,6 +437,18 @@ function monthButtonClass(isSelected: boolean, isAvailable: boolean): string {
                     {{ currentDate }} · {{ header?.timezone ?? 'WIB' }}
                 </div>
             </div>
+
+            <Button
+                variant="ghost"
+                size="icon"
+                class="wm-trigger-ghost rounded-full"
+                :aria-label="appearanceToggleLabel"
+                :title="appearanceToggleLabel"
+                @click="toggleAppearance"
+            >
+                <component :is="appearanceToggleIcon" class="h-4 w-4" />
+                <span class="sr-only">{{ appearanceToggleLabel }}</span>
+            </Button>
 
             <DropdownMenu>
                 <DropdownMenuTrigger as-child>

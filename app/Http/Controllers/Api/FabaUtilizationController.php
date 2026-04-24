@@ -7,7 +7,9 @@ use App\Models\FabaAuditLog;
 use App\Models\FabaMovement;
 use App\Models\User;
 use App\Services\FabaAuditService;
+use App\Services\FabaMovementLedgerService;
 use App\Services\FabaRecapService;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,6 +27,7 @@ class FabaUtilizationController extends ApiController
     public function __construct(
         protected FabaRecapService $fabaRecapService,
         protected FabaAuditService $fabaAuditService,
+        protected FabaMovementLedgerService $fabaMovementLedgerService,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -43,6 +46,9 @@ class FabaUtilizationController extends ApiController
                 'purpose:id,name',
                 'createdByUser:id,name',
                 'updatedByUser:id,name',
+                'submittedByUser:id,name',
+                'approvedByUser:id,name',
+                'rejectedByUser:id,name',
             ])
             ->orderByDesc('transaction_date')
             ->orderByDesc('created_at');
@@ -89,12 +95,33 @@ class FabaUtilizationController extends ApiController
         }
 
         $validated = $request->validated();
-        $year = (int) date('Y', strtotime($validated['transaction_date']));
-        $month = (int) date('n', strtotime($validated['transaction_date']));
+        $transactionDate = CarbonImmutable::parse($validated['transaction_date']);
+        $year = (int) $transactionDate->year;
+        $month = (int) $transactionDate->month;
 
         if ($this->fabaRecapService->isPeriodLocked($year, $month)) {
             return $this->error('Periode bulan ini sedang diajukan atau sudah disetujui, sehingga transaksi tidak bisa ditambah.', 'CONFLICT', status: 409);
         }
+
+        if ($this->exceedsAvailableStock($validated, $transactionDate)) {
+            return $this->error(
+                'Jumlah pemanfaatan melebihi stok FABA yang tersedia pada tanggal transaksi.',
+                'VALIDATION_ERROR',
+                ['quantity' => ['Jumlah pemanfaatan melebihi stok FABA yang tersedia pada tanggal transaksi.']],
+                422,
+            );
+        }
+
+        $duplicateWarning = $this->fabaMovementLedgerService->getPotentialDuplicateWarning([
+            'transaction_date' => $validated['transaction_date'],
+            'material_type' => $validated['material_type'],
+            'movement_type' => $validated['movement_type'],
+            'vendor_id' => $validated['vendor_id'] ?? null,
+            'internal_destination_id' => $validated['internal_destination_id'] ?? null,
+            'document_number' => $validated['document_number'] ?? null,
+            'document_date' => $validated['document_date'] ?? null,
+            'quantity' => round((float) $validated['quantity'], 2),
+        ]);
 
         $attachmentPath = null;
 
@@ -120,6 +147,9 @@ class FabaUtilizationController extends ApiController
             'attachment_path' => $attachmentPath,
             'period_year' => $year,
             'period_month' => $month,
+            'approval_status' => FabaMovement::STATUS_PENDING_APPROVAL,
+            'submitted_by' => $user->id,
+            'submitted_at' => now(),
             'note' => $validated['note'] ?? null,
             'created_by' => $user->id,
             'updated_by' => $user->id,
@@ -131,6 +161,9 @@ class FabaUtilizationController extends ApiController
             'purpose:id,name',
             'createdByUser:id,name',
             'updatedByUser:id,name',
+            'submittedByUser:id,name',
+            'approvedByUser:id,name',
+            'rejectedByUser:id,name',
         ]);
 
         $this->fabaAuditService->log(
@@ -145,7 +178,11 @@ class FabaUtilizationController extends ApiController
             $this->serializeMovement($movement, $user)
         );
 
-        return $this->success($this->serializeMovement($movement, $user), 'Movement pemanfaatan FABA berhasil dibuat.', status: 201);
+        $message = $duplicateWarning
+            ? 'Movement pemanfaatan FABA berhasil dibuat dengan warning potensi duplikasi.'
+            : 'Movement pemanfaatan FABA berhasil dibuat.';
+
+        return $this->success($this->serializeMovement($movement, $user), $message, status: 201);
     }
 
     public function show(Request $request, string $utilization): JsonResponse
@@ -173,12 +210,33 @@ class FabaUtilizationController extends ApiController
         }
 
         $validated = $request->validated();
-        $year = (int) date('Y', strtotime($validated['transaction_date']));
-        $month = (int) date('n', strtotime($validated['transaction_date']));
+        $transactionDate = CarbonImmutable::parse($validated['transaction_date']);
+        $year = (int) $transactionDate->year;
+        $month = (int) $transactionDate->month;
 
         if (($year !== $movement->period_year || $month !== $movement->period_month) && $this->fabaRecapService->isPeriodLocked($year, $month)) {
             return $this->error('Periode tujuan sedang terkunci.', 'CONFLICT', status: 409);
         }
+
+        if ($this->exceedsAvailableStock($validated, $transactionDate, $movement->id)) {
+            return $this->error(
+                'Jumlah pemanfaatan melebihi stok FABA yang tersedia pada tanggal transaksi.',
+                'VALIDATION_ERROR',
+                ['quantity' => ['Jumlah pemanfaatan melebihi stok FABA yang tersedia pada tanggal transaksi.']],
+                422,
+            );
+        }
+
+        $duplicateWarning = $this->fabaMovementLedgerService->getPotentialDuplicateWarning([
+            'transaction_date' => $validated['transaction_date'],
+            'material_type' => $validated['material_type'],
+            'movement_type' => $validated['movement_type'],
+            'vendor_id' => $validated['vendor_id'] ?? null,
+            'internal_destination_id' => $validated['internal_destination_id'] ?? null,
+            'document_number' => $validated['document_number'] ?? null,
+            'document_date' => $validated['document_date'] ?? null,
+            'quantity' => round((float) $validated['quantity'], 2),
+        ], $movement->id);
 
         $attachmentPath = $movement->attachment_path;
 
@@ -204,6 +262,14 @@ class FabaUtilizationController extends ApiController
             'attachment_path' => $attachmentPath,
             'period_year' => $year,
             'period_month' => $month,
+            'approval_status' => FabaMovement::STATUS_PENDING_APPROVAL,
+            'submitted_by' => $user->id,
+            'submitted_at' => now(),
+            'approved_by' => null,
+            'approved_at' => null,
+            'rejected_by' => null,
+            'rejected_at' => null,
+            'rejection_note' => null,
             'note' => $validated['note'] ?? null,
             'updated_by' => $user->id,
         ]);
@@ -214,6 +280,9 @@ class FabaUtilizationController extends ApiController
             'purpose:id,name',
             'createdByUser:id,name',
             'updatedByUser:id,name',
+            'submittedByUser:id,name',
+            'approvedByUser:id,name',
+            'rejectedByUser:id,name',
         ]);
 
         $this->fabaAuditService->log(
@@ -228,7 +297,11 @@ class FabaUtilizationController extends ApiController
             $this->serializeMovement($movement, $user)
         );
 
-        return $this->success($this->serializeMovement($movement, $user), 'Movement pemanfaatan FABA berhasil diperbarui.');
+        $message = $duplicateWarning
+            ? 'Movement pemanfaatan FABA berhasil diperbarui dengan warning potensi duplikasi.'
+            : 'Movement pemanfaatan FABA berhasil diperbarui.';
+
+        return $this->success($this->serializeMovement($movement, $user), $message);
     }
 
     public function destroy(Request $request, string $utilization): JsonResponse
@@ -275,6 +348,9 @@ class FabaUtilizationController extends ApiController
                 'purpose:id,name',
                 'createdByUser:id,name',
                 'updatedByUser:id,name',
+                'submittedByUser:id,name',
+                'approvedByUser:id,name',
+                'rejectedByUser:id,name',
             ])
             ->findOrFail($id);
     }
@@ -284,6 +360,18 @@ class FabaUtilizationController extends ApiController
      */
     protected function serializeMovement(FabaMovement $movement, $user): array
     {
+        $state = $this->fabaRecapService->getMovementState($movement);
+        $duplicateWarning = $this->fabaMovementLedgerService->getPotentialDuplicateWarning([
+            'transaction_date' => $movement->transaction_date->format('Y-m-d'),
+            'material_type' => $movement->material_type,
+            'movement_type' => $movement->movement_type,
+            'vendor_id' => $movement->vendor_id,
+            'internal_destination_id' => $movement->internal_destination_id,
+            'document_number' => $movement->document_number,
+            'document_date' => $movement->document_date?->format('Y-m-d'),
+            'quantity' => round((float) $movement->quantity, 2),
+        ], $movement->id);
+
         return [
             'id' => $movement->id,
             'display_number' => sprintf('FM-UTL-%s-%s', $movement->transaction_date->format('Ymd'), strtoupper(substr(str_replace('-', '', $movement->id), -6))),
@@ -304,12 +392,24 @@ class FabaUtilizationController extends ApiController
             'note' => $movement->note,
             'period_year' => $movement->period_year,
             'period_month' => $movement->period_month,
-            'approval_status' => $this->fabaRecapService->getPeriodStatus($movement->period_year, $movement->period_month),
+            'approval_status' => $movement->approval_status,
+            'period_status' => $state['period_status'],
+            'period_operational_status' => $state['period_operational_status'],
+            'locked' => $state['locked'],
+            'effective_status' => $state['effective_status'],
             'period_label' => $this->fabaRecapService->formatPeriodLabel($movement->period_year, $movement->period_month),
             'created_by_user' => $movement->createdByUser,
             'updated_by_user' => $movement->updatedByUser,
+            'submitted_by_user' => $movement->submittedByUser,
+            'approved_by_user' => $movement->approvedByUser,
+            'rejected_by_user' => $movement->rejectedByUser,
+            'submitted_at' => $movement->submitted_at?->toIso8601String(),
+            'approved_at' => $movement->approved_at?->toIso8601String(),
+            'rejected_at' => $movement->rejected_at?->toIso8601String(),
+            'rejection_note' => $movement->rejection_note,
             'created_at' => $movement->created_at?->toIso8601String(),
             'updated_at' => $movement->updated_at?->toIso8601String(),
+            'duplicate_warning' => $duplicateWarning,
             'allowed_actions' => $this->allowedActions($movement, $user),
         ];
     }
@@ -347,11 +447,26 @@ class FabaUtilizationController extends ApiController
             return false;
         }
 
+        if (! in_array($movement->approval_status, [FabaMovement::STATUS_PENDING_APPROVAL, FabaMovement::STATUS_REJECTED], true)) {
+            return false;
+        }
+
         if ($user->hasRole('operator')) {
             return (string) $movement->created_by === (string) $user->id;
         }
 
         return true;
+    }
+
+    protected function exceedsAvailableStock(array $validated, CarbonImmutable $transactionDate, ?string $excludeMovementId = null): bool
+    {
+        $availableStock = $this->fabaMovementLedgerService->calculateAvailableStock(
+            $validated['material_type'],
+            $transactionDate,
+            $excludeMovementId,
+        );
+
+        return round((float) $validated['quantity'], 2) > $availableStock;
     }
 
     /**

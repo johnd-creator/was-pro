@@ -48,8 +48,10 @@ export function formatFabaStatus(value: string): string {
     const labels: Record<string, string> = {
         draft: 'Draft',
         submitted: 'Diajukan',
+        pending_approval: 'Menunggu Persetujuan',
         approved: 'Disetujui',
         rejected: 'Ditolak',
+        locked: 'Terkunci',
     };
 
     return labels[value] ?? value;

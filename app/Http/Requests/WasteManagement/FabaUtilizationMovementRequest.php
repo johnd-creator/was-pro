@@ -16,6 +16,7 @@ class FabaUtilizationMovementRequest extends FormRequest
     public function rules(): array
     {
         $isExternal = $this->input('movement_type') === FabaMovement::TYPE_UTILIZATION_EXTERNAL;
+        $requiresAttachment = $isExternal && ! $this->hasExistingAttachment();
 
         return [
             'transaction_date' => ['required', 'date', 'before_or_equal:today'],
@@ -45,7 +46,7 @@ class FabaUtilizationMovementRequest extends FormRequest
             'unit' => ['nullable', Rule::in([FabaMovement::DEFAULT_UNIT])],
             'document_number' => [Rule::requiredIf($isExternal), 'nullable', 'string', 'max:255'],
             'document_date' => [Rule::requiredIf($isExternal), 'nullable', 'date', 'before_or_equal:today'],
-            'attachment' => ['nullable', 'file', 'max:5120'],
+            'attachment' => [Rule::requiredIf($requiresAttachment), 'nullable', 'file', 'mimetypes:image/jpeg,image/png,image/webp,application/pdf', 'max:5120'],
             'note' => ['nullable', 'string'],
         ];
     }
@@ -64,7 +65,23 @@ class FabaUtilizationMovementRequest extends FormRequest
             'document_number.required' => 'Nomor dokumen wajib diisi untuk pemanfaatan eksternal.',
             'document_date.required' => 'Tanggal dokumen wajib diisi untuk pemanfaatan eksternal.',
             'document_date.before_or_equal' => 'Tanggal dokumen tidak boleh melebihi hari ini.',
+            'attachment.required' => 'Lampiran wajib diunggah untuk pemanfaatan eksternal.',
+            'attachment.mimetypes' => 'Lampiran harus berupa foto JPG/PNG/WEBP atau PDF.',
             'unit.in' => 'Satuan transaksi harus ton.',
         ];
+    }
+
+    protected function hasExistingAttachment(): bool
+    {
+        $utilization = $this->route('utilization');
+
+        if (! is_string($utilization) || $utilization === '') {
+            return false;
+        }
+
+        return FabaMovement::query()
+            ->whereKey($utilization)
+            ->whereNotNull('attachment_path')
+            ->exists();
     }
 }

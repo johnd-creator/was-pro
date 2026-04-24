@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { AlertCircle, CircleCheck } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
 import WasteHaulingsController from '@/actions/App/Http/Controllers/WasteManagement/WasteHaulingsController';
 import Heading from '@/components/Heading.vue';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -60,6 +62,7 @@ const props = defineProps<{
         can_cancel: boolean;
     };
 }>();
+const page = usePage();
 
 const breadcrumbItems: BreadcrumbItem[] = [
     { title: 'Pengangkutan Limbah', href: WasteHaulingsController.index().url },
@@ -78,6 +81,16 @@ const rejectForm = useForm({
 });
 
 const isPending = computed(() => props.hauling.status === 'pending_approval');
+const statusMessage = ref<string | null>(null);
+const errorMessage = ref<string | null>(null);
+const flash = computed(
+    () => page.props.flash as { success?: string; error?: string } | undefined,
+);
+
+function resetMessages(): void {
+    statusMessage.value = null;
+    errorMessage.value = null;
+}
 
 function formatDate(value: string | null): string {
     if (!value) {
@@ -94,20 +107,65 @@ function formatDate(value: string | null): string {
 }
 
 function approve(): void {
+    resetMessages();
     approveForm.post(WasteHaulingsController.approve(props.hauling.id).url, {
         preserveScroll: true,
+        onSuccess: () => {
+            if (flash.value?.success) {
+                statusMessage.value = flash.value.success;
+            } else if (flash.value?.error) {
+                errorMessage.value = flash.value.error;
+            } else {
+                statusMessage.value =
+                    'Pengajuan pengangkutan berhasil diproses.';
+            }
+        },
+        onError: () => {
+            errorMessage.value =
+                'Pengajuan pengangkutan tidak dapat disetujui saat ini.';
+        },
     });
 }
 
 function reject(): void {
+    resetMessages();
     rejectForm.post(WasteHaulingsController.reject(props.hauling.id).url, {
         preserveScroll: true,
+        onSuccess: () => {
+            if (flash.value?.success) {
+                statusMessage.value = flash.value.success;
+            } else if (flash.value?.error) {
+                errorMessage.value = flash.value.error;
+            } else {
+                statusMessage.value =
+                    'Pengajuan pengangkutan berhasil ditolak.';
+            }
+        },
+        onError: () => {
+            errorMessage.value =
+                'Pengajuan pengangkutan tidak dapat ditolak saat ini.';
+        },
     });
 }
 
 function cancel(): void {
+    resetMessages();
     useForm({}).post(WasteHaulingsController.cancel(props.hauling.id).url, {
         preserveScroll: true,
+        onSuccess: () => {
+            if (flash.value?.success) {
+                statusMessage.value = flash.value.success;
+            } else if (flash.value?.error) {
+                errorMessage.value = flash.value.error;
+            } else {
+                statusMessage.value =
+                    'Pengajuan pengangkutan berhasil dibatalkan.';
+            }
+        },
+        onError: () => {
+            errorMessage.value =
+                'Pengajuan pengangkutan tidak dapat dibatalkan saat ini.';
+        },
     });
 }
 </script>
@@ -124,6 +182,25 @@ function cancel(): void {
                 title="Detail Pengangkutan"
                 description="Tinjau pengajuan, status approval, dan dampaknya terhadap sisa limbah."
             />
+
+            <Alert
+                v-if="statusMessage || flash?.success"
+                class="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-100"
+            >
+                <CircleCheck class="h-4 w-4" />
+                <AlertTitle>Aksi berhasil</AlertTitle>
+                <AlertDescription>{{
+                    statusMessage ?? flash?.success
+                }}</AlertDescription>
+            </Alert>
+
+            <Alert v-if="errorMessage || flash?.error" variant="destructive">
+                <AlertCircle class="h-4 w-4" />
+                <AlertTitle>Aksi gagal</AlertTitle>
+                <AlertDescription>{{
+                    errorMessage ?? flash?.error
+                }}</AlertDescription>
+            </Alert>
 
             <div class="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
                 <Card>

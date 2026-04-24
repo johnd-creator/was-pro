@@ -9,6 +9,7 @@ use App\Http\Requests\WasteManagement\ReopenFabaMonthlyApprovalRequest;
 use App\Http\Requests\WasteManagement\SubmitFabaMonthlyApprovalRequest;
 use App\Models\FabaAuditLog;
 use App\Models\FabaMonthlyApproval;
+use App\Models\FabaMovement;
 use App\Services\FabaAuditService;
 use App\Services\FabaRecapService;
 use Illuminate\Http\RedirectResponse;
@@ -75,6 +76,10 @@ class FabaMonthlyApprovalsController extends Controller
 
         if (! $hasTransactions) {
             return Redirect::back()->with('error', 'Periode kosong tidak dapat diajukan untuk approval.');
+        }
+
+        if (FabaMovement::query()->forPeriod($year, $month)->pendingApproval()->exists()) {
+            return Redirect::back()->with('error', 'Masih ada transaksi FABA harian yang menunggu persetujuan. Selesaikan approval transaksi sebelum closing bulanan.');
         }
 
         $approval = $this->fabaRecapService->getOrCreateMonthlyApproval($year, $month);

@@ -1,0 +1,60 @@
+# Product Requirements Document (PRD): Restrukturisasi Sistem Manajemen FABA (v2.0)
+
+## 1. Ringkasan Proyek
+**Tujuan:** Menyederhanakan aplikasi pengelolaan FABA (Fly Ash & Bottom Ash) dari sistem yang terfragmentasi menjadi satu platform terpadu yang fokus pada efisiensi operasional dan akurasi pelaporan manajemen.
+
+**Masalah Utama:** * Terlalu banyak menu input yang terpisah (Internal vs Eksternal).
+* Risiko selisih stok antara data harian dan laporan bulanan.
+* Belum adanya mekanisme penguncian data otomatis setelah approval.
+
+---
+
+## 2. Arsitektur Modul Baru (Unified & Simple)
+
+### A. Modul Transaksi (The Core)
+Menyatukan seluruh arus keluar-masuk barang ke dalam satu logika transaksi.
+* **Menu Produksi:** Input harian volume Fly Ash (FA) dan Bottom Ash (BA).
+* **Menu Pemanfaatan (Unified):** Satu formulir cerdas untuk semua jenis pengeluaran.
+  * *Dropdown:* Internal (Workshop, Batako, Konstruksi) atau Eksternal (Vendor Pihak ke-3).
+  * *Dynamic Fields:* Menampilkan kolom "Nama Vendor" dan "Upload Surat Jalan" hanya jika tipe "Eksternal" dipilih.
+* **Menu Adjusment:** Fitur koreksi stok untuk sinkronisasi hasil *Stock Opname* dengan catatan aplikasi.
+
+### B. Modul Kontrol & Approval
+* **Verification Dashboard:** Halaman khusus bagi Manager/SPV untuk meninjau antrean persetujuan transaksi harian dan *adjustment*.
+* **Monthly Period Locking:** Mekanisme "Closing" bulanan. Begitu periode laporan ditutup, semua data pada bulan tersebut menjadi *read-only* untuk mencegah manipulasi data masa lalu.
+
+### C. Modul Pelaporan (Executive Insight)
+* **Live Stock Card:** Kartu stok otomatis yang diperbarui setiap ada transaksi yang disetujui.
+* **Analysis Matrix:** Automasi tabel pemanfaatan tahunan (berdasarkan format file `2026.pdf`) yang menunjukkan persentase realisasi vs target.
+
+---
+
+## 3. Spesifikasi Teknis & Aturan Bisnis
+
+| Fitur | Aturan Bisnis |
+| :--- | :--- |
+| **Integrasi Stok** | Stok Akhir = (Stok Awal + Produksi + Adjustment) - Pemanfaatan. |
+| **Validation Logic** | Sistem menolak input pemanfaatan jika melebihi saldo stok yang tersedia. |
+| **Document Mandatory** | Transaksi eksternal wajib melampirkan foto/PDF bukti manifest/surat jalan. |
+| **Workflow Status** | Draft -> Pending Approval -> Approved -> Locked (saat Closing). |
+
+---
+
+## 4. Rencana Pengembangan (Roadmap)
+
+### Fase 1: Konsolidasi Data (Database & Backend)
+* Merancang ulang struktur tabel menjadi `faba_transactions` yang lebih generis.
+* Migrasi data dari sistem lama ke struktur baru.
+
+### Fase 2: Perbaikan UI/UX (Frontend Laravel & Flutter)
+* Implementasi *Unified Form* untuk mempercepat proses input admin lapangan.
+* Pembuatan Dashboard visual untuk monitoring kapasitas TPS (Tempat Penyimpanan Sementara).
+
+### Fase 3: Otomatisasi Laporan
+* Pembuatan fitur *Export to PDF/Excel* yang langsung siap kirim tanpa perlu diolah manual di spreadsheet.
+
+---
+
+## 5. Kesimpulan
+Dengan restrukturisasi ini, aplikasi tidak lagi dirasakan sebagai beban administratif bagi staf lapangan, melainkan menjadi alat monitoring yang handal bagi manajemen untuk memastikan kepatuhan pengelolaan limbah FABA sesuai regulasi.
+"""

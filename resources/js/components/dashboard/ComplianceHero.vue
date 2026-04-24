@@ -27,10 +27,7 @@ interface Props {
 interface HeroTone {
     badgeClass: string;
     shellClass: string;
-    valueClass: string;
-    statusClass: string;
     buttonClass: string;
-    iconClass: string;
     railClass: string;
     ringClass: string;
 }
@@ -85,43 +82,12 @@ const totalApprovalCount = computed(
     () => props.pendingWasteApprovals + props.pendingFabaApprovals,
 );
 
-const summaryLabel = computed(() => {
-    if (totalRiskCount.value === 0) {
-        return 'Tidak ada isu aktif';
-    }
-
-    if (props.riskStatus === 'critical') {
-        return 'Butuh tindakan cepat';
-    }
-
-    if (props.riskStatus === 'warning') {
-        return 'Perlu tindak lanjut';
-    }
-
-    return 'Terkendali';
-});
-
-const summaryDetails = computed(() => {
-    const parts: string[] = [];
-
-    if (props.expiredWaste > 0) {
-        parts.push(`${props.expiredWaste} kritis`);
-    }
-
-    if (props.expiringSoonWaste > 0) {
-        parts.push(`${props.expiringSoonWaste} mendekati batas`);
-    }
-
-    if (totalApprovalCount.value > 0) {
-        parts.push(`${totalApprovalCount.value} approval`);
-    }
-
-    if (props.fabaWarnings > 0) {
-        parts.push(`${props.fabaWarnings} warning FABA`);
-    }
-
-    return parts.length > 0 ? parts.join(' • ') : 'Seluruh indikator aman';
-});
+const bannerBadgeLabel = computed(() => `Kepatuhan ${props.riskLabel}`);
+const actionLabel = computed(() =>
+    props.riskStatus === 'critical'
+        ? 'Tinjau Catatan Kritis'
+        : 'Tinjau Catatan',
+);
 
 const toneMap: Record<Props['riskTone'], HeroTone> = {
     red: {
@@ -129,12 +95,8 @@ const toneMap: Record<Props['riskTone'], HeroTone> = {
             'border border-red-300/90 bg-red-100 text-red-800 dark:border-red-900/70 dark:bg-red-950/50 dark:text-red-200',
         shellClass:
             'border-red-300/80 bg-linear-to-br from-red-50 via-white to-red-50/70 dark:border-red-900/70 dark:from-red-950/45 dark:via-slate-950 dark:to-red-950/20',
-        valueClass: 'text-red-700 dark:text-red-300',
-        statusClass:
-            'border-red-300 bg-red-100 text-red-800 dark:border-red-900/70 dark:bg-red-950/45 dark:text-red-200',
         buttonClass:
             'border-red-200 bg-red-600 text-white hover:bg-red-700 dark:border-red-900/60 dark:bg-red-700 dark:hover:bg-red-600',
-        iconClass: 'text-red-600 dark:text-red-300',
         railClass: 'bg-red-600 dark:bg-red-500',
         ringClass: 'ring-1 ring-red-200/80 dark:ring-red-900/40',
     },
@@ -143,12 +105,8 @@ const toneMap: Record<Props['riskTone'], HeroTone> = {
             'border border-amber-300/90 bg-amber-100 text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/50 dark:text-amber-200',
         shellClass:
             'border-amber-300/80 bg-linear-to-br from-amber-50 via-white to-orange-50/70 dark:border-amber-900/70 dark:from-amber-950/35 dark:via-slate-950 dark:to-orange-950/20',
-        valueClass: 'text-amber-700 dark:text-amber-300',
-        statusClass:
-            'border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/45 dark:text-amber-200',
         buttonClass:
             'border-amber-200 bg-amber-600 text-white hover:bg-amber-700 dark:border-amber-900/60 dark:bg-amber-700 dark:hover:bg-amber-600',
-        iconClass: 'text-amber-600 dark:text-amber-300',
         railClass: 'bg-amber-500 dark:bg-amber-400',
         ringClass: 'ring-1 ring-amber-200/80 dark:ring-amber-900/40',
     },
@@ -157,12 +115,8 @@ const toneMap: Record<Props['riskTone'], HeroTone> = {
             'border border-emerald-300/90 bg-emerald-100 text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/50 dark:text-emerald-200',
         shellClass:
             'border-emerald-300/80 bg-linear-to-br from-emerald-50 via-white to-teal-50/60 dark:border-emerald-900/70 dark:from-emerald-950/28 dark:via-slate-950 dark:to-teal-950/16',
-        valueClass: 'text-emerald-700 dark:text-emerald-300',
-        statusClass:
-            'border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/45 dark:text-emerald-200',
         buttonClass:
             'border-emerald-200 bg-emerald-600 text-white hover:bg-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-700 dark:hover:bg-emerald-600',
-        iconClass: 'text-emerald-600 dark:text-emerald-300',
         railClass: 'bg-emerald-500 dark:bg-emerald-400',
         ringClass: 'ring-1 ring-emerald-200/80 dark:ring-emerald-900/40',
     },
@@ -293,83 +247,47 @@ const metricCards = computed<MetricCard[]>(() => [
                 class="absolute inset-y-0 left-0 w-1.5"
                 :class="tone.railClass"
             />
-            <div class="flex flex-col gap-3.5 p-4 sm:p-4.5">
-                <div
-                    class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between"
-                >
-                    <div class="min-w-0 flex-1">
-                        <div class="flex flex-wrap items-center gap-2.5">
-                            <div
-                                :class="[
-                                    'inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-[0.12em] uppercase',
-                                    tone.badgeClass,
-                                ]"
-                            >
-                                <component :is="statusIcon" class="size-3.5" />
-                                Kepatuhan Kritis
-                            </div>
-                            <div
-                                :class="[
-                                    'inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-medium',
-                                    tone.statusClass,
-                                ]"
-                            >
-                                <component :is="statusIcon" class="size-3.5" />
-                                {{ riskLabel }}
-                            </div>
-                        </div>
-
-                        <div
-                            class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5"
-                        >
-                            <p
-                                class="wm-text-primary text-[15px] leading-6 font-semibold sm:text-base"
-                            >
-                                {{ primaryMessage }}
-                            </p>
-                            <p class="wm-text-secondary text-xs font-medium">
-                                {{ totalRiskCount }} indikator aktif
-                            </p>
-                        </div>
+            <div
+                class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+                <div class="min-w-0 flex-1">
+                    <div
+                        :class="[
+                            'inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-[0.12em] uppercase',
+                            tone.badgeClass,
+                        ]"
+                    >
+                        <component :is="statusIcon" class="size-3.5" />
+                        {{ bannerBadgeLabel }}
                     </div>
-
-                    <div class="flex shrink-0 items-center gap-2.5">
-                        <Button
-                            as-child
-                            class="h-9 rounded-lg px-4"
-                            :class="tone.buttonClass"
+                    <div class="mt-2 flex flex-wrap items-center gap-2.5">
+                        <p
+                            class="wm-text-primary text-[15px] leading-6 font-semibold sm:text-base"
                         >
-                            <Link
-                                :href="
-                                    wasteManagementRoutes.records.pendingApproval()
-                                        .url
-                                "
-                            >
-                                Tinjau Catatan Kritis
-                                <ArrowRight class="ml-2 size-4" />
-                            </Link>
-                        </Button>
+                            {{ primaryMessage }}
+                        </p>
+                        <p class="wm-text-secondary text-xs font-medium">
+                            {{ totalRiskCount }} indikator aktif
+                        </p>
                     </div>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2.5">
-                    <div class="wm-panel-elevated rounded-lg border px-3 py-2">
-                        <p
-                            class="wm-text-muted text-[10px] font-semibold tracking-[0.14em] uppercase"
-                        >
-                            Ringkasan
-                        </p>
-                        <p class="wm-text-primary mt-0.5 text-sm font-semibold">
-                            {{ summaryLabel }}
-                        </p>
-                    </div>
-                    <div
-                        v-for="part in summaryDetails.split(' • ')"
-                        :key="part"
-                        class="wm-panel-elevated wm-text-secondary inline-flex items-center rounded-lg border px-3 py-2 text-xs font-medium"
+                <div class="flex shrink-0 items-center">
+                    <Button
+                        as-child
+                        class="h-9 rounded-lg px-4"
+                        :class="tone.buttonClass"
                     >
-                        {{ part }}
-                    </div>
+                        <Link
+                            :href="
+                                wasteManagementRoutes.records.pendingApproval()
+                                    .url
+                            "
+                        >
+                            {{ actionLabel }}
+                            <ArrowRight class="ml-2 size-4" />
+                        </Link>
+                    </Button>
                 </div>
             </div>
         </div>

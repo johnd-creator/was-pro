@@ -3,14 +3,13 @@ import {
     Activity,
     CheckCircle2,
     CircleAlert,
+    ClipboardList,
     Factory,
     PackageCheck,
     Scale,
     ShieldAlert,
-    ClipboardList,
 } from 'lucide-vue-next';
 import { computed } from 'vue';
-import { Card, CardContent } from '@/components/ui/card';
 
 interface Props {
     title: string;
@@ -30,32 +29,40 @@ const props = withDefaults(defineProps<Props>(), {
 const accentClasses = computed(() => {
     const colors = {
         blue: {
-            shell: 'wm-panel border',
-            title: 'wm-text-secondary',
-            value: 'wm-text-primary',
-            unit: 'wm-text-muted',
-            icon: 'text-blue-600 dark:text-blue-300',
+            shell: 'border-sky-200/70 bg-linear-to-br from-white via-sky-50/70 to-blue-100/60 dark:border-sky-800/50 dark:from-slate-900/40 dark:via-sky-950/50 dark:to-blue-950/40 dark:before:absolute dark:before:inset-0 dark:before:bg-gradient-to-br dark:before:from-sky-500/5 dark:before:to-blue-500/5 dark:before:content-[""]',
+            title: 'text-slate-800 dark:text-slate-100',
+            value: 'text-slate-950 dark:text-white',
+            unit: 'text-slate-400 dark:text-slate-300',
+            context: 'border-slate-200/85 bg-white/90 text-slate-700 dark:border-sky-700/60 dark:bg-sky-950/50 dark:text-sky-100',
+            hint: 'text-slate-600 dark:text-slate-300',
+            icon: 'text-sky-700/75 dark:text-sky-300/60',
         },
         emerald: {
-            shell: 'wm-panel border',
-            title: 'wm-text-secondary',
-            value: 'wm-text-primary',
-            unit: 'wm-text-muted',
-            icon: 'text-emerald-600 dark:text-emerald-300',
+            shell: 'border-emerald-200/70 bg-linear-to-br from-white via-emerald-50/70 to-teal-100/55 dark:border-emerald-800/50 dark:from-slate-900/40 dark:via-emerald-950/50 dark:to-teal-950/40 dark:before:absolute dark:before:inset-0 dark:before:bg-gradient-to-br dark:before:from-emerald-500/5 dark:before:to-teal-500/5 dark:before:content-[""]',
+            title: 'text-slate-800 dark:text-slate-100',
+            value: 'text-slate-950 dark:text-white',
+            unit: 'text-slate-400 dark:text-slate-300',
+            context: 'border-slate-200/85 bg-white/90 text-slate-700 dark:border-emerald-700/60 dark:bg-emerald-950/50 dark:text-emerald-100',
+            hint: 'text-slate-600 dark:text-slate-300',
+            icon: 'text-emerald-700/75 dark:text-emerald-300/60',
         },
         orange: {
-            shell: 'wm-panel border',
-            title: 'wm-text-secondary',
-            value: 'wm-text-primary',
-            unit: 'wm-text-muted',
-            icon: 'text-amber-600 dark:text-amber-300',
+            shell: 'border-orange-200/70 bg-linear-to-br from-white via-orange-50/75 to-amber-100/60 dark:border-orange-800/50 dark:from-slate-900/40 dark:via-orange-950/50 dark:to-amber-950/40 dark:before:absolute dark:before:inset-0 dark:before:bg-gradient-to-br dark:before:from-orange-500/5 dark:before:to-amber-500/5 dark:before:content-[""]',
+            title: 'text-slate-800 dark:text-slate-100',
+            value: 'text-slate-950 dark:text-white',
+            unit: 'text-slate-400 dark:text-slate-300',
+            context: 'border-slate-200/85 bg-white/90 text-slate-700 dark:border-orange-700/60 dark:bg-orange-950/50 dark:text-orange-100',
+            hint: 'text-slate-600 dark:text-slate-300',
+            icon: 'text-orange-700/75 dark:text-orange-300/60',
         },
         red: {
-            shell: 'wm-panel border',
-            title: 'wm-text-secondary',
-            value: 'wm-text-primary',
-            unit: 'wm-text-muted',
-            icon: 'text-red-600 dark:text-red-300',
+            shell: 'border-rose-200/70 bg-linear-to-br from-white via-rose-50/70 to-red-100/60 dark:border-rose-800/50 dark:from-slate-900/40 dark:via-rose-950/50 dark:to-red-950/40 dark:before:absolute dark:before:inset-0 dark:before:bg-gradient-to-br dark:before:from-rose-500/5 dark:before:to-red-500/5 dark:before:content-[""]',
+            title: 'text-slate-800 dark:text-slate-100',
+            value: 'text-slate-950 dark:text-white',
+            unit: 'text-slate-400 dark:text-slate-300',
+            context: 'border-slate-200/85 bg-white/90 text-slate-700 dark:border-rose-700/60 dark:bg-rose-950/50 dark:text-rose-100',
+            hint: 'text-slate-600 dark:text-slate-300',
+            icon: 'text-rose-700/75 dark:text-rose-300/60',
         },
     };
 
@@ -80,77 +87,61 @@ const icon = computed(() => {
 </script>
 
 <template>
-    <Card
+    <div
         :class="[
-            'group relative overflow-hidden rounded-2xl border shadow-sm transition-colors duration-200 hover:border-slate-300 dark:hover:border-slate-700',
+            'group relative overflow-hidden rounded-[26px] border p-4 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_50px_-28px_rgba(15,23,42,0.45)]',
             accentClasses.shell,
         ]"
     >
-        <div
-            class="absolute inset-x-0 top-0 h-0.5"
-            :class="{
-                'bg-blue-500/80 dark:bg-blue-400/80': color === 'blue',
-                'bg-emerald-500/80 dark:bg-emerald-400/80': color === 'emerald',
-                'bg-amber-500/80 dark:bg-amber-400/80': color === 'orange',
-                'bg-red-500/85 dark:bg-red-400/85': color === 'red',
-            }"
-        />
-        <CardContent
-            class="relative flex h-full min-h-[126px] flex-col gap-3 p-4"
-        >
-            <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0 space-y-2.5">
-                    <p
-                        :class="[
-                            'text-sm font-medium tracking-tight',
-                            accentClasses.title,
-                        ]"
-                    >
-                        {{ title }}
-                    </p>
-                    <p
-                        :class="[
-                            'text-3xl font-bold tracking-tight tabular-nums',
-                            accentClasses.value,
-                        ]"
-                    >
-                        {{ value }}
-                        <span
-                            v-if="unit"
-                            :class="[
-                                'ml-1 text-sm font-medium',
-                                accentClasses.unit,
-                            ]"
-                        >
-                            {{ unit }}
-                        </span>
-                    </p>
-                </div>
+        <div class="pointer-events-none absolute right-3 bottom-3">
+            <component :is="icon" class="size-11" :class="accentClasses.icon" />
+        </div>
 
-                <div
+        <div class="relative flex h-full min-h-[126px] flex-col gap-3 pr-14">
+            <div class="mb-1 flex items-start justify-between gap-3 pr-12">
+                <span
+                    v-if="contextLabel"
                     :class="[
-                        'wm-surface-subtle flex size-9 shrink-0 items-center justify-center rounded-xl border',
+                        'rounded-full border px-2.5 py-1 text-[10px] font-bold tracking-[0.14em] uppercase',
+                        accentClasses.context,
                     ]"
                 >
-                    <component
-                        :is="icon"
-                        class="size-4 shrink-0"
-                        :class="accentClasses.icon"
-                    />
-                </div>
-            </div>
-
-            <div
-                v-if="contextLabel || hint"
-                class="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
-            >
-                <span v-if="contextLabel" class="wm-text-secondary font-medium">
                     {{ contextLabel }}
                 </span>
-                <span v-if="hint" class="wm-text-muted">
-                    {{ hint }}
-                </span>
             </div>
-        </CardContent>
-    </Card>
+            <p
+                :class="[
+                    'pr-12 text-sm font-semibold tracking-tight',
+                    accentClasses.title,
+                ]"
+            >
+                {{ title }}
+            </p>
+            <p
+                :class="[
+                    'pr-12 text-3xl font-black tracking-tight tabular-nums',
+                    accentClasses.value,
+                ]"
+            >
+                {{ value }}
+                <span
+                    v-if="unit"
+                    :class="[
+                        'ml-1 text-sm font-medium',
+                        accentClasses.unit,
+                    ]"
+                >
+                    {{ unit }}
+                </span>
+            </p>
+
+            <div
+                v-if="hint"
+                class="mt-auto text-[12px] leading-5"
+                :class="accentClasses.hint"
+            >
+                {{ hint }}
+            </div>
+        </div>
+    </div>
 </template>

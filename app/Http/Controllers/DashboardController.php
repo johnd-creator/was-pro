@@ -34,13 +34,15 @@ class DashboardController extends Controller
             'recentActivities' => $data['recent_activities'],
             'pendingApprovals' => $data['pending_approvals'],
             'tasks' => $data['tasks'],
-            'wasteByCategory' => $data['waste_by_category'],
-            'fabaProductionMaterialDistribution' => $data['faba_production_material_distribution'],
-            'transportationByStatus' => $data['transportation_stats'],
+            'wasteHaulingStatusDistribution' => $data['waste_hauling_status_distribution'],
+            'wasteBacklogUrgencyDistribution' => $data['waste_backlog_urgency_distribution'],
 
             // FABA Data
             'fabaStats' => $data['faba_stats'],
+            'fabaHeroStats' => $data['faba_hero_stats'],
             'fabaChart' => $data['faba_chart'],
+            'fabaMaterialBalanceDistribution' => $data['faba_material_balance_distribution'],
+            'fabaUtilizationDistribution' => $data['faba_utilization_distribution'],
             'fabaPendingApprovals' => $data['faba_pending'],
             'fabaWarnings' => $data['faba_warnings'],
             'latestFabaPeriod' => $data['faba_latest'],

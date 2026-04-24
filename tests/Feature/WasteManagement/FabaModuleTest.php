@@ -6,17 +6,21 @@ use App\Models\FabaMonthlyClosingSnapshot;
 use App\Models\FabaMovement;
 use App\Models\FabaOpeningBalance;
 use App\Models\FabaPurpose;
+use App\Models\FabaTpsCapacity;
 use App\Models\Organization;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Services\TenantService;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -36,9 +40,11 @@ function spreadsheetRows(TestResponse $response): array
 beforeEach(function () {
     Storage::fake();
 
+    $suffix = Str::lower(Str::random(8));
+
     $this->organization = Organization::factory()->create([
-        'code' => 'FABA',
-        'schema_name' => 'tenant_faba',
+        'code' => 'FABA'.$suffix,
+        'schema_name' => 'tenant_faba_'.$suffix,
     ]);
 
     $tenantService = app(TenantService::class);
@@ -114,6 +120,18 @@ test('operator can create faba production entry', function () {
 });
 
 test('operator can create external utilization with vendor and attachment', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    FabaMovement::factory()->create([
+        'transaction_date' => now()->subDay()->toDateString(),
+        'material_type' => FabaMovement::MATERIAL_BOTTOM_ASH,
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'period_year' => (int) now()->year,
+        'period_month' => (int) now()->month,
+        'quantity' => 12,
+    ]);
+    $this->tenantService->switchToPublic();
+
     $response = $this->actingAs($this->operator)
         ->post(route('waste-management.faba.utilization.store'), [
             'transaction_date' => now()->toDateString(),
@@ -143,6 +161,71 @@ test('operator can create external utilization with vendor and attachment', func
     expect($movement?->purpose_id)->toBe($this->purpose->id);
 });
 
+test('utilization cannot exceed available stock', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-03-01',
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'period_year' => 2026,
+        'period_month' => 3,
+        'quantity' => 5,
+    ]);
+    $this->tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->operator)
+        ->post(route('waste-management.faba.utilization.store'), [
+            'transaction_date' => '2026-03-12',
+            'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+            'movement_type' => FabaMovement::TYPE_UTILIZATION_INTERNAL,
+            'internal_destination_id' => $this->internalDestination->id,
+            'quantity' => 9,
+            'unit' => 'ton',
+        ]);
+
+    $response->assertSessionHasErrors(['quantity']);
+});
+
+test('utilization update cannot exceed available stock', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-03-01',
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'period_year' => 2026,
+        'period_month' => 3,
+        'quantity' => 8,
+    ]);
+    $entry = FabaMovement::factory()->create([
+        'transaction_date' => '2026-03-10',
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_UTILIZATION_INTERNAL,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_OUT,
+        'internal_destination_id' => $this->internalDestination->id,
+        'period_year' => 2026,
+        'period_month' => 3,
+        'quantity' => 2,
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+    ]);
+    $this->tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->operator)
+        ->put(route('waste-management.faba.utilization.update', $entry), [
+            'transaction_date' => '2026-03-10',
+            'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+            'movement_type' => FabaMovement::TYPE_UTILIZATION_INTERNAL,
+            'vendor_id' => null,
+            'internal_destination_id' => $this->internalDestination->id,
+            'quantity' => 10,
+            'unit' => 'ton',
+        ]);
+
+    $response->assertSessionHasErrors(['quantity']);
+});
+
 test('external utilization requires vendor', function () {
     $response = $this->actingAs($this->operator)
         ->post(route('waste-management.faba.utilization.store'), [
@@ -170,6 +253,189 @@ test('external utilization requires document metadata', function () {
     $response->assertSessionHasErrors(['document_number', 'document_date']);
 });
 
+test('external utilization requires attachment', function () {
+    $response = $this->actingAs($this->operator)
+        ->post(route('waste-management.faba.utilization.store'), [
+            'transaction_date' => now()->toDateString(),
+            'material_type' => 'fly_ash',
+            'movement_type' => FabaMovement::TYPE_UTILIZATION_EXTERNAL,
+            'vendor_id' => $this->vendor->id,
+            'quantity' => 3,
+            'unit' => 'ton',
+            'document_number' => 'DOC-001',
+            'document_date' => now()->toDateString(),
+        ]);
+
+    $response->assertSessionHasErrors(['attachment']);
+});
+
+test('supervisor can store tenant tps capacity settings', function () {
+    $response = $this->actingAs($this->supervisor)
+        ->post(route('waste-management.faba.recaps.tpsCapacity.store'), [
+            'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+            'capacity' => 155.5,
+            'warning_threshold' => 76,
+            'critical_threshold' => 93,
+        ]);
+
+    $response->assertRedirect();
+    $response->assertSessionHas('success');
+
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+
+    expect(FabaTpsCapacity::query()
+        ->where('material_type', FabaMovement::MATERIAL_FLY_ASH)
+        ->value('capacity'))
+        ->toBe('155.50');
+
+    $this->tenantService->switchToPublic();
+});
+
+test('legacy faba migration command migrates once and stays idempotent', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+
+    Schema::create('faba_production_entries', function (Blueprint $table) {
+        $table->uuid('id')->primary();
+        $table->string('entry_number')->unique();
+        $table->date('transaction_date');
+        $table->string('material_type');
+        $table->string('entry_type');
+        $table->decimal('quantity', 15, 2);
+        $table->string('unit')->default('ton');
+        $table->text('note')->nullable();
+        $table->unsignedSmallInteger('period_year')->nullable();
+        $table->unsignedTinyInteger('period_month')->nullable();
+        $table->uuid('created_by')->nullable();
+        $table->uuid('updated_by')->nullable();
+        $table->timestamps();
+        $table->softDeletes();
+    });
+
+    Schema::create('faba_utilization_entries', function (Blueprint $table) {
+        $table->uuid('id')->primary();
+        $table->string('entry_number')->unique();
+        $table->date('transaction_date');
+        $table->string('material_type');
+        $table->string('utilization_type');
+        $table->uuid('vendor_id')->nullable();
+        $table->uuid('internal_destination_id')->nullable();
+        $table->uuid('purpose_id')->nullable();
+        $table->decimal('quantity', 15, 2);
+        $table->string('unit')->default('ton');
+        $table->string('document_number')->nullable();
+        $table->date('document_date')->nullable();
+        $table->string('attachment_path')->nullable();
+        $table->text('note')->nullable();
+        $table->unsignedSmallInteger('period_year')->nullable();
+        $table->unsignedTinyInteger('period_month')->nullable();
+        $table->uuid('created_by')->nullable();
+        $table->uuid('updated_by')->nullable();
+        $table->timestamps();
+        $table->softDeletes();
+    });
+
+    $legacyProductionId = (string) Str::uuid();
+    $legacyUtilizationId = (string) Str::uuid();
+
+    DB::table('faba_production_entries')->insert([
+        'id' => $legacyProductionId,
+        'entry_number' => 'LEG-PROD-001',
+        'transaction_date' => '2026-03-05',
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'entry_type' => 'production',
+        'quantity' => 18.5,
+        'unit' => 'ton',
+        'note' => 'Legacy produksi',
+        'period_year' => 2026,
+        'period_month' => 3,
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->supervisor->id,
+        'created_at' => now()->subDays(10),
+        'updated_at' => now()->subDays(9),
+        'deleted_at' => null,
+    ]);
+
+    DB::table('faba_utilization_entries')->insert([
+        'id' => $legacyUtilizationId,
+        'entry_number' => 'LEG-UTIL-001',
+        'transaction_date' => '2026-03-09',
+        'material_type' => FabaMovement::MATERIAL_BOTTOM_ASH,
+        'utilization_type' => 'external',
+        'vendor_id' => $this->vendor->id,
+        'internal_destination_id' => null,
+        'purpose_id' => $this->purpose->id,
+        'quantity' => 7.25,
+        'unit' => 'ton',
+        'document_number' => 'DOC-LEG-001',
+        'document_date' => '2026-03-09',
+        'attachment_path' => 'legacy/doc-001.pdf',
+        'note' => 'Legacy pemanfaatan',
+        'period_year' => 2026,
+        'period_month' => 3,
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->supervisor->id,
+        'created_at' => now()->subDays(8),
+        'updated_at' => now()->subDays(7),
+        'deleted_at' => null,
+    ]);
+
+    $this->tenantService->switchToPublic();
+
+    $this->artisan('faba:migrate-legacy', [
+        '--schema' => $this->organization->schema_name,
+    ])->assertSuccessful();
+
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+
+    expect(FabaMovement::query()
+        ->where('reference_type', 'legacy_faba_production_entry')
+        ->where('reference_id', $legacyProductionId)
+        ->count())
+        ->toBe(1);
+
+    expect(FabaMovement::query()
+        ->where('reference_type', 'legacy_faba_utilization_entry')
+        ->where('reference_id', $legacyUtilizationId)
+        ->count())
+        ->toBe(1);
+
+    $migratedCount = FabaMovement::query()
+        ->whereIn('reference_type', ['legacy_faba_production_entry', 'legacy_faba_utilization_entry'])
+        ->count();
+
+    $this->tenantService->switchToPublic();
+
+    $this->artisan('faba:migrate-legacy', [
+        '--schema' => $this->organization->schema_name,
+    ])->assertSuccessful();
+
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+
+    expect(FabaMovement::query()
+        ->whereIn('reference_type', ['legacy_faba_production_entry', 'legacy_faba_utilization_entry'])
+        ->count())
+        ->toBe($migratedCount);
+
+    $this->tenantService->switchToPublic();
+});
+
+test('external utilization rejects unsupported attachment mime type', function () {
+    $response = $this->actingAs($this->operator)
+        ->post(route('waste-management.faba.utilization.store'), [
+            'transaction_date' => now()->toDateString(),
+            'material_type' => 'fly_ash',
+            'movement_type' => FabaMovement::TYPE_UTILIZATION_EXTERNAL,
+            'vendor_id' => $this->vendor->id,
+            'quantity' => 3,
+            'unit' => 'ton',
+            'document_number' => 'DOC-UNSUPPORTED',
+            'document_date' => now()->toDateString(),
+            'attachment' => UploadedFile::fake()->create('catatan.txt', 10, 'text/plain'),
+        ]);
+
+    $response->assertSessionHasErrors(['attachment']);
+});
+
 test('internal utilization requires internal destination', function () {
     $response = $this->actingAs($this->operator)
         ->post(route('waste-management.faba.utilization.store'), [
@@ -193,6 +459,149 @@ test('utilization index renders active vendor, destination, and purpose options'
         ->has('vendors', 1)
         ->has('internalDestinations', 1)
         ->has('purposes', 1)
+        ->where('initialMovementType', null)
+    );
+});
+
+test('faba dashboard exposes verification queues and latest movements', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-03-05',
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'period_year' => 2026,
+        'period_month' => 3,
+        'quantity' => 12,
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+        'approval_status' => FabaMovement::STATUS_APPROVED,
+    ]);
+
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-04-08',
+        'material_type' => FabaMovement::MATERIAL_BOTTOM_ASH,
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'period_year' => 2026,
+        'period_month' => 4,
+        'quantity' => 10,
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+        'approval_status' => FabaMovement::STATUS_APPROVED,
+    ]);
+
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-04-09',
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_UTILIZATION_INTERNAL,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_OUT,
+        'internal_destination_id' => $this->internalDestination->id,
+        'period_year' => 2026,
+        'period_month' => 4,
+        'quantity' => 2,
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+        'approval_status' => FabaMovement::STATUS_PENDING_APPROVAL,
+        'submitted_by' => $this->operator->id,
+        'submitted_at' => now(),
+    ]);
+
+    FabaMonthlyApproval::factory()->create([
+        'year' => 2026,
+        'month' => 3,
+        'status' => FabaMonthlyApproval::STATUS_SUBMITTED,
+    ]);
+
+    $this->tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->supervisor)
+        ->get(route('waste-management.faba.dashboard', ['year' => 2026]));
+
+    $response->assertSuccessful();
+    $response->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('waste-management/faba/Dashboard')
+        ->has('pendingApprovals', 1)
+        ->has('pendingTransactionApprovals', 1)
+        ->has('readyClosingPeriods', 1)
+        ->has('latestMovements')
+        ->where('pendingApprovals.0.period_label', 'Maret 2026')
+        ->where('readyClosingPeriods.0.period_label', 'April 2026')
+        ->where('latestMovements.0.period_label', 'April 2026')
+    );
+});
+
+test('faba dashboard exposes tps capacity summary', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-04-05',
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'period_year' => 2026,
+        'period_month' => 4,
+        'quantity' => 48,
+    ]);
+
+    $this->tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->supervisor)
+        ->get(route('waste-management.faba.dashboard', ['year' => 2026]));
+
+    $response->assertSuccessful();
+    $response->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('waste-management/faba/Dashboard')
+        ->where('tpsCapacitySummary.total.capacity', 200)
+        ->where('tpsCapacitySummary.materials.0.capacity', 120)
+    );
+});
+
+test('production detail exposes locked and duplicate warning state', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+
+    $first = FabaMovement::factory()->create([
+        'transaction_date' => '2026-04-10',
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'period_year' => 2026,
+        'period_month' => 4,
+        'quantity' => 12,
+        'approval_status' => FabaMovement::STATUS_PENDING_APPROVAL,
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+    ]);
+
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-04-10',
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'period_year' => 2026,
+        'period_month' => 4,
+        'quantity' => 12,
+        'approval_status' => FabaMovement::STATUS_APPROVED,
+    ]);
+
+    FabaMonthlyApproval::factory()->create([
+        'year' => 2026,
+        'month' => 4,
+        'status' => FabaMonthlyApproval::STATUS_APPROVED,
+    ]);
+
+    $this->tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->operator)
+        ->get(route('waste-management.faba.production.show', $first));
+
+    $response->assertSuccessful();
+    $response->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('waste-management/faba/production/Show')
+        ->where('entry.locked', true)
+        ->where('entry.effective_status', 'locked')
+        ->where('entry.duplicate_warning.count', 1)
     );
 });
 
@@ -207,6 +616,7 @@ test('operator can view production entries from the same organization but can on
         'period_month' => 3,
         'created_by' => $this->operator->id,
         'updated_by' => $this->operator->id,
+        'approval_status' => FabaMovement::STATUS_PENDING_APPROVAL,
     ]);
 
     $supervisorEntry = FabaMovement::factory()->create([
@@ -217,6 +627,7 @@ test('operator can view production entries from the same organization but can on
         'period_month' => 3,
         'created_by' => $this->supervisor->id,
         'updated_by' => $this->supervisor->id,
+        'approval_status' => FabaMovement::STATUS_PENDING_APPROVAL,
     ]);
 
     $this->tenantService->switchToPublic();
@@ -246,15 +657,7 @@ test('operator cannot edit production entry created by another user even when pe
         'period_month' => 3,
         'created_by' => $this->supervisor->id,
         'updated_by' => $this->supervisor->id,
-    ]);
-
-    FabaMonthlyApproval::factory()->create([
-        'year' => 2026,
-        'month' => 3,
-        'status' => FabaMonthlyApproval::STATUS_REJECTED,
-        'rejected_by' => $this->supervisor->id,
-        'rejected_at' => now(),
-        'rejection_note' => 'Perlu revisi data pendukung.',
+        'approval_status' => FabaMovement::STATUS_PENDING_APPROVAL,
     ]);
 
     $this->tenantService->switchToPublic();
@@ -428,6 +831,7 @@ test('operator can submit month and supervisor can approve it', function () {
         'period_year' => 2026,
         'period_month' => 3,
         'quantity' => 12,
+        'approval_status' => FabaMovement::STATUS_APPROVED,
     ]);
     $this->tenantService->switchToPublic();
 
@@ -453,6 +857,57 @@ test('operator can submit month and supervisor can approve it', function () {
     $this->tenantService->switchToSchema($this->organization->schema_name);
     expect(FabaMonthlyApproval::query()->first()?->status)->toBe('approved');
     expect(FabaMonthlyClosingSnapshot::query()->forPeriod(2026, 3)->exists())->toBeTrue();
+});
+
+test('cannot submit monthly approval when pending transaction approvals still exist', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-03-05',
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'period_year' => 2026,
+        'period_month' => 3,
+        'quantity' => 12,
+        'approval_status' => FabaMovement::STATUS_PENDING_APPROVAL,
+        'submitted_by' => $this->operator->id,
+        'submitted_at' => now(),
+    ]);
+    $this->tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->operator)
+        ->post(route('waste-management.faba.approvals.submit'), [
+            'year' => 2026,
+            'month' => 3,
+        ]);
+
+    $response->assertSessionHas('error');
+});
+
+test('supervisor can approve pending production transaction', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    $entry = FabaMovement::factory()->create([
+        'transaction_date' => '2026-03-05',
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'period_year' => 2026,
+        'period_month' => 3,
+        'quantity' => 12,
+        'approval_status' => FabaMovement::STATUS_PENDING_APPROVAL,
+        'submitted_by' => $this->operator->id,
+        'submitted_at' => now(),
+    ]);
+    $this->tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->supervisor)
+        ->post(route('waste-management.faba.movements.approve', $entry), [
+            'approval_note' => 'Data valid.',
+        ]);
+
+    $response->assertRedirect();
+
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    expect($entry->fresh()?->approval_status)->toBe(FabaMovement::STATUS_APPROVED);
+    expect($entry->fresh()?->approved_by)->toBe($this->supervisor->id);
 });
 
 test('approved period locks production edits', function () {
@@ -660,6 +1115,41 @@ test('faba export endpoints require correct permission', function () {
     $response->assertForbidden();
 });
 
+test('reports index exposes analysis matrix and tps capacity summary', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+
+    $semenPurpose = FabaPurpose::factory()->create([
+        'name' => 'Semen',
+        'slug' => 'semen',
+    ]);
+
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-03-05',
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_UTILIZATION_EXTERNAL,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_OUT,
+        'vendor_id' => $this->vendor->id,
+        'purpose_id' => $semenPurpose->id,
+        'document_number' => 'DOC-MATRIX-001',
+        'document_date' => '2026-03-05',
+        'period_year' => 2026,
+        'period_month' => 3,
+        'quantity' => 25,
+    ]);
+
+    $this->tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->operator)
+        ->get(route('waste-management.faba.reports.index', ['year' => 2026, 'month' => 3]));
+
+    $response->assertSuccessful();
+    $response->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('waste-management/faba/reports/Index')
+        ->where('analysisMatrix.summary.total_actual_quantity', 25)
+        ->where('tpsCapacitySummary.total.capacity', 200)
+    );
+});
+
 test('stock card page renders movement ledger rows', function () {
     $this->tenantService->switchToSchema($this->organization->schema_name);
     FabaMovement::factory()->create([
@@ -862,6 +1352,44 @@ test('anomaly report pdf can be downloaded', function () {
     $response->assertSuccessful();
     expect($response->headers->get('content-type'))->toContain('application/pdf');
     expect($response->getContent())->toStartWith('%PDF');
+});
+
+test('analysis matrix report xlsx can be downloaded', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+
+    $semenPurpose = FabaPurpose::factory()->create([
+        'name' => 'Semen',
+        'slug' => 'semen',
+    ]);
+
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-03-05',
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_UTILIZATION_EXTERNAL,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_OUT,
+        'vendor_id' => $this->vendor->id,
+        'purpose_id' => $semenPurpose->id,
+        'document_number' => 'DOC-MATRIX-002',
+        'document_date' => '2026-03-05',
+        'period_year' => 2026,
+        'period_month' => 3,
+        'quantity' => 18,
+    ]);
+
+    $this->tenantService->switchToPublic();
+
+    $response = $this->actingAs($this->operator)
+        ->get(route('waste-management.faba.reports.analysis-matrix.xlsx', ['year' => 2026]));
+
+    $response->assertSuccessful();
+    expect($response->headers->get('content-type'))->toContain('spreadsheetml');
+
+    $rows = spreadsheetRows($response);
+    $flattened = collect($rows)->flatten()->implode('|');
+
+    expect($flattened)->toContain('Laporan Analysis Matrix FABA')
+        ->toContain('Semen dan Batako')
+        ->toContain('18');
 });
 
 test('production export csv respects report filters', function () {
@@ -1134,7 +1662,7 @@ test('faba demo seed rejects fresh mode for protected default demo schema on a n
 });
 
 test('integrated demo seed command prepares waste and faba data in one tenant', function () {
-    CarbonImmutable::setTestNow('2026-03-19 10:00:00');
+    CarbonImmutable::setTestNow('2026-04-16 10:00:00');
 
     $response = Artisan::call('demo:seed', [
         '--tenant' => 'TWMSALLDEMO',
@@ -1155,7 +1683,7 @@ test('integrated demo seed command prepares waste and faba data in one tenant', 
     expect(\App\Models\WasteCategory::query()->count())->toBe(3)
         ->and(\App\Models\WasteType::query()->count())->toBe(4)
         ->and(\App\Models\WasteRecord::query()->count())->toBe(144)
-        ->and(\App\Models\WasteTransportation::query()->count())->toBe(60)
+        ->and(\App\Models\WasteHauling::query()->count())->toBe(60)
         ->and(Vendor::query()->count())->toBe(6)
         ->and(FabaInternalDestination::query()->count())->toBe(2)
         ->and(FabaPurpose::query()->count())->toBe(3)
