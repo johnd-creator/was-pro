@@ -57,8 +57,8 @@ const totalBacklog = computed(() =>
                     Pencatatan vs Pengangkutan Limbah
                 </CardTitle>
                 <CardDescription>
-                    Perbandingan volume pencatatan limbah dan pengangkutan
-                    yang disetujui untuk membaca throughput operasional 6 bulan
+                    Perbandingan volume pencatatan limbah dan pengangkutan yang
+                    disetujui untuk membaca throughput operasional 6 bulan
                     terakhir.
                 </CardDescription>
             </div>

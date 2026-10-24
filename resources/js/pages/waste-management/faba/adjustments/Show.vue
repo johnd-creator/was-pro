@@ -62,7 +62,9 @@ function approve(): void {
 }
 
 function reject(): void {
-    rejectForm.post(wasteManagementRoutes.faba.movements.reject(props.entry.id).url);
+    rejectForm.post(
+        wasteManagementRoutes.faba.movements.reject(props.entry.id).url,
+    );
 }
 </script>
 
@@ -289,25 +291,47 @@ function reject(): void {
                 </Card>
 
                 <Card
-                    v-if="entry.can_approve || entry.can_reject || entry.rejection_note"
+                    v-if="
+                        entry.can_approve ||
+                        entry.can_reject ||
+                        entry.rejection_note
+                    "
                     class="rounded-[28px] border-slate-200/80 bg-white/90 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.28)] dark:bg-slate-950/85"
                 >
-                    <CardHeader><CardTitle>Approval Transaksi</CardTitle></CardHeader>
+                    <CardHeader
+                        ><CardTitle>Approval Transaksi</CardTitle></CardHeader
+                    >
                     <CardContent class="space-y-4">
-                        <p v-if="entry.rejection_note" class="text-sm text-slate-600 dark:text-slate-300">
+                        <p
+                            v-if="entry.rejection_note"
+                            class="text-sm text-slate-600 dark:text-slate-300"
+                        >
                             Catatan penolakan: {{ entry.rejection_note }}
                         </p>
                         <div v-if="entry.can_approve" class="flex justify-end">
                             <Button @click="approve">Setujui Transaksi</Button>
                         </div>
-                        <form v-if="entry.can_reject" class="space-y-3" @submit.prevent="reject">
+                        <form
+                            v-if="entry.can_reject"
+                            class="space-y-3"
+                            @submit.prevent="reject"
+                        >
                             <div class="grid gap-2">
-                                <Label for="rejection_note">Catatan penolakan</Label>
-                                <Textarea id="rejection_note" v-model="rejectForm.rejection_note" />
-                                <InputError :message="rejectForm.errors.rejection_note" />
+                                <Label for="rejection_note"
+                                    >Catatan penolakan</Label
+                                >
+                                <Textarea
+                                    id="rejection_note"
+                                    v-model="rejectForm.rejection_note"
+                                />
+                                <InputError
+                                    :message="rejectForm.errors.rejection_note"
+                                />
                             </div>
                             <div class="flex justify-end">
-                                <Button variant="destructive" type="submit">Tolak Transaksi</Button>
+                                <Button variant="destructive" type="submit"
+                                    >Tolak Transaksi</Button
+                                >
                             </div>
                         </form>
                     </CardContent>

@@ -1,16 +1,15 @@
 <?php
 
 use App\Models\Organization;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
-use App\Models\Vendor;
 use App\Models\WasteCategory;
 use App\Models\WasteCharacteristic;
+use App\Models\WasteHauling;
 use App\Models\WasteRecord;
-use App\Models\WasteTransportation;
 use App\Models\WasteType;
 use App\Services\TenantService;
-use Illuminate\Support\Facades\Artisan;
 use Inertia\Testing\AssertableInertia;
 
 uses()->group('waste-management', 'visibility');
@@ -28,10 +27,7 @@ beforeEach(function () {
     }
 
     $this->tenantService->switchToSchema($this->organization->schema_name);
-    Artisan::call('migrate', [
-        '--path' => 'database/migrations/tenant',
-        '--force' => true,
-    ]);
+    $this->tenantService->runMigrationsForTenant($this->organization->schema_name, 'database/migrations/tenant');
 
     $category = WasteCategory::query()->create([
         'name' => 'Limbah B3',
@@ -56,12 +52,6 @@ beforeEach(function () {
         'description' => 'Waste type uji visibilitas',
         'storage_period_days' => 30,
         'transport_cost' => 150000,
-        'is_active' => true,
-    ]);
-
-    $this->vendor = Vendor::query()->create([
-        'name' => 'Vendor Uji',
-        'code' => 'VENDOR-VIS',
         'is_active' => true,
     ]);
 
@@ -131,36 +121,31 @@ function createWasteRecordForVisibilityTest(
     return $record;
 }
 
-function createTransportationForVisibilityTest(
+function createHaulingForVisibilityTest(
     TenantService $tenantService,
     Organization $organization,
     WasteRecord $wasteRecord,
-    Vendor $vendor,
     User $creator,
     array $attributes = []
-): WasteTransportation {
+): WasteHauling {
     $tenantService->switchToSchema($organization->schema_name);
 
-    $sequence = WasteTransportation::query()->count() + 1;
+    $sequence = WasteHauling::query()->count() + 1;
 
-    $transportation = WasteTransportation::query()->create(array_merge([
-        'transportation_number' => 'TR-'.$organization->code.'-2026-03-'.str_pad((string) $sequence, 4, '0', STR_PAD_LEFT),
+    $hauling = WasteHauling::query()->create(array_merge([
+        'hauling_number' => 'HL-'.$organization->code.'-2026-03-'.str_pad((string) $sequence, 4, '0', STR_PAD_LEFT),
         'waste_record_id' => $wasteRecord->id,
-        'vendor_id' => $vendor->id,
-        'transportation_date' => '2026-03-12',
+        'hauling_date' => '2026-03-12',
         'quantity' => 50,
         'unit' => 'kg',
-        'vehicle_number' => 'B 1234 VIS',
-        'driver_name' => 'Driver Uji',
-        'driver_phone' => '08123456789',
-        'status' => 'pending',
+        'status' => 'pending_approval',
         'created_by' => $creator->id,
         'updated_by' => $creator->id,
     ], $attributes));
 
     $tenantService->switchToPublic();
 
-    return $transportation;
+    return $hauling;
 }
 
 test('super admin can see all waste records created by another user', function () {
@@ -192,7 +177,8 @@ test('super admin can see all waste records created by another user', function (
     );
 });
 
-test('operator only sees own waste records', function () {
+test('operator without view all only sees own waste records', function () {
+    $this->operator->role->permissions()->detach(Permission::where('slug', 'waste_records.view_all')->value('id'));
     createWasteRecordForVisibilityTest(
         $this->tenantService,
         $this->organization,
@@ -220,7 +206,7 @@ test('operator only sees own waste records', function () {
     );
 });
 
-test('super admin can see all transportations created by another user', function () {
+test('super admin can see hauling history created by another user', function () {
     $record = createWasteRecordForVisibilityTest(
         $this->tenantService,
         $this->organization,
@@ -228,44 +214,41 @@ test('super admin can see all transportations created by another user', function
         $this->demoCreator
     );
 
-    $firstTransportation = createTransportationForVisibilityTest(
+    $firstHauling = createHaulingForVisibilityTest(
         $this->tenantService,
         $this->organization,
         $record,
-        $this->vendor,
         $this->demoCreator,
-        ['transportation_number' => 'TR-VISIBILITY-2026-03-0001']
+        ['hauling_number' => 'HL-VISIBILITY-2026-03-0001']
     );
 
-    $secondTransportation = createTransportationForVisibilityTest(
+    $secondHauling = createHaulingForVisibilityTest(
         $this->tenantService,
         $this->organization,
         $record,
-        $this->vendor,
         $this->demoCreator,
         [
-            'transportation_number' => 'TR-VISIBILITY-2026-03-0002',
-            'status' => 'delivered',
-            'delivered_at' => now(),
-            'dispatched_at' => now()->subHour(),
+            'hauling_number' => 'HL-VISIBILITY-2026-03-0002',
+            'status' => 'approved',
+            'approved_at' => now(),
         ]
     );
 
     $response = $this->actingAs($this->john)
-        ->get(route('waste-management.transportations.index'));
+        ->get(route('waste-management.haulings.index'));
 
     $response->assertSuccessful();
     $response->assertInertia(fn (AssertableInertia $page) => $page
-        ->component('waste-management/transportations/Index')
-        ->has('wasteTransportations', 2)
-        ->where('wasteTransportations', fn ($transportations): bool => collect($transportations)->pluck('transportation_number')->contains($firstTransportation->transportation_number)
-            && collect($transportations)->pluck('transportation_number')->contains($secondTransportation->transportation_number))
-        ->where('stats.pending', 1)
-        ->where('stats.delivered', 1)
+        ->component('waste-management/haulings/Index')
+        ->has('records', 1)
+        ->where('records.0.hauling_history', fn ($haulings): bool => collect($haulings)->pluck('hauling_number')->contains($firstHauling->hauling_number)
+            && collect($haulings)->pluck('hauling_number')->contains($secondHauling->hauling_number))
+        ->where('stats.pending_requests', 1)
     );
 });
 
 test('record export csv follows own visibility scope', function () {
+    $this->operator->role->permissions()->detach(Permission::where('slug', 'waste_records.view_all')->value('id'));
     $ownRecord = createWasteRecordForVisibilityTest(
         $this->tenantService,
         $this->organization,
@@ -291,7 +274,7 @@ test('record export csv follows own visibility scope', function () {
         ->not->toContain($otherRecord->record_number);
 });
 
-test('transportation export csv follows own visibility scope', function () {
+test('hauling details follow own visibility scope', function () {
     $ownRecord = createWasteRecordForVisibilityTest(
         $this->tenantService,
         $this->organization,
@@ -308,31 +291,34 @@ test('transportation export csv follows own visibility scope', function () {
         ['record_number' => 'WR-VISIBILITY-2026-03-0302']
     );
 
-    $ownTransportation = createTransportationForVisibilityTest(
+    $ownHauling = createHaulingForVisibilityTest(
         $this->tenantService,
         $this->organization,
         $ownRecord,
-        $this->vendor,
         $this->operator,
-        ['transportation_number' => 'TR-VISIBILITY-2026-03-0301']
+        ['hauling_number' => 'HL-VISIBILITY-2026-03-0301']
     );
 
-    $otherTransportation = createTransportationForVisibilityTest(
+    $otherHauling = createHaulingForVisibilityTest(
         $this->tenantService,
         $this->organization,
         $otherRecord,
-        $this->vendor,
         $this->demoCreator,
-        ['transportation_number' => 'TR-VISIBILITY-2026-03-0302']
+        ['hauling_number' => 'HL-VISIBILITY-2026-03-0302']
     );
 
     $response = $this->actingAs($this->operator)
-        ->get(route('waste-management.transportations.export.csv'));
+        ->get(route('waste-management.haulings.show', $ownHauling));
 
     $response->assertSuccessful();
-    expect($response->streamedContent())
-        ->toContain($ownTransportation->transportation_number)
-        ->not->toContain($otherTransportation->transportation_number);
+    $response->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('waste-management/haulings/Show')
+        ->where('hauling.hauling_number', $ownHauling->hauling_number)
+    );
+
+    $this->actingAs($this->operator)
+        ->get(route('waste-management.haulings.show', $otherHauling))
+        ->assertForbidden();
 });
 
 test('supervisor can open pending approval page through has permission flow', function () {

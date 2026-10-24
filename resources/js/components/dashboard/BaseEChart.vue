@@ -14,11 +14,6 @@ withDefaults(defineProps<Props>(), {
 
 <template>
     <div :class="['w-full', heightClass]">
-        <VChart
-            :option="option"
-            autoresize
-            class="h-full w-full"
-        />
+        <VChart :option="option" autoresize class="h-full w-full" />
     </div>
 </template>
-

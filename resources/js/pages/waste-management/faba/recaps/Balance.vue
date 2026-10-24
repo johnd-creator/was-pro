@@ -54,10 +54,15 @@ const form = useForm({
 });
 
 const capacityForm = useForm({
-    material_type: props.tpsCapacitySummary.materials[0]?.material_type ?? 'fly_ash',
+    material_type:
+        props.tpsCapacitySummary.materials[0]?.material_type ?? 'fly_ash',
     capacity: String(props.tpsCapacitySummary.materials[0]?.capacity ?? 0),
-    warning_threshold: String(props.tpsCapacitySummary.materials[0]?.warning_threshold ?? 80),
-    critical_threshold: String(props.tpsCapacitySummary.materials[0]?.critical_threshold ?? 95),
+    warning_threshold: String(
+        props.tpsCapacitySummary.materials[0]?.warning_threshold ?? 80,
+    ),
+    critical_threshold: String(
+        props.tpsCapacitySummary.materials[0]?.critical_threshold ?? 95,
+    ),
 });
 
 const breadcrumbItems: BreadcrumbItem[] = [
@@ -92,11 +97,15 @@ function syncCapacityForm(
     capacityForm.material_type = materialType;
     capacityForm.capacity = String(selected?.capacity ?? 0);
     capacityForm.warning_threshold = String(selected?.warning_threshold ?? 80);
-    capacityForm.critical_threshold = String(selected?.critical_threshold ?? 95);
+    capacityForm.critical_threshold = String(
+        selected?.critical_threshold ?? 95,
+    );
 }
 
 function submitCapacity(): void {
-    capacityForm.post(wasteManagementRoutes.faba.recaps.tpsCapacity.store.url());
+    capacityForm.post(
+        wasteManagementRoutes.faba.recaps.tpsCapacity.store.url(),
+    );
 }
 </script>
 
@@ -436,7 +445,9 @@ function submitCapacity(): void {
                                 <p
                                     class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300"
                                 >
-                                    Simpan kapasitas aktual dan threshold warning/critical untuk monitoring TPS tenant ini.
+                                    Simpan kapasitas aktual dan threshold
+                                    warning/critical untuk monitoring TPS tenant
+                                    ini.
                                 </p>
                             </div>
 
@@ -444,7 +455,9 @@ function submitCapacity(): void {
                                 <div class="grid gap-2">
                                     <Label>Material</Label>
                                     <Select
-                                        :model-value="capacityForm.material_type"
+                                        :model-value="
+                                            capacityForm.material_type
+                                        "
                                         @update:model-value="syncCapacityForm"
                                     >
                                         <SelectTrigger class="h-11"
@@ -484,7 +497,9 @@ function submitCapacity(): void {
                                 <div class="grid gap-2">
                                     <Label>Critical threshold</Label>
                                     <Input
-                                        v-model="capacityForm.critical_threshold"
+                                        v-model="
+                                            capacityForm.critical_threshold
+                                        "
                                         type="number"
                                         step="0.01"
                                         min="0"
@@ -512,7 +527,11 @@ function submitCapacity(): void {
                                 <p
                                     class="mt-1 text-sm text-slate-600 dark:text-slate-300"
                                 >
-                                    Utilisasi {{ tpsCapacitySummary.total.utilization_percentage }}%
+                                    Utilisasi
+                                    {{
+                                        tpsCapacitySummary.total
+                                            .utilization_percentage
+                                    }}%
                                 </p>
                             </div>
                             <div
@@ -533,7 +552,8 @@ function submitCapacity(): void {
                                 <p
                                     class="mt-1 text-xs text-slate-500 dark:text-slate-400"
                                 >
-                                    Warning {{ item.warning_threshold }}% • Critical {{ item.critical_threshold }}%
+                                    Warning {{ item.warning_threshold }}% •
+                                    Critical {{ item.critical_threshold }}%
                                 </p>
                             </div>
                             <Button

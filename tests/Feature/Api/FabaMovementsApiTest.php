@@ -246,6 +246,7 @@ test('pending faba movement can be approved via api', function () {
 test('locked period rejects production update via api', function () {
     $this->tenantService->switchToSchema($this->organization->schema_name);
     $movement = FabaMovement::factory()->create([
+        'approval_status' => FabaMovement::STATUS_PENDING_APPROVAL,
         'transaction_date' => '2026-03-10',
         'material_type' => FabaMovement::MATERIAL_FLY_ASH,
         'movement_type' => FabaMovement::TYPE_PRODUCTION,

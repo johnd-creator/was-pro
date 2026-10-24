@@ -60,7 +60,7 @@ Route::prefix('v1')->group(function () {
         });
 
         Route::prefix('faba')->group(function () {
-            Route::get('/options', FabaOptionsController::class)->name('api.v1.faba.options');
+            Route::get('/options', FabaOptionsController::class)->name('api.v1.faba.lookups');
             Route::get('/dashboard', [FabaRecapController::class, 'dashboard'])->name('api.v1.faba.dashboard');
 
             Route::prefix('production')->group(function () {

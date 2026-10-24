@@ -276,7 +276,9 @@ const wasteStatsContext = computed(() => {
                 </section>
 
                 <section class="space-y-3 lg:space-y-4">
-                    <div class="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(340px,1fr)]">
+                    <div
+                        class="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(340px,1fr)]"
+                    >
                         <div>
                             <p
                                 class="wm-text-muted text-[11px] font-semibold tracking-[0.12em] uppercase"
@@ -317,20 +319,25 @@ const wasteStatsContext = computed(() => {
                         </div>
 
                         <div class="space-y-4">
-                            <div class="grid gap-4 grid-cols-1">
+                            <div class="grid grid-cols-1 gap-4">
                                 <Card
                                     class="wm-panel-elevated wm-card-overlay-blue overflow-hidden rounded-2xl border shadow-sm dark:border-slate-700/50 dark:bg-slate-900/40"
                                 >
                                     <CardHeader
-                                        class="wm-border-default border-b bg-slate-50/40 pb-3 dark:bg-slate-900/60 dark:border-slate-700/50"
+                                        class="wm-border-default border-b bg-slate-50/40 pb-3 dark:border-slate-700/50 dark:bg-slate-900/60"
                                     >
-                                        <CardTitle class="wm-text-primary text-base">
-                                            Distribusi Status Pengangkutan Limbah
+                                        <CardTitle
+                                            class="wm-text-primary text-base"
+                                        >
+                                            Distribusi Status Pengangkutan
+                                            Limbah
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
                                         <DistributionDonut
-                                            :data="wasteHaulingStatusDistribution"
+                                            :data="
+                                                wasteHaulingStatusDistribution
+                                            "
                                             total-label="Catatan"
                                             value-suffix="catatan"
                                         />
@@ -341,15 +348,19 @@ const wasteStatsContext = computed(() => {
                                     class="wm-panel-elevated wm-card-overlay-blue overflow-hidden rounded-2xl border shadow-sm dark:border-slate-700/50 dark:bg-slate-900/40"
                                 >
                                     <CardHeader
-                                        class="wm-border-default border-b bg-slate-50/40 pb-3 dark:bg-slate-900/60 dark:border-slate-700/50"
+                                        class="wm-border-default border-b bg-slate-50/40 pb-3 dark:border-slate-700/50 dark:bg-slate-900/60"
                                     >
-                                        <CardTitle class="wm-text-primary text-base">
+                                        <CardTitle
+                                            class="wm-text-primary text-base"
+                                        >
                                             Distribusi Urgensi Backlog Limbah
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
                                         <DistributionDonut
-                                            :data="wasteBacklogUrgencyDistribution"
+                                            :data="
+                                                wasteBacklogUrgencyDistribution
+                                            "
                                             total-label="Backlog"
                                             value-suffix="record"
                                         />
@@ -360,15 +371,19 @@ const wasteStatsContext = computed(() => {
                                     class="wm-panel-elevated wm-card-overlay-blue overflow-hidden rounded-2xl border shadow-sm dark:border-slate-700/50 dark:bg-slate-900/40"
                                 >
                                     <CardHeader
-                                        class="wm-border-default border-b bg-slate-50/40 pb-3 dark:bg-slate-900/60 dark:border-slate-700/50"
+                                        class="wm-border-default border-b bg-slate-50/40 pb-3 dark:border-slate-700/50 dark:bg-slate-900/60"
                                     >
-                                        <CardTitle class="wm-text-primary text-base">
+                                        <CardTitle
+                                            class="wm-text-primary text-base"
+                                        >
                                             Komposisi Saldo FABA
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
                                         <DistributionDonut
-                                            :data="fabaMaterialBalanceDistribution"
+                                            :data="
+                                                fabaMaterialBalanceDistribution
+                                            "
                                             total-label="Saldo"
                                             value-suffix="ton"
                                         />
@@ -379,9 +394,11 @@ const wasteStatsContext = computed(() => {
                                     class="wm-panel-elevated wm-card-overlay-blue overflow-hidden rounded-2xl border shadow-sm dark:border-slate-700/50 dark:bg-slate-900/40"
                                 >
                                     <CardHeader
-                                        class="wm-border-default border-b bg-slate-50/40 pb-3 dark:bg-slate-900/60 dark:border-slate-700/50"
+                                        class="wm-border-default border-b bg-slate-50/40 pb-3 dark:border-slate-700/50 dark:bg-slate-900/60"
                                     >
-                                        <CardTitle class="wm-text-primary text-base">
+                                        <CardTitle
+                                            class="wm-text-primary text-base"
+                                        >
                                             Komposisi Pemanfaatan FABA
                                         </CardTitle>
                                     </CardHeader>

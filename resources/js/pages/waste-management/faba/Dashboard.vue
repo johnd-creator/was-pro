@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import {
-    AlertTriangle,
-    ArrowRight,
-} from 'lucide-vue-next';
+import { AlertTriangle, ArrowRight } from 'lucide-vue-next';
 import { computed, reactive } from 'vue';
 import FabaHeroKpiCards from '@/components/dashboard/FabaHeroKpiCards.vue';
 import Heading from '@/components/Heading.vue';
@@ -330,7 +327,7 @@ function formatPercentage(value: number): string {
 
                     <div class="grid gap-4 lg:grid-cols-3">
                         <Card
-                            class="rounded-[28px] border-slate-200/80 bg-white/90 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.28)] dark:bg-slate-950/85 lg:col-span-2"
+                            class="rounded-[28px] border-slate-200/80 bg-white/90 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.28)] lg:col-span-2 dark:bg-slate-950/85"
                         >
                             <CardHeader>
                                 <CardTitle>Utilisasi per material</CardTitle>
@@ -341,25 +338,47 @@ function formatPercentage(value: number): string {
                                     :key="item.material_type"
                                     class="wm-surface-subtle rounded-[22px] p-4"
                                 >
-                                    <div class="flex items-start justify-between gap-3">
+                                    <div
+                                        class="flex items-start justify-between gap-3"
+                                    >
                                         <div>
-                                            <p class="text-sm font-semibold text-slate-950 dark:text-slate-100">
-                                                {{ formatFabaMaterial(item.material_type) }}
+                                            <p
+                                                class="text-sm font-semibold text-slate-950 dark:text-slate-100"
+                                            >
+                                                {{
+                                                    formatFabaMaterial(
+                                                        item.material_type,
+                                                    )
+                                                }}
                                             </p>
-                                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                {{ formatNumber(item.balance) }} / {{ formatNumber(item.capacity) }} ton
+                                            <p
+                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                {{ formatNumber(item.balance) }}
+                                                /
+                                                {{
+                                                    formatNumber(item.capacity)
+                                                }}
+                                                ton
                                             </p>
                                         </div>
                                         <Badge
                                             variant="secondary"
                                             class="rounded-full"
                                             :class="{
-                                                'border border-emerald-200 bg-emerald-50 text-emerald-700': item.status === 'normal',
-                                                'border border-amber-200 bg-amber-50 text-amber-700': item.status === 'warning',
-                                                'border border-rose-200 bg-rose-50 text-rose-700': item.status === 'critical',
+                                                'border border-emerald-200 bg-emerald-50 text-emerald-700':
+                                                    item.status === 'normal',
+                                                'border border-amber-200 bg-amber-50 text-amber-700':
+                                                    item.status === 'warning',
+                                                'border border-rose-200 bg-rose-50 text-rose-700':
+                                                    item.status === 'critical',
                                             }"
                                         >
-                                            {{ formatPercentage(item.utilization_percentage) }}
+                                            {{
+                                                formatPercentage(
+                                                    item.utilization_percentage,
+                                                )
+                                            }}
                                         </Badge>
                                     </div>
                                 </div>
@@ -374,16 +393,52 @@ function formatPercentage(value: number): string {
                             </CardHeader>
                             <CardContent class="space-y-4">
                                 <div>
-                                    <p class="text-3xl font-semibold tracking-tight text-slate-950 dark:text-slate-100">
-                                        {{ formatPercentage(tpsCapacitySummary.total.utilization_percentage) }}
+                                    <p
+                                        class="text-3xl font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                                    >
+                                        {{
+                                            formatPercentage(
+                                                tpsCapacitySummary.total
+                                                    .utilization_percentage,
+                                            )
+                                        }}
                                     </p>
-                                    <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                                        {{ formatNumber(tpsCapacitySummary.total.balance) }} dari {{ formatNumber(tpsCapacitySummary.total.capacity) }} ton kapasitas.
+                                    <p
+                                        class="mt-2 text-sm text-slate-600 dark:text-slate-300"
+                                    >
+                                        {{
+                                            formatNumber(
+                                                tpsCapacitySummary.total
+                                                    .balance,
+                                            )
+                                        }}
+                                        dari
+                                        {{
+                                            formatNumber(
+                                                tpsCapacitySummary.total
+                                                    .capacity,
+                                            )
+                                        }}
+                                        ton kapasitas.
                                     </p>
                                 </div>
-                                <div class="wm-surface-subtle rounded-[20px] p-4 text-sm text-slate-600 dark:text-slate-300">
-                                    Threshold warning {{ formatPercentage(tpsCapacitySummary.thresholds.warning) }}
-                                    dan critical {{ formatPercentage(tpsCapacitySummary.thresholds.critical) }}.
+                                <div
+                                    class="wm-surface-subtle rounded-[20px] p-4 text-sm text-slate-600 dark:text-slate-300"
+                                >
+                                    Threshold warning
+                                    {{
+                                        formatPercentage(
+                                            tpsCapacitySummary.thresholds
+                                                .warning,
+                                        )
+                                    }}
+                                    dan critical
+                                    {{
+                                        formatPercentage(
+                                            tpsCapacitySummary.thresholds
+                                                .critical,
+                                        )
+                                    }}.
                                 </div>
                             </CardContent>
                         </Card>
@@ -561,41 +616,86 @@ function formatPercentage(value: number): string {
                                 </CardHeader>
                                 <CardContent>
                                     <div
-                                        v-if="pendingTransactionApprovals.length === 0"
+                                        v-if="
+                                            pendingTransactionApprovals.length ===
+                                            0
+                                        "
                                         class="rounded-[22px] border border-dashed border-slate-200 bg-white/80 px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400"
                                     >
-                                        Tidak ada transaksi harian yang menunggu persetujuan.
+                                        Tidak ada transaksi harian yang menunggu
+                                        persetujuan.
                                     </div>
                                     <div v-else class="space-y-3">
                                         <Link
                                             v-for="item in pendingTransactionApprovals"
                                             :key="item.id"
                                             :href="
-                                                item.movement_type.startsWith('adjustment')
-                                                    ? wasteManagementRoutes.faba.adjustments.show(item.id).url
-                                                    : item.movement_type.startsWith('utilization')
-                                                      ? wasteManagementRoutes.faba.utilization.show(item.id).url
-                                                      : wasteManagementRoutes.faba.production.show(item.id).url
+                                                item.movement_type.startsWith(
+                                                    'adjustment',
+                                                )
+                                                    ? wasteManagementRoutes.faba.adjustments.show(
+                                                          item.id,
+                                                      ).url
+                                                    : item.movement_type.startsWith(
+                                                            'utilization',
+                                                        )
+                                                      ? wasteManagementRoutes.faba.utilization.show(
+                                                            item.id,
+                                                        ).url
+                                                      : wasteManagementRoutes.faba.production.show(
+                                                            item.id,
+                                                        ).url
                                             "
                                             class="group block rounded-[22px] border border-white/90 bg-white/90 px-4 py-3 shadow-sm shadow-slate-100/70 transition-all hover:-translate-y-0.5 hover:border-sky-200 hover:bg-white dark:bg-slate-950 dark:bg-slate-950/85"
                                         >
-                                            <div class="flex items-start justify-between gap-3">
+                                            <div
+                                                class="flex items-start justify-between gap-3"
+                                            >
                                                 <div>
-                                                    <p class="font-semibold text-slate-950 dark:text-slate-100">
-                                                        {{ item.display_number }}
+                                                    <p
+                                                        class="font-semibold text-slate-950 dark:text-slate-100"
+                                                    >
+                                                        {{
+                                                            item.display_number
+                                                        }}
                                                     </p>
-                                                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                        {{ formatFabaMovementType(item.movement_type) }} •
-                                                        {{ formatFabaMaterial(item.material_type) }} •
+                                                    <p
+                                                        class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                                    >
+                                                        {{
+                                                            formatFabaMovementType(
+                                                                item.movement_type,
+                                                            )
+                                                        }}
+                                                        •
+                                                        {{
+                                                            formatFabaMaterial(
+                                                                item.material_type,
+                                                            )
+                                                        }}
+                                                        •
                                                         {{ item.period_label }}
                                                     </p>
                                                 </div>
                                                 <div class="text-right">
-                                                    <p class="text-sm font-semibold text-slate-950 dark:text-slate-100">
-                                                        {{ formatNumber(item.quantity) }} {{ item.unit }}
+                                                    <p
+                                                        class="text-sm font-semibold text-slate-950 dark:text-slate-100"
+                                                    >
+                                                        {{
+                                                            formatNumber(
+                                                                item.quantity,
+                                                            )
+                                                        }}
+                                                        {{ item.unit }}
                                                     </p>
-                                                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                        {{ item.created_by_user?.name ?? 'Sistem' }}
+                                                    <p
+                                                        class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                                    >
+                                                        {{
+                                                            item.created_by_user
+                                                                ?.name ??
+                                                            'Sistem'
+                                                        }}
                                                     </p>
                                                 </div>
                                             </div>
@@ -622,16 +722,21 @@ function formatPercentage(value: number): string {
                                         v-if="readyClosingPeriods.length === 0"
                                         class="rounded-[22px] border border-dashed border-slate-200 bg-white/80 px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400"
                                     >
-                                        Belum ada periode yang siap diajukan untuk closing.
+                                        Belum ada periode yang siap diajukan
+                                        untuk closing.
                                     </div>
                                     <div v-else class="space-y-3">
                                         <Link
                                             v-for="item in readyClosingPeriods"
                                             :key="`${item.year}-${item.month}`"
                                             :href="
-                                                wasteManagementRoutes.faba.approvals.index.url({
-                                                    query: { year: item.year },
-                                                })
+                                                wasteManagementRoutes.faba.approvals.index.url(
+                                                    {
+                                                        query: {
+                                                            year: item.year,
+                                                        },
+                                                    },
+                                                )
                                             "
                                             class="group block rounded-[22px] border border-white/90 bg-white/90 px-4 py-3 shadow-sm shadow-slate-100/70 transition-all hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-white dark:bg-slate-950 dark:bg-slate-950/85"
                                         >
@@ -647,8 +752,15 @@ function formatPercentage(value: number): string {
                                                     <p
                                                         class="mt-1 text-xs text-slate-500 dark:text-slate-400"
                                                     >
-                                                        Saldo akhir {{ formatNumber(item.closing_balance) }} ton
-                                                        dengan {{ item.warning_count }} warning aktif.
+                                                        Saldo akhir
+                                                        {{
+                                                            formatNumber(
+                                                                item.closing_balance,
+                                                            )
+                                                        }}
+                                                        ton dengan
+                                                        {{ item.warning_count }}
+                                                        warning aktif.
                                                     </p>
                                                 </div>
                                                 <Badge
@@ -807,7 +919,8 @@ function formatPercentage(value: number): string {
                                 v-if="latestOperationalMovements.length === 0"
                                 class="rounded-[24px] border border-dashed border-slate-200 bg-white/80 px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
                             >
-                                Belum ada transaksi FABA pada periode yang tersedia.
+                                Belum ada transaksi FABA pada periode yang
+                                tersedia.
                             </div>
                             <div v-else class="space-y-3">
                                 <div
@@ -844,14 +957,20 @@ function formatPercentage(value: number): string {
                                                 class="text-xs text-slate-500 dark:text-slate-400"
                                             >
                                                 {{ item.transaction_date }} •
-                                                {{ item.created_by_user?.name ?? 'Sistem' }}
+                                                {{
+                                                    item.created_by_user
+                                                        ?.name ?? 'Sistem'
+                                                }}
                                             </p>
                                         </div>
                                         <div class="text-left lg:text-right">
                                             <p
                                                 class="text-base font-semibold text-slate-950 dark:text-slate-100"
                                             >
-                                                {{ formatNumber(item.quantity) }} {{ item.unit }}
+                                                {{
+                                                    formatNumber(item.quantity)
+                                                }}
+                                                {{ item.unit }}
                                             </p>
                                             <p
                                                 class="mt-1 text-xs text-slate-500 dark:text-slate-400"

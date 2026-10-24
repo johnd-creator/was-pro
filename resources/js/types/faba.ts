@@ -222,7 +222,12 @@ export interface FabaPeriodSummary {
     can_reject: boolean;
     can_review: boolean;
     can_reopen: boolean;
-    operational_status?: 'draft' | 'open' | 'ready_to_submit' | 'submitted' | 'approved';
+    operational_status?:
+        | 'draft'
+        | 'open'
+        | 'ready_to_submit'
+        | 'submitted'
+        | 'approved';
     recap: FabaMonthlyRecap;
 }
 
@@ -230,7 +235,12 @@ export interface FabaVerificationQueueItem {
     year: number;
     month: number;
     period_label: string;
-    operational_status: 'draft' | 'open' | 'ready_to_submit' | 'submitted' | 'approved';
+    operational_status:
+        | 'draft'
+        | 'open'
+        | 'ready_to_submit'
+        | 'submitted'
+        | 'approved';
     can_submit: boolean;
     warning_count: number;
     closing_balance: number;
