@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreOrganizationRequest;
 use App\Models\Organization;
 use App\Services\TenantService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class OrganizationsController extends Controller
 {
@@ -31,39 +33,23 @@ class OrganizationsController extends Controller
     /**
      * Store a newly created organization.
      */
-    public function store(): RedirectResponse
+    public function store(StoreOrganizationRequest $request): RedirectResponse
     {
-        $validated = request()->validate([
-            'name' => 'required|string|max:255',
-            'code' => 'required|string|max:50|unique:organizations,code',
-            'description' => 'nullable|string',
-            'address' => 'nullable|string',
-            'phone' => 'nullable|string|max:50',
-            'email' => 'nullable|email|max:255',
-            'is_active' => 'boolean',
-        ]);
+        try {
+            $this->tenantService->provisionOrganization([
+                ...$request->validated(),
+                'created_by' => $request->user()->id,
+                'updated_by' => $request->user()->id,
+            ]);
+        } catch (Throwable $exception) {
+            report($exception);
 
-        // Generate schema name from code
-        $schemaName = 'org_'.strtolower(preg_replace('/[^a-z0-9]/i', '_', $validated['code'])).'_'.time();
-
-        $organization = Organization::create([
-            'name' => $validated['name'],
-            'code' => $validated['code'],
-            'schema_name' => $schemaName,
-            'description' => $validated['description'] ?? null,
-            'address' => $validated['address'] ?? null,
-            'phone' => $validated['phone'] ?? null,
-            'email' => $validated['email'] ?? null,
-            'is_active' => $validated['is_active'] ?? true,
-            'created_by' => auth()->id(),
-            'updated_by' => auth()->id(),
-        ]);
-
-        // Create the schema
-        $this->tenantService->createSchema($schemaName);
+            return Redirect::back()->withInput()
+                ->with('error', 'Organisasi belum dapat disiapkan. Silakan coba lagi atau hubungi administrator.');
+        }
 
         return Redirect::route('admin.organizations.index')
-            ->with('success', 'Organization created successfully.');
+            ->with('success', 'Organisasi berhasil dibuat dan disiapkan.');
     }
 
     /**

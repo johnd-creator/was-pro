@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\Organization;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class TenantService
@@ -20,14 +22,38 @@ class TenantService
      */
     protected ?string $currentSchema = null;
 
+    public function provisionOrganization(array $attributes): Organization
+    {
+        return $this->withRestoredSchema(function () use ($attributes): Organization {
+            return DB::connection()->transaction(function () use ($attributes): Organization {
+                $this->switchToPublic();
+                $schemaName = 'org_'.str_replace('-', '', (string) Str::uuid());
+
+                if ($this->schemaExists($schemaName)) {
+                    throw new RuntimeException('Refusing to provision an existing tenant schema.');
+                }
+
+                $organization = Organization::create([...$attributes, 'schema_name' => $schemaName]);
+
+                if (! $this->createSchema($schemaName, mustBeNew: true)) {
+                    throw new RuntimeException('Tenant schema creation failed.');
+                }
+
+                $this->runMigrationsForTenant($schemaName, 'database/migrations/tenant');
+
+                return $organization;
+            });
+        });
+    }
+
     /**
      * Create a new schema for an organization.
      */
-    public function createSchema(string $schemaName): bool
+    public function createSchema(string $schemaName, bool $mustBeNew = false): bool
     {
         try {
             // Check if schema already exists
-            if ($this->schemaExists($schemaName)) {
+            if (! $mustBeNew && $this->schemaExists($schemaName)) {
                 return true;
             }
 
@@ -147,32 +173,47 @@ class TenantService
      */
     public function runMigrationsForTenant(string $schemaName, string $migrationPath): void
     {
+        $this->withRestoredSchema(function () use ($schemaName, $migrationPath): void {
+            $connectionName = config('database.default');
+
+            DB::connection($connectionName)->transaction(function () use ($schemaName, $migrationPath, $connectionName): void {
+                if (! $this->schemaExists($schemaName)) {
+                    throw new RuntimeException('Tenant schema does not exist.');
+                }
+
+                $this->setConnectionSearchPath($connectionName, "\"{$schemaName}\", public", $schemaName);
+                $exitCode = \Artisan::call('migrate', [
+                    '--path' => $migrationPath,
+                    '--force' => true,
+                    '--database' => $connectionName,
+                ]);
+
+                if ($exitCode !== 0) {
+                    throw new RuntimeException('Tenant migration command failed.');
+                }
+            });
+        });
+    }
+
+    protected function withRestoredSchema(callable $callback): mixed
+    {
         $originalSchema = $this->getCurrentSchema();
         $connectionName = config('database.default');
+        $connection = DB::connection($connectionName);
+        $actualSearchPath = $connection->selectOne('SHOW search_path', [], false)->search_path;
         $originalSearchPath = config("database.connections.{$connectionName}.search_path");
         $originalConnectionSchema = config("database.connections.{$connectionName}.schema");
 
         try {
-            $this->setConnectionSearchPath($connectionName, "\"{$schemaName}\", public", $schemaName);
-
-            // Run migrations using the artisan command
-            \Artisan::call('migrate', [
-                '--path' => $migrationPath,
-                '--force' => true,
-                '--database' => $connectionName,
-            ]);
+            return $callback();
         } finally {
-            $this->setConnectionSearchPath(
-                $connectionName,
-                is_string($originalSearchPath) ? $originalSearchPath : 'public',
-                is_string($originalConnectionSchema) ? $originalConnectionSchema : 'public',
-            );
+            config([
+                "database.connections.{$connectionName}.search_path" => $originalSearchPath,
+                "database.connections.{$connectionName}.schema" => $originalConnectionSchema,
+            ]);
 
-            if ($originalSchema) {
-                $this->switchToSchema($originalSchema);
-            } else {
-                $this->switchToPublic();
-            }
+            $connection->statement("SELECT set_config('search_path', ?, false)", [$actualSearchPath]);
+            $this->currentSchema = $originalSchema;
         }
     }
 
