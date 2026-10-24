@@ -37,6 +37,9 @@ class WasteRecordRequest extends FormRequest
         // For updates, allow changing certain fields only in draft/rejected status
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
             $record = $this->route('wasteRecord');
+            if (is_string($record)) {
+                $record = \App\Models\WasteRecord::query()->findOrFail($record);
+            }
 
             if ($record && ! $record->canBeEdited()) {
                 // If record is not editable, only allow notes

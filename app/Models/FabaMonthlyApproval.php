@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FabaMonthlyApproval extends Model
 {
+    use \App\Concerns\SerializesOperationalWrites;
     use HasFactory, HasUuids;
 
     public const STATUS_DRAFT = 'draft';

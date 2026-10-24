@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FabaMovement extends Model
 {
+    use \App\Concerns\SerializesOperationalWrites;
     use HasFactory, HasUuids;
 
     public const DEFAULT_UNIT = 'ton';

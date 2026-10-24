@@ -24,7 +24,7 @@ Route::prefix('v1')->group(function () {
         });
     });
 
-    Route::middleware(['auth.api', 'tenant.schema'])->group(function () {
+    Route::middleware(['auth.api', 'tenant.schema', 'operational.atomic'])->group(function () {
         Route::get('/me', [BootstrapController::class, 'me'])->name('api.v1.me');
         Route::get('/dashboard', [BootstrapController::class, 'dashboard'])->name('api.v1.dashboard');
         Route::get('/lookups', [BootstrapController::class, 'lookups'])->name('api.v1.lookups');

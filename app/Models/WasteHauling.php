@@ -10,7 +10,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class WasteHauling extends Model
 {
-    use HasFactory, HasUuids, SoftDeletes;
+    use \App\Concerns\RestoresOperationalWrites, \App\Concerns\SerializesOperationalWrites, HasFactory, HasUuids, SoftDeletes {
+        SoftDeletes::restore as protected restoreWithSoftDeletes;
+        \App\Concerns\RestoresOperationalWrites::restore insteadof SoftDeletes;
+    }
 
     protected static function booted(): void
     {
@@ -24,16 +27,7 @@ class WasteHauling extends Model
                 }
 
                 $prefix = 'WH-'.($organization?->code ?? 'UNKNOWN').'-'.now()->format('Y-m');
-                $lastHauling = self::query()
-                    ->where('hauling_number', 'like', $prefix.'%')
-                    ->orderByDesc('hauling_number')
-                    ->first();
-
-                $sequence = $lastHauling
-                    ? (int) substr($lastHauling->hauling_number, -4) + 1
-                    : 1;
-
-                $hauling->hauling_number = $prefix.'-'.str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
+                $hauling->hauling_number = app(\App\Services\DocumentNumberService::class)->next(self::class, 'hauling_number', $prefix);
             }
         });
     }
@@ -118,41 +112,17 @@ class WasteHauling extends Model
 
     public function approve(string $approvedBy, ?string $notes = null): bool
     {
-        if (! $this->canBeApproved()) {
-            return false;
-        }
-
-        $this->status = 'approved';
-        $this->approved_by = $approvedBy;
-        $this->approved_at = now();
-        $this->approval_notes = $notes;
-
-        return $this->save();
+        return $this->transitionOperationally('canBeApproved', ['status' => 'approved', 'approved_by' => $approvedBy, 'approved_at' => now(), 'approval_notes' => $notes]);
     }
 
     public function reject(string $rejectedBy, string $reason): bool
     {
-        if (! $this->canBeRejected()) {
-            return false;
-        }
-
-        $this->status = 'rejected';
-        $this->approved_by = $rejectedBy;
-        $this->approved_at = now();
-        $this->rejection_reason = $reason;
-
-        return $this->save();
+        return $this->transitionOperationally('canBeRejected', ['status' => 'rejected', 'approved_by' => $rejectedBy, 'approved_at' => now(), 'rejection_reason' => $reason]);
     }
 
     public function cancel(): bool
     {
-        if (! $this->canBeCancelled()) {
-            return false;
-        }
-
-        $this->status = 'cancelled';
-
-        return $this->save();
+        return $this->transitionOperationally('canBeCancelled', ['status' => 'cancelled']);
     }
 
     public function getStatusLabel(): string

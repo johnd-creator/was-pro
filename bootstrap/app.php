@@ -25,11 +25,15 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
+        $middleware->prependToPriorityList(\Illuminate\Routing\Middleware\SubstituteBindings::class, SetTenantSchema::class);
+        $middleware->prependToPriorityList(\Illuminate\Routing\Middleware\SubstituteBindings::class, \App\Http\Middleware\AtomicOperationalMutation::class);
+        $middleware->prependToPriorityList(SetTenantSchema::class, \App\Http\Middleware\AuthenticateApiToken::class);
 
         $middleware->web(append: [
             HandleAppearance::class,
             HandleInertiaRequests::class,
             SetTenantSchema::class,
+            \App\Http\Middleware\AtomicOperationalMutation::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
@@ -40,9 +44,17 @@ return Application::configure(basePath: dirname(__DIR__))
             'super.admin' => IsSuperAdmin::class,
             'auth.api' => \App\Http\Middleware\AuthenticateApiToken::class,
             'tenant.schema' => SetTenantSchema::class,
+            'operational.atomic' => \App\Http\Middleware\AtomicOperationalMutation::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(function (\App\Exceptions\OperationalConflict $exception, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json(['success' => false, 'message' => $exception->getMessage(), 'error_code' => 'CONFLICT', 'errors' => []], 409);
+            }
+
+            return redirect()->back()->with('error', $exception->getMessage());
+        });
         $exceptions->render(function (ValidationException $exception, Request $request) {
             if (! $request->is('api/*')) {
                 return null;
