@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\FabaInternalDestination;
 use App\Models\FabaMonthlyApproval;
+use App\Models\FabaMovement;
 use App\Models\FabaPurpose;
 use App\Models\Vendor;
 use App\Models\WasteCategory;
@@ -29,6 +30,11 @@ class BootstrapController extends ApiController
     public function dashboard(Request $request): JsonResponse
     {
         $user = $request->user();
+
+        if (! $user->organization) {
+            return $this->error('Data organisasi belum siap. Hubungi administrator.', 'TENANT_NOT_READY', status: 503);
+        }
+
         $year = (int) now()->year;
         $fabaYearlyRecap = $this->fabaRecapService->getYearlyRecap($year);
 

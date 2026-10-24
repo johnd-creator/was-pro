@@ -28,18 +28,22 @@ class SetTenantSchema
         if (Auth::check() && Auth::user()->organization_id) {
             $organization = Auth::user()->organization;
 
-            if ($organization) {
-                $schemaName = $organization->schema_name;
+            if (! $organization || ! $this->tenantService->schemaExists($organization->schema_name)) {
+                $this->tenantService->switchToPublic();
 
-                // Ensure the schema exists before switching
-                if (! $this->tenantService->schemaExists($schemaName)) {
-                    // Create the schema if it doesn't exist
-                    $this->tenantService->createSchema($schemaName);
+                if ($request->is('api/*')) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Data organisasi belum siap. Hubungi administrator.',
+                        'error_code' => 'TENANT_NOT_READY',
+                        'errors' => [],
+                    ], 503);
                 }
 
-                // Switch to the organization's schema
-                $this->tenantService->switchToSchema($schemaName);
+                abort(503, 'Data organisasi belum siap. Hubungi administrator.');
             }
+
+            $this->tenantService->switchToSchema($organization->schema_name);
         } else {
             // Switch to public schema for non-authenticated users or super admins without organization
             $this->tenantService->switchToPublic();

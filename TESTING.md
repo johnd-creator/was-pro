@@ -40,3 +40,13 @@ The pure tests in `tests/Unit` do not boot Laravel or use the database. Database
 Run tests serially when sharing a workstation with other active projects. Stop only the disposable PostgreSQL instance after verification; do not stop existing application services.
 
 `phpunit.xml` gives the test process a 512 MiB PHP memory limit for Excel/PDF export checks. This does not change the PHP configuration of a running application.
+
+## Organization provisioning and dashboard regressions
+
+New organizations are provisioned explicitly by a super admin. Organization metadata, fresh UUID schema creation, and the tenant migration batch share one PostgreSQL transaction. Existing schema names are never adopted as a new organization's storage; a failed schema creation or migration does not return a success response. Migration command failures propagate, and both successful and failed operations restore the caller's actual write-connection search path and configuration.
+
+Normal web/API requests do not provision missing schemas. Requests with an assigned organization return HTTP 503 if that organization's record or schema is missing; the dashboard also returns this response when no organization is assigned. Authentication and permissions are unchanged. Existing empty or outdated tenant schemas are not automatically migrated or repaired by a request. They require a separately planned, explicit maintenance operation after assessing their data.
+
+Focused coverage is in `tests/Feature/Api/DashboardTest.php` and `tests/Feature/Admin/OrganizationProvisioningTest.php`. It includes unauthenticated requests, organization isolation, missing schemas, complete provisioning, preservation of existing data/public migration history, schema collisions, failed schema creation, nonzero migration exits, and rollback after both PHP and PostgreSQL SQL errors. Test-only failure migrations live in `tests/Fixtures`; they must only run through the guarded disposable test suite.
+
+The batch transaction requires transaction-compatible PostgreSQL migrations. A future migration that requires execution outside a transaction needs a separately reviewed migration strategy. No existing tenant data, database grants, credentials, or running application settings are changed by this package's local verification.
