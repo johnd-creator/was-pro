@@ -33,6 +33,8 @@ npm run format:check
 
 The build generates Wayfinder helpers before TypeScript validation. The FABA lookup endpoint keeps the URL `/api/v1/faba/options`, but its internal route name is `api.v1.faba.lookups` to avoid collision between Wayfinder's generated function and its `options` parameter.
 
+ESLint explicitly treats the `@/` alias as internal, so import ordering is consistent both on a clean checkout without generated helpers and after a build.
+
 The pure tests in `tests/Unit` do not boot Laravel or use the database. Database guard regression tests cover missing/invalid opt-in, environment mismatch, connection URL overrides, unmarked databases, and a mismatched actual database.
 
 Run tests serially when sharing a workstation with other active projects. Stop only the disposable PostgreSQL instance after verification; do not stop existing application services.
