@@ -10,7 +10,10 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import type { DashboardEChartsOption } from '@/composables/useDashboardEChart';
-import { dashboardChartPalette, dashboardChartPreset } from '@/composables/useDashboardEChart';
+import {
+    dashboardChartPalette,
+    dashboardChartPreset,
+} from '@/composables/useDashboardEChart';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { WasteChartData } from '@/types';
 
@@ -26,8 +29,12 @@ const totalInput = computed(() =>
 const totalCompleted = computed(() =>
     props.data.reduce((sum, item) => sum + item.hauled_quantity, 0),
 );
-const latestBacklog = computed(() => props.data.at(-1)?.closing_backlog_quantity ?? 0);
-const latestBacklogCount = computed(() => props.data.at(-1)?.closing_backlog_count ?? 0);
+const latestBacklog = computed(
+    () => props.data.at(-1)?.closing_backlog_quantity ?? 0,
+);
+const latestBacklogCount = computed(
+    () => props.data.at(-1)?.closing_backlog_count ?? 0,
+);
 const latestExpiredBacklog = computed(
     () => props.data.at(-1)?.expired_backlog_quantity ?? 0,
 );
@@ -42,10 +49,14 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
     const completedData = props.data.map((item) => item.hauled_quantity);
     const backlogData = props.data.map((item) => item.closing_backlog_quantity);
     const expiredMarkers = props.data.map((item) =>
-        item.expired_backlog_quantity > 0 ? item.closing_backlog_quantity : null,
+        item.expired_backlog_quantity > 0
+            ? item.closing_backlog_quantity
+            : null,
     );
     const expiringMarkers = props.data.map((item) =>
-        item.expiring_soon_backlog_quantity > 0 ? item.closing_backlog_quantity : null,
+        item.expiring_soon_backlog_quantity > 0
+            ? item.closing_backlog_quantity
+            : null,
     );
     const leftMax = Math.max(...inputData, ...completedData, ...backlogData, 0);
 
@@ -111,7 +122,9 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
         tooltip: {
             ...(dashboardChartPreset.tooltip as object),
             formatter: (params) => {
-                const entries = (Array.isArray(params) ? params : [params]) as Array<{
+                const entries = (
+                    Array.isArray(params) ? params : [params]
+                ) as Array<{
                     axisValue?: string | number;
                     axisValueLabel?: string;
                     dataIndex?: number;
@@ -130,11 +143,17 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
                 ];
 
                 for (const point of entries) {
-                    if (point.seriesName === 'Risiko Expired' || point.seriesName === 'Risiko Mendekati Batas') {
+                    if (
+                        point.seriesName === 'Risiko Expired' ||
+                        point.seriesName === 'Risiko Mendekati Batas'
+                    ) {
                         continue;
                     }
 
-                    const value = typeof point.value === 'number' ? point.value : Number(point.value ?? 0);
+                    const value =
+                        typeof point.value === 'number'
+                            ? point.value
+                            : Number(point.value ?? 0);
                     const normalizedValue = Number.isFinite(value) ? value : 0;
                     lines.push(
                         `<div style="display:flex;justify-content:space-between;gap:16px;"><span>${point.seriesName ?? '-'}</span><strong>${formatNumber(normalizedValue)} ${chartUnit.value}</strong></div>`,
@@ -229,44 +248,85 @@ function formatQuantity(value: number): string {
         <CardHeader
             class="wm-border-default border-b bg-slate-50/40 pb-4 dark:border-slate-700/50 dark:bg-slate-900/60"
         >
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div
+                class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
+            >
                 <div class="space-y-1.5">
                     <CardTitle class="wm-text-primary text-base">
                         Intake Approved, Penyelesaian, dan Backlog Limbah
                     </CardTitle>
-                    <CardDescription class="wm-text-secondary text-sm leading-6">
-                        Memantau kuantitas limbah approved yang masuk, kuantitas terangkut, posisi backlog akhir, dan
-                        risiko batas simpan tiap periode.
+                    <CardDescription
+                        class="wm-text-secondary text-sm leading-6"
+                    >
+                        Memantau kuantitas limbah approved yang masuk, kuantitas
+                        terangkut, posisi backlog akhir, dan risiko batas simpan
+                        tiap periode.
                     </CardDescription>
                     <p
                         v-if="hasOtherUnits"
                         class="text-xs font-medium text-amber-700 dark:text-amber-300"
                     >
-                        Chart kuantitas memakai unit dominan {{ chartUnit }}. Unit lain tetap dihitung pada record dan
-                        backlog.
+                        Chart kuantitas memakai unit dominan {{ chartUnit }}.
+                        Unit lain tetap dihitung pada record dan backlog.
                     </p>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-3 text-xs">
                     <div class="flex items-center gap-1.5">
-                        <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: dashboardChartPalette.intake }" />
-                        <span class="wm-text-secondary font-medium">Intake approved</span>
+                        <span
+                            class="h-2.5 w-2.5 rounded-full"
+                            :style="{
+                                backgroundColor: dashboardChartPalette.intake,
+                            }"
+                        />
+                        <span class="wm-text-secondary font-medium"
+                            >Intake approved</span
+                        >
                     </div>
                     <div class="flex items-center gap-1.5">
-                        <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: dashboardChartPalette.completed }" />
-                        <span class="wm-text-secondary font-medium">Selesai diangkut</span>
+                        <span
+                            class="h-2.5 w-2.5 rounded-full"
+                            :style="{
+                                backgroundColor:
+                                    dashboardChartPalette.completed,
+                            }"
+                        />
+                        <span class="wm-text-secondary font-medium"
+                            >Selesai diangkut</span
+                        >
                     </div>
                     <div class="flex items-center gap-1.5">
-                        <span class="h-0.5 w-4 rounded-full" :style="{ backgroundColor: dashboardChartPalette.backlog }" />
-                        <span class="wm-text-secondary font-medium">Backlog akhir</span>
+                        <span
+                            class="h-0.5 w-4 rounded-full"
+                            :style="{
+                                backgroundColor: dashboardChartPalette.backlog,
+                            }"
+                        />
+                        <span class="wm-text-secondary font-medium"
+                            >Backlog akhir</span
+                        >
                     </div>
                     <div class="flex items-center gap-1.5">
-                        <span class="h-2 w-2 rounded-full" :style="{ backgroundColor: dashboardChartPalette.critical }" />
-                        <span class="wm-text-secondary font-medium">Expired</span>
+                        <span
+                            class="h-2 w-2 rounded-full"
+                            :style="{
+                                backgroundColor: dashboardChartPalette.critical,
+                            }"
+                        />
+                        <span class="wm-text-secondary font-medium"
+                            >Expired</span
+                        >
                     </div>
                     <div class="flex items-center gap-1.5">
-                        <span class="h-2 w-2 rounded-full" :style="{ backgroundColor: dashboardChartPalette.warning }" />
-                        <span class="wm-text-secondary font-medium">Mendekati batas</span>
+                        <span
+                            class="h-2 w-2 rounded-full"
+                            :style="{
+                                backgroundColor: dashboardChartPalette.warning,
+                            }"
+                        />
+                        <span class="wm-text-secondary font-medium"
+                            >Mendekati batas</span
+                        >
                     </div>
                 </div>
             </div>
@@ -278,8 +338,14 @@ function formatQuantity(value: number): string {
                     :href="wasteManagementRoutes.records.index.url()"
                     class="wm-surface-subtle rounded-2xl border px-4 py-3 transition-colors hover:border-teal-200 hover:bg-white dark:hover:border-teal-900 dark:hover:bg-slate-950/80"
                 >
-                    <p class="wm-text-muted text-[11px] font-semibold tracking-[0.12em] uppercase">Limbah Masuk</p>
-                    <p class="wm-text-primary mt-2 text-2xl font-semibold tracking-tight">
+                    <p
+                        class="wm-text-muted text-[11px] font-semibold tracking-[0.12em] uppercase"
+                    >
+                        Limbah Masuk
+                    </p>
+                    <p
+                        class="wm-text-primary mt-2 text-2xl font-semibold tracking-tight"
+                    >
                         {{ formatQuantity(totalInput) }}
                     </p>
                 </Link>
@@ -288,8 +354,14 @@ function formatQuantity(value: number): string {
                     :href="wasteManagementRoutes.haulings.index.url()"
                     class="wm-surface-subtle rounded-2xl border px-4 py-3 transition-colors hover:border-amber-200 hover:bg-white dark:hover:border-amber-900 dark:hover:bg-slate-950/80"
                 >
-                    <p class="wm-text-muted text-[11px] font-semibold tracking-[0.14em] uppercase">Terangkut</p>
-                    <p class="wm-text-primary mt-2 text-2xl font-semibold tracking-tight">
+                    <p
+                        class="wm-text-muted text-[11px] font-semibold tracking-[0.14em] uppercase"
+                    >
+                        Terangkut
+                    </p>
+                    <p
+                        class="wm-text-primary mt-2 text-2xl font-semibold tracking-tight"
+                    >
                         {{ formatQuantity(totalCompleted) }}
                     </p>
                 </Link>
@@ -298,19 +370,29 @@ function formatQuantity(value: number): string {
                     :href="wasteManagementRoutes.haulings.index.url()"
                     class="wm-surface-subtle rounded-2xl border px-4 py-3 transition-colors hover:border-red-200 hover:bg-white dark:hover:border-red-900 dark:hover:bg-slate-950/80"
                 >
-                    <p class="wm-text-muted text-[11px] font-semibold tracking-[0.14em] uppercase">Backlog Expired</p>
-                    <p class="mt-2 text-2xl font-semibold tracking-tight text-red-700 dark:text-red-300">
+                    <p
+                        class="wm-text-muted text-[11px] font-semibold tracking-[0.14em] uppercase"
+                    >
+                        Backlog Expired
+                    </p>
+                    <p
+                        class="mt-2 text-2xl font-semibold tracking-tight text-red-700 dark:text-red-300"
+                    >
                         {{ formatQuantity(latestExpiredBacklog) }}
                     </p>
                     <p class="wm-text-muted mt-1 text-xs">
-                        Backlog akhir {{ formatQuantity(latestBacklog) }} dari {{ formatNumber(latestBacklogCount) }}
+                        Backlog akhir {{ formatQuantity(latestBacklog) }} dari
+                        {{ formatNumber(latestBacklogCount) }}
                         record
                     </p>
                 </Link>
             </div>
 
             <div class="wm-panel rounded-2xl border p-3">
-                <BaseEChart :option="wasteChartOption" height-class="h-[320px] sm:h-[340px]" />
+                <BaseEChart
+                    :option="wasteChartOption"
+                    height-class="h-[320px] sm:h-[340px]"
+                />
             </div>
         </CardContent>
     </Card>

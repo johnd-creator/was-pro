@@ -320,7 +320,9 @@ function returnToDraft(): void {
                     <Card
                         class="overflow-hidden rounded-[30px] border-slate-200/70 bg-linear-to-br from-white via-slate-50/60 to-sky-50/20 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800/80 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950/18 dark:shadow-[0_24px_60px_-36px_rgba(2,6,23,0.9)]"
                     >
-                        <CardContent class="space-y-6 p-6 text-slate-900 dark:text-slate-100 lg:p-8">
+                        <CardContent
+                            class="space-y-6 p-6 text-slate-900 lg:p-8 dark:text-slate-100"
+                        >
                             <div
                                 class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
                             >
@@ -410,15 +412,21 @@ function returnToDraft(): void {
                         class="overflow-hidden rounded-[30px] border-slate-200/70 bg-linear-to-br from-white via-slate-50/60 to-slate-100/45 text-slate-900 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800/80 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800/70 dark:text-slate-100 dark:shadow-[0_24px_60px_-36px_rgba(2,6,23,0.9)]"
                     >
                         <CardHeader class="space-y-3">
-                            <CardTitle class="text-xl text-slate-900 dark:text-slate-100">
+                            <CardTitle
+                                class="text-xl text-slate-900 dark:text-slate-100"
+                            >
                                 Ringkasan workflow
                             </CardTitle>
-                            <CardDescription class="text-slate-600 dark:text-slate-300">
+                            <CardDescription
+                                class="text-slate-600 dark:text-slate-300"
+                            >
                                 Status saat ini dan jejak keputusan terakhir
                                 untuk catatan ini.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent class="space-y-4 text-sm text-slate-900 dark:text-slate-100">
+                        <CardContent
+                            class="space-y-4 text-sm text-slate-900 dark:text-slate-100"
+                        >
                             <div
                                 class="rounded-xl border border-slate-200/80 bg-white/75 p-4 dark:border-slate-800/80 dark:bg-slate-950/60"
                             >
@@ -437,10 +445,14 @@ function returnToDraft(): void {
                                 <div
                                     class="rounded-xl border border-slate-200/80 bg-white/75 p-4 dark:border-slate-800/80 dark:bg-slate-950/60"
                                 >
-                                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                                    <p
+                                        class="text-xs text-slate-500 dark:text-slate-400"
+                                    >
                                         Diajukan pada
                                     </p>
-                                    <p class="mt-2 font-medium text-slate-900 dark:text-slate-100">
+                                    <p
+                                        class="mt-2 font-medium text-slate-900 dark:text-slate-100"
+                                    >
                                         {{
                                             formatDate(wasteRecord.submitted_at)
                                         }}
@@ -449,10 +461,14 @@ function returnToDraft(): void {
                                 <div
                                     class="rounded-xl border border-slate-200/80 bg-white/75 p-4 dark:border-slate-800/80 dark:bg-slate-950/60"
                                 >
-                                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                                    <p
+                                        class="text-xs text-slate-500 dark:text-slate-400"
+                                    >
                                         Diputuskan pada
                                     </p>
-                                    <p class="mt-2 font-medium text-slate-900 dark:text-slate-100">
+                                    <p
+                                        class="mt-2 font-medium text-slate-900 dark:text-slate-100"
+                                    >
                                         {{
                                             formatDate(wasteRecord.approved_at)
                                         }}
@@ -571,7 +587,9 @@ function returnToDraft(): void {
                                     rows="4"
                                     placeholder="Jelaskan apa yang perlu diperbaiki sebelum catatan dapat diajukan kembali."
                                 />
-                                <p class="text-xs text-slate-500 dark:text-slate-400">
+                                <p
+                                    class="text-xs text-slate-500 dark:text-slate-400"
+                                >
                                     Minimal 10 karakter dan sebaiknya
                                     menyebutkan bagian data yang perlu
                                     diperbaiki.
@@ -607,7 +625,9 @@ function returnToDraft(): void {
                             <h3
                                 class="mt-2 flex items-center gap-3 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
                             >
-                                <span class="h-px w-8 bg-slate-300 dark:bg-slate-700" />
+                                <span
+                                    class="h-px w-8 bg-slate-300 dark:bg-slate-700"
+                                />
                                 Informasi inti dan jejak keputusan
                             </h3>
                         </div>
@@ -625,12 +645,16 @@ function returnToDraft(): void {
                                     limbah.
                                 </CardDescription>
                             </CardHeader>
-                            <CardContent class="grid gap-4 text-sm text-slate-900 dark:text-slate-100 sm:grid-cols-2">
+                            <CardContent
+                                class="grid gap-4 text-sm text-slate-900 sm:grid-cols-2 dark:text-slate-100"
+                            >
                                 <div>
                                     <p class="font-medium">
                                         Tanggal pencatatan
                                     </p>
-                                    <p class="text-slate-600 dark:text-slate-300">
+                                    <p
+                                        class="text-slate-600 dark:text-slate-300"
+                                    >
                                         {{ formatDate(wasteRecord.date) }}
                                     </p>
                                 </div>
@@ -648,7 +672,9 @@ function returnToDraft(): void {
                                 </div>
                                 <div>
                                     <p class="font-medium">Jenis limbah</p>
-                                    <p class="text-slate-600 dark:text-slate-300">
+                                    <p
+                                        class="text-slate-600 dark:text-slate-300"
+                                    >
                                         {{
                                             wasteRecord.waste_type?.name || '-'
                                         }}
@@ -659,7 +685,9 @@ function returnToDraft(): void {
                                 </div>
                                 <div>
                                     <p class="font-medium">Kategori</p>
-                                    <p class="text-slate-600 dark:text-slate-300">
+                                    <p
+                                        class="text-slate-600 dark:text-slate-300"
+                                    >
                                         {{
                                             wasteRecord.waste_type?.category
                                                 ?.name || '-'
@@ -668,7 +696,9 @@ function returnToDraft(): void {
                                 </div>
                                 <div>
                                     <p class="font-medium">Karakteristik</p>
-                                    <p class="text-slate-600 dark:text-slate-300">
+                                    <p
+                                        class="text-slate-600 dark:text-slate-300"
+                                    >
                                         {{
                                             wasteRecord.waste_type
                                                 ?.characteristic?.name || '-'
@@ -677,7 +707,9 @@ function returnToDraft(): void {
                                 </div>
                                 <div>
                                     <p class="font-medium">Jumlah</p>
-                                    <p class="text-slate-600 dark:text-slate-300">
+                                    <p
+                                        class="text-slate-600 dark:text-slate-300"
+                                    >
                                         {{
                                             Number(
                                                 wasteRecord.quantity,
@@ -688,7 +720,9 @@ function returnToDraft(): void {
                                 </div>
                                 <div>
                                     <p class="font-medium">Sudah diangkut</p>
-                                    <p class="text-slate-600 dark:text-slate-300">
+                                    <p
+                                        class="text-slate-600 dark:text-slate-300"
+                                    >
                                         {{
                                             Number(
                                                 wasteRecord.approved_hauled_quantity,
@@ -699,7 +733,9 @@ function returnToDraft(): void {
                                 </div>
                                 <div>
                                     <p class="font-medium">Sisa limbah</p>
-                                    <p class="text-slate-600 dark:text-slate-300">
+                                    <p
+                                        class="text-slate-600 dark:text-slate-300"
+                                    >
                                         {{
                                             Number(
                                                 wasteRecord.remaining_quantity,
@@ -729,7 +765,9 @@ function returnToDraft(): void {
                                 </div>
                                 <div class="sm:col-span-2">
                                     <p class="font-medium">Sumber / lokasi</p>
-                                    <p class="text-slate-600 dark:text-slate-300">
+                                    <p
+                                        class="text-slate-600 dark:text-slate-300"
+                                    >
                                         {{ wasteRecord.source || '-' }}
                                     </p>
                                 </div>
@@ -774,10 +812,14 @@ function returnToDraft(): void {
                                     memutuskan catatan ini.
                                 </CardDescription>
                             </CardHeader>
-                            <CardContent class="grid gap-4 text-sm text-slate-900 dark:text-slate-100 sm:grid-cols-2">
+                            <CardContent
+                                class="grid gap-4 text-sm text-slate-900 sm:grid-cols-2 dark:text-slate-100"
+                            >
                                 <div>
                                     <p class="font-medium">Dibuat oleh</p>
-                                    <p class="text-slate-600 dark:text-slate-300">
+                                    <p
+                                        class="text-slate-600 dark:text-slate-300"
+                                    >
                                         {{
                                             wasteRecord.created_by?.name || '-'
                                         }}
@@ -785,7 +827,9 @@ function returnToDraft(): void {
                                 </div>
                                 <div>
                                     <p class="font-medium">Diajukan oleh</p>
-                                    <p class="text-slate-600 dark:text-slate-300">
+                                    <p
+                                        class="text-slate-600 dark:text-slate-300"
+                                    >
                                         {{
                                             wasteRecord.submitted_by_user
                                                 ?.name || '-'
@@ -796,7 +840,9 @@ function returnToDraft(): void {
                                     <p class="font-medium">
                                         Disetujui / ditolak oleh
                                     </p>
-                                    <p class="text-slate-600 dark:text-slate-300">
+                                    <p
+                                        class="text-slate-600 dark:text-slate-300"
+                                    >
                                         {{
                                             wasteRecord.approved_by_user
                                                 ?.name || '-'
@@ -805,7 +851,9 @@ function returnToDraft(): void {
                                 </div>
                                 <div>
                                     <p class="font-medium">Waktu keputusan</p>
-                                    <p class="text-slate-600 dark:text-slate-300">
+                                    <p
+                                        class="text-slate-600 dark:text-slate-300"
+                                    >
                                         {{
                                             formatDate(wasteRecord.approved_at)
                                         }}
@@ -815,13 +863,17 @@ function returnToDraft(): void {
                                     <p class="font-medium">
                                         Catatan persetujuan
                                     </p>
-                                    <p class="text-slate-600 dark:text-slate-300">
+                                    <p
+                                        class="text-slate-600 dark:text-slate-300"
+                                    >
                                         {{ wasteRecord.approval_notes || '-' }}
                                     </p>
                                 </div>
                                 <div class="sm:col-span-2">
                                     <p class="font-medium">Alasan penolakan</p>
-                                    <p class="text-slate-600 dark:text-slate-300">
+                                    <p
+                                        class="text-slate-600 dark:text-slate-300"
+                                    >
                                         {{
                                             wasteRecord.rejection_reason || '-'
                                         }}
@@ -842,16 +894,22 @@ function returnToDraft(): void {
                             lanjut operasional.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent class="grid gap-4 text-sm text-slate-900 dark:text-slate-100 lg:grid-cols-2">
+                    <CardContent
+                        class="grid gap-4 text-sm text-slate-900 lg:grid-cols-2 dark:text-slate-100"
+                    >
                         <div>
                             <p class="font-medium">Deskripsi</p>
-                            <p class="mt-1 leading-6 text-slate-600 dark:text-slate-300">
+                            <p
+                                class="mt-1 leading-6 text-slate-600 dark:text-slate-300"
+                            >
                                 {{ wasteRecord.description || '-' }}
                             </p>
                         </div>
                         <div>
                             <p class="font-medium">Catatan internal</p>
-                            <p class="mt-1 leading-6 text-slate-600 dark:text-slate-300">
+                            <p
+                                class="mt-1 leading-6 text-slate-600 dark:text-slate-300"
+                            >
                                 {{ wasteRecord.notes || '-' }}
                             </p>
                         </div>
@@ -868,7 +926,9 @@ function returnToDraft(): void {
                             catatan limbah ini.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent class="space-y-3 text-sm text-slate-900 dark:text-slate-100">
+                    <CardContent
+                        class="space-y-3 text-sm text-slate-900 dark:text-slate-100"
+                    >
                         <div
                             v-if="!wasteRecord.hauling_history?.length"
                             class="text-slate-600 dark:text-slate-300"
@@ -890,7 +950,9 @@ function returnToDraft(): void {
                                     {{ hauling.status_label }}
                                 </div>
                             </div>
-                            <div class="mt-2 text-slate-600 dark:text-slate-300">
+                            <div
+                                class="mt-2 text-slate-600 dark:text-slate-300"
+                            >
                                 {{ hauling.hauling_date }} •
                                 {{ hauling.quantity }} {{ hauling.unit }}
                             </div>

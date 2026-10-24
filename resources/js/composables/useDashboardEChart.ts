@@ -1,9 +1,5 @@
 import type { EChartsOption } from 'echarts';
-import {
-    BarChart,
-    LineChart,
-    ScatterChart,
-} from 'echarts/charts';
+import { BarChart, LineChart, ScatterChart } from 'echarts/charts';
 import {
     GridComponent,
     LegendComponent,

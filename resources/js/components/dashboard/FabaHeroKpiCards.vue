@@ -1,10 +1,5 @@
 <script setup lang="ts">
-import {
-    Factory,
-    PackageCheck,
-    Scale,
-    ShieldAlert,
-} from 'lucide-vue-next';
+import { Factory, PackageCheck, Scale, ShieldAlert } from 'lucide-vue-next';
 import type { LucideIcon } from 'lucide-vue-next';
 import { computed } from 'vue';
 
@@ -24,13 +19,16 @@ interface StatCard {
     unit: string;
 }
 
-const props = withDefaults(defineProps<{
-    year: number;
-    stats: FabaHeroStats;
-    variant?: 'full' | 'summary';
-}>(), {
-    variant: 'full',
-});
+const props = withDefaults(
+    defineProps<{
+        year: number;
+        stats: FabaHeroStats;
+        variant?: 'full' | 'summary';
+    }>(),
+    {
+        variant: 'full',
+    },
+);
 
 const statCards = computed<StatCard[]>(() => {
     const cards: StatCard[] = [
@@ -63,7 +61,10 @@ const statCards = computed<StatCard[]>(() => {
             value: props.stats.negative_periods,
             tone: props.stats.negative_periods > 0 ? 'orange' : 'emerald',
             icon: ShieldAlert,
-            hint: props.stats.negative_periods > 0 ? 'Perlu rekonsiliasi' : 'Tidak ada anomali',
+            hint:
+                props.stats.negative_periods > 0
+                    ? 'Perlu rekonsiliasi'
+                    : 'Tidak ada anomali',
             unit: 'periode',
         },
     ];
@@ -78,7 +79,8 @@ function formatNumber(value: number): string {
 function toneClasses(tone: StatCard['tone']): string {
     const map = {
         blue: 'border-sky-200/70 bg-linear-to-br from-white via-sky-50/70 to-blue-100/60 dark:border-sky-800/50 dark:from-slate-900/40 dark:via-sky-950/50 dark:to-blue-950/40 dark:before:absolute dark:before:inset-0 dark:before:bg-gradient-to-br dark:before:from-sky-500/5 dark:before:to-blue-500/5 dark:before:content-[""]',
-        emerald: 'border-emerald-200/70 bg-linear-to-br from-white via-emerald-50/70 to-teal-100/55 dark:border-emerald-800/50 dark:from-slate-900/40 dark:via-emerald-950/50 dark:to-teal-950/40 dark:before:absolute dark:before:inset-0 dark:before:bg-gradient-to-br dark:before:from-emerald-500/5 dark:before:to-teal-500/5 dark:before:content-[""]',
+        emerald:
+            'border-emerald-200/70 bg-linear-to-br from-white via-emerald-50/70 to-teal-100/55 dark:border-emerald-800/50 dark:from-slate-900/40 dark:via-emerald-950/50 dark:to-teal-950/40 dark:before:absolute dark:before:inset-0 dark:before:bg-gradient-to-br dark:before:from-emerald-500/5 dark:before:to-teal-500/5 dark:before:content-[""]',
         orange: 'border-orange-200/70 bg-linear-to-br from-white via-orange-50/75 to-amber-100/60 dark:border-orange-800/50 dark:from-slate-900/40 dark:via-orange-950/50 dark:to-amber-950/40 dark:before:absolute dark:before:inset-0 dark:before:bg-gradient-to-br dark:before:from-orange-500/5 dark:before:to-amber-500/5 dark:before:content-[""]',
         red: 'border-rose-200/70 bg-linear-to-br from-white via-rose-50/70 to-red-100/60 dark:border-rose-800/50 dark:from-slate-900/40 dark:via-rose-950/50 dark:to-red-950/40 dark:before:absolute dark:before:inset-0 dark:before:bg-gradient-to-br dark:before:from-rose-500/5 dark:before:to-red-500/5 dark:before:content-[""]',
     };
@@ -108,7 +110,11 @@ function iconClasses(tone: StatCard['tone']): string {
         ]"
     >
         <div class="pointer-events-none absolute right-3 bottom-3">
-            <component :is="card.icon" class="size-11" :class="iconClasses(card.tone)" />
+            <component
+                :is="card.icon"
+                class="size-11"
+                :class="iconClasses(card.tone)"
+            />
         </div>
 
         <div class="mb-4 flex items-start justify-between gap-3 pr-12">
@@ -118,14 +124,23 @@ function iconClasses(tone: StatCard['tone']): string {
                 {{ year }}
             </span>
         </div>
-        <p class="pr-12 text-sm font-semibold tracking-tight text-slate-800 dark:text-slate-100">
+        <p
+            class="pr-12 text-sm font-semibold tracking-tight text-slate-800 dark:text-slate-100"
+        >
             {{ card.title }}
         </p>
-        <p class="mt-2 pr-12 text-3xl font-black tracking-tight text-slate-950 dark:text-white">
+        <p
+            class="mt-2 pr-12 text-3xl font-black tracking-tight text-slate-950 dark:text-white"
+        >
             {{ formatNumber(card.value) }}
-            <span class="ml-1 text-sm font-medium text-slate-400 dark:text-slate-300">{{ card.unit }}</span>
+            <span
+                class="ml-1 text-sm font-medium text-slate-400 dark:text-slate-300"
+                >{{ card.unit }}</span
+            >
         </p>
-        <p class="mt-2 pr-14 text-[12px] leading-5 text-slate-600 dark:text-slate-300">
+        <p
+            class="mt-2 pr-14 text-[12px] leading-5 text-slate-600 dark:text-slate-300"
+        >
             {{ card.hint }}
         </p>
     </div>

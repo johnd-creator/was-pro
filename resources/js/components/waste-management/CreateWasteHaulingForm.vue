@@ -72,7 +72,9 @@ function submit(): void {
 
 <template>
     <div class="space-y-7">
-        <div class="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+        <div
+            class="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]"
+        >
             <!-- Form Card -->
             <Card class="border-slate-200 shadow-sm dark:border-slate-800">
                 <CardHeader class="px-6 pt-6 pb-4 sm:px-7">
@@ -167,7 +169,9 @@ function submit(): void {
                         />
                     </div>
 
-                    <div class="space-y-4 rounded-lg border border-dashed px-5 py-4">
+                    <div
+                        class="space-y-4 rounded-lg border border-dashed px-5 py-4"
+                    >
                         <div class="flex items-baseline justify-between">
                             <span class="text-sm text-muted-foreground"
                                 >Total</span
@@ -227,7 +231,9 @@ function submit(): void {
                         </div>
                     </div>
 
-                    <div class="flex items-baseline justify-between gap-4 text-sm">
+                    <div
+                        class="flex items-baseline justify-between gap-4 text-sm"
+                    >
                         <span class="text-muted-foreground">Sumber</span>
                         <span class="text-right leading-6 font-medium">{{
                             record.source || '-'
@@ -238,7 +244,9 @@ function submit(): void {
         </div>
 
         <!-- Actions -->
-        <div class="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-end">
+        <div
+            class="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-end"
+        >
             <p class="mr-auto max-w-xl text-sm leading-6 text-muted-foreground">
                 Supervisor akan menyetujui pengajuan ini sebelum proses angkut
                 dilakukan.

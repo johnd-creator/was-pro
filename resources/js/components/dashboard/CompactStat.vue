@@ -33,7 +33,8 @@ const accentClasses = computed(() => {
             title: 'text-slate-800 dark:text-slate-100',
             value: 'text-slate-950 dark:text-white',
             unit: 'text-slate-400 dark:text-slate-300',
-            context: 'border-slate-200/85 bg-white/90 text-slate-700 dark:border-sky-700/60 dark:bg-sky-950/50 dark:text-sky-100',
+            context:
+                'border-slate-200/85 bg-white/90 text-slate-700 dark:border-sky-700/60 dark:bg-sky-950/50 dark:text-sky-100',
             hint: 'text-slate-600 dark:text-slate-300',
             icon: 'text-sky-700/75 dark:text-sky-300/60',
         },
@@ -42,7 +43,8 @@ const accentClasses = computed(() => {
             title: 'text-slate-800 dark:text-slate-100',
             value: 'text-slate-950 dark:text-white',
             unit: 'text-slate-400 dark:text-slate-300',
-            context: 'border-slate-200/85 bg-white/90 text-slate-700 dark:border-emerald-700/60 dark:bg-emerald-950/50 dark:text-emerald-100',
+            context:
+                'border-slate-200/85 bg-white/90 text-slate-700 dark:border-emerald-700/60 dark:bg-emerald-950/50 dark:text-emerald-100',
             hint: 'text-slate-600 dark:text-slate-300',
             icon: 'text-emerald-700/75 dark:text-emerald-300/60',
         },
@@ -51,7 +53,8 @@ const accentClasses = computed(() => {
             title: 'text-slate-800 dark:text-slate-100',
             value: 'text-slate-950 dark:text-white',
             unit: 'text-slate-400 dark:text-slate-300',
-            context: 'border-slate-200/85 bg-white/90 text-slate-700 dark:border-orange-700/60 dark:bg-orange-950/50 dark:text-orange-100',
+            context:
+                'border-slate-200/85 bg-white/90 text-slate-700 dark:border-orange-700/60 dark:bg-orange-950/50 dark:text-orange-100',
             hint: 'text-slate-600 dark:text-slate-300',
             icon: 'text-orange-700/75 dark:text-orange-300/60',
         },
@@ -60,7 +63,8 @@ const accentClasses = computed(() => {
             title: 'text-slate-800 dark:text-slate-100',
             value: 'text-slate-950 dark:text-white',
             unit: 'text-slate-400 dark:text-slate-300',
-            context: 'border-slate-200/85 bg-white/90 text-slate-700 dark:border-rose-700/60 dark:bg-rose-950/50 dark:text-rose-100',
+            context:
+                'border-slate-200/85 bg-white/90 text-slate-700 dark:border-rose-700/60 dark:bg-rose-950/50 dark:text-rose-100',
             hint: 'text-slate-600 dark:text-slate-300',
             icon: 'text-rose-700/75 dark:text-rose-300/60',
         },
@@ -126,10 +130,7 @@ const icon = computed(() => {
                 {{ value }}
                 <span
                     v-if="unit"
-                    :class="[
-                        'ml-1 text-sm font-medium',
-                        accentClasses.unit,
-                    ]"
+                    :class="['ml-1 text-sm font-medium', accentClasses.unit]"
                 >
                     {{ unit }}
                 </span>

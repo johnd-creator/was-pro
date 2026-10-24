@@ -144,7 +144,8 @@ test('operator can create and view own waste records via api', function () {
         ->assertJsonPath('data.waste_type.id', $this->wasteType->id);
 });
 
-test('operator list only returns own records via api', function () {
+test('operator without view all only receives own records via api', function () {
+    $this->operator->role->permissions()->detach(Permission::where('slug', 'waste_records.view_all')->value('id'));
     $this->tenantService->switchToSchema($this->organization->schema_name);
     $ownRecord = WasteRecord::factory()->draft()->create([
         'waste_type_id' => $this->wasteType->id,

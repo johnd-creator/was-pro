@@ -860,71 +860,124 @@ function applyFilters(): void {
                                     >
                                         Analysis Matrix
                                     </p>
-                                    <h3 class="text-xl font-semibold tracking-tight text-slate-950 dark:text-slate-100">
+                                    <h3
+                                        class="text-xl font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                                    >
                                         Realisasi vs target tahunan
                                     </h3>
-                                    <p class="text-sm leading-6 text-slate-600 dark:text-slate-300">
-                                        Baca kinerja pemanfaatan FABA per segmen utama dengan target tahunan dan realisasi kumulatif.
+                                    <p
+                                        class="text-sm leading-6 text-slate-600 dark:text-slate-300"
+                                    >
+                                        Baca kinerja pemanfaatan FABA per segmen
+                                        utama dengan target tahunan dan
+                                        realisasi kumulatif.
                                     </p>
                                 </div>
-                                <div class="rounded-2xl border border-amber-200/80 bg-amber-50/90 p-3 text-amber-700">
+                                <div
+                                    class="rounded-2xl border border-amber-200/80 bg-amber-50/90 p-3 text-amber-700"
+                                >
                                     <FileBarChart2 class="h-5 w-5" />
                                 </div>
                             </div>
 
                             <div class="mt-5 grid gap-3 sm:grid-cols-3">
-                                <div class="wm-surface-subtle rounded-[20px] px-4 py-3">
-                                    <p class="text-[11px] font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+                                <div
+                                    class="wm-surface-subtle rounded-[20px] px-4 py-3"
+                                >
+                                    <p
+                                        class="text-[11px] font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                                    >
                                         Target
                                     </p>
-                                    <p class="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100">
-                                        {{ analysisMatrix.summary.total_target_quantity }} ton
+                                    <p
+                                        class="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                                    >
+                                        {{
+                                            analysisMatrix.summary
+                                                .total_target_quantity
+                                        }}
+                                        ton
                                     </p>
                                 </div>
-                                <div class="wm-surface-subtle rounded-[20px] px-4 py-3">
-                                    <p class="text-[11px] font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+                                <div
+                                    class="wm-surface-subtle rounded-[20px] px-4 py-3"
+                                >
+                                    <p
+                                        class="text-[11px] font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                                    >
                                         Realisasi
                                     </p>
-                                    <p class="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100">
-                                        {{ analysisMatrix.summary.total_actual_quantity }} ton
+                                    <p
+                                        class="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                                    >
+                                        {{
+                                            analysisMatrix.summary
+                                                .total_actual_quantity
+                                        }}
+                                        ton
                                     </p>
                                 </div>
-                                <div class="wm-surface-subtle rounded-[20px] px-4 py-3">
-                                    <p class="text-[11px] font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+                                <div
+                                    class="wm-surface-subtle rounded-[20px] px-4 py-3"
+                                >
+                                    <p
+                                        class="text-[11px] font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                                    >
                                         Rata-rata
                                     </p>
-                                    <p class="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100">
-                                        {{ analysisMatrix.summary.average_achievement_percentage }}%
+                                    <p
+                                        class="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                                    >
+                                        {{
+                                            analysisMatrix.summary
+                                                .average_achievement_percentage
+                                        }}%
                                     </p>
                                 </div>
                             </div>
 
                             <div class="mt-4 space-y-2">
                                 <div
-                                    v-for="segment in analysisMatrix.segments.slice(0, 4)"
+                                    v-for="segment in analysisMatrix.segments.slice(
+                                        0,
+                                        4,
+                                    )"
                                     :key="segment.key"
                                     class="wm-surface-subtle flex items-center justify-between rounded-[18px] px-4 py-3"
                                 >
                                     <div>
-                                        <p class="text-sm font-semibold text-slate-950 dark:text-slate-100">
+                                        <p
+                                            class="text-sm font-semibold text-slate-950 dark:text-slate-100"
+                                        >
                                             {{ segment.label }}
                                         </p>
-                                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                            {{ segment.actual_quantity }} / {{ segment.target_quantity }} ton
+                                        <p
+                                            class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                        >
+                                            {{ segment.actual_quantity }} /
+                                            {{ segment.target_quantity }} ton
                                         </p>
                                     </div>
-                                    <Badge variant="secondary" class="rounded-full border border-slate-200/80 bg-white/90 text-slate-700">
+                                    <Badge
+                                        variant="secondary"
+                                        class="rounded-full border border-slate-200/80 bg-white/90 text-slate-700"
+                                    >
                                         {{ segment.achievement_percentage }}%
                                     </Badge>
                                 </div>
                             </div>
 
                             <div class="mt-5 flex flex-wrap gap-2">
-                                <Button @click="download(analysisMatrixUrl('xlsx'))">
+                                <Button
+                                    @click="download(analysisMatrixUrl('xlsx'))"
+                                >
                                     <FileSpreadsheet class="mr-2 h-4 w-4" />
                                     Excel
                                 </Button>
-                                <Button variant="outline" @click="download(analysisMatrixUrl('pdf'))">
+                                <Button
+                                    variant="outline"
+                                    @click="download(analysisMatrixUrl('pdf'))"
+                                >
                                     <FileText class="mr-2 h-4 w-4" />
                                     PDF
                                 </Button>
@@ -936,17 +989,27 @@ function applyFilters(): void {
                         >
                             <div class="flex items-start justify-between gap-4">
                                 <div class="space-y-2">
-                                    <p class="text-[11px] font-semibold tracking-[0.16em] text-cyan-700/75 uppercase">
+                                    <p
+                                        class="text-[11px] font-semibold tracking-[0.16em] text-cyan-700/75 uppercase"
+                                    >
                                         Kapasitas TPS
                                     </p>
-                                    <h3 class="text-xl font-semibold tracking-tight text-slate-950 dark:text-slate-100">
+                                    <h3
+                                        class="text-xl font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                                    >
                                         Snapshot utilisasi penyimpanan
                                     </h3>
-                                    <p class="text-sm leading-6 text-slate-600 dark:text-slate-300">
-                                        Posisi saldo aktif dibanding kapasitas TPS untuk tiap material dan total periode.
+                                    <p
+                                        class="text-sm leading-6 text-slate-600 dark:text-slate-300"
+                                    >
+                                        Posisi saldo aktif dibanding kapasitas
+                                        TPS untuk tiap material dan total
+                                        periode.
                                     </p>
                                 </div>
-                                <div class="rounded-2xl border border-cyan-200/80 bg-cyan-50/90 p-3 text-cyan-700">
+                                <div
+                                    class="rounded-2xl border border-cyan-200/80 bg-cyan-50/90 p-3 text-cyan-700"
+                                >
                                     <Layers3 class="h-5 w-5" />
                                 </div>
                             </div>
@@ -957,29 +1020,57 @@ function applyFilters(): void {
                                     :key="item.material_type"
                                     class="wm-surface-subtle rounded-[20px] px-4 py-3"
                                 >
-                                    <div class="flex items-start justify-between gap-3">
+                                    <div
+                                        class="flex items-start justify-between gap-3"
+                                    >
                                         <div>
-                                            <p class="text-sm font-semibold text-slate-950 dark:text-slate-100">
-                                                {{ formatFabaMaterial(item.material_type) }}
+                                            <p
+                                                class="text-sm font-semibold text-slate-950 dark:text-slate-100"
+                                            >
+                                                {{
+                                                    formatFabaMaterial(
+                                                        item.material_type,
+                                                    )
+                                                }}
                                             </p>
-                                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                {{ item.balance }} dari {{ item.capacity }} ton
+                                            <p
+                                                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                            >
+                                                {{ item.balance }} dari
+                                                {{ item.capacity }} ton
                                             </p>
                                         </div>
-                                        <Badge variant="secondary" class="rounded-full border border-slate-200/80 bg-white/90 text-slate-700">
+                                        <Badge
+                                            variant="secondary"
+                                            class="rounded-full border border-slate-200/80 bg-white/90 text-slate-700"
+                                        >
                                             {{ item.utilization_percentage }}%
                                         </Badge>
                                     </div>
                                 </div>
-                                <div class="wm-surface-subtle rounded-[20px] px-4 py-3">
-                                    <p class="text-[11px] font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+                                <div
+                                    class="wm-surface-subtle rounded-[20px] px-4 py-3"
+                                >
+                                    <p
+                                        class="text-[11px] font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400"
+                                    >
                                         Total TPS
                                     </p>
-                                    <p class="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100">
-                                        {{ tpsCapacitySummary.total.balance }} / {{ tpsCapacitySummary.total.capacity }} ton
+                                    <p
+                                        class="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
+                                    >
+                                        {{ tpsCapacitySummary.total.balance }} /
+                                        {{ tpsCapacitySummary.total.capacity }}
+                                        ton
                                     </p>
-                                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                        Utilisasi {{ tpsCapacitySummary.total.utilization_percentage }}%
+                                    <p
+                                        class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                    >
+                                        Utilisasi
+                                        {{
+                                            tpsCapacitySummary.total
+                                                .utilization_percentage
+                                        }}%
                                     </p>
                                 </div>
                             </div>

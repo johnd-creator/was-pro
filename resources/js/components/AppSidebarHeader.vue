@@ -119,9 +119,7 @@ const isDashboardPage = computed(() => page.component === 'Dashboard');
 const isSuperAdmin = computed(() => user.value?.is_super_admin === true);
 const isDarkAppearance = computed(() => resolvedAppearance.value === 'dark');
 const appearanceToggleLabel = computed(() =>
-    isDarkAppearance.value
-        ? 'Ubah ke mode terang'
-        : 'Ubah ke mode gelap',
+    isDarkAppearance.value ? 'Ubah ke mode terang' : 'Ubah ke mode gelap',
 );
 const appearanceToggleIcon = computed(() =>
     isDarkAppearance.value ? Sun : Moon,

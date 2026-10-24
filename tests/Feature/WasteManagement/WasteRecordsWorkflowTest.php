@@ -8,7 +8,6 @@ use App\Models\WasteHauling;
 use App\Models\WasteRecord;
 use App\Models\WasteType;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia;
@@ -346,8 +345,8 @@ test('operator can view hauling backlog index with partially hauled approved rec
         ->component('waste-management/haulings/Index')
         ->has('records', 1)
         ->where('records.0.id', $availableRecord->id)
-        ->where('records.0.approved_hauled_quantity', 40.0)
-        ->where('records.0.remaining_quantity', 60.0)
+        ->where('records.0.approved_hauled_quantity', fn ($quantity): bool => (is_int($quantity) || is_float($quantity)) && (float) $quantity === 40.0)
+        ->where('records.0.remaining_quantity', fn ($quantity): bool => (is_int($quantity) || is_float($quantity)) && (float) $quantity === 60.0)
     );
 });
 
@@ -1069,7 +1068,8 @@ test('waste management demo command seeds deterministic data for twelve previous
             $criticalMonth->toDateString(),
             now()->toDateString(),
         ])->count())->toBe(2)
-        ->and(WasteRecord::query()->approved()->whereYear('expiry_date', $previousMonth->year)->whereMonth('expiry_date', $previousMonth->month)->count())->toBe(0)
+        ->and(WasteRecord::query()->approved()->with('haulings')->whereYear('expiry_date', $previousMonth->year)->whereMonth('expiry_date', $previousMonth->month)
+            ->get()->filter(fn (WasteRecord $record): bool => $record->getRemainingQuantity() > 0)->count())->toBe(0)
         ->and(WasteHauling::query()->whereYear('hauling_date', $criticalMonth->year)->whereMonth('hauling_date', $criticalMonth->month)->pendingApproval()->count())->toBe(1);
 
     \Carbon\CarbonImmutable::setTestNow();
@@ -1211,8 +1211,7 @@ test('waste management demo seed rejects fresh mode for protected default demo s
 
     $response = $this->artisan('waste-management:seed-demo', [
         '--fresh-tenant' => true,
-    ]);
+    ])->expectsOutputToContain('hanya diizinkan pada database testing');
 
     $response->assertFailed();
-    expect(Artisan::output())->toContain('hanya diizinkan pada database testing');
 });

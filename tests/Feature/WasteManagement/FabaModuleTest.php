@@ -199,6 +199,7 @@ test('utilization update cannot exceed available stock', function () {
         'quantity' => 8,
     ]);
     $entry = FabaMovement::factory()->create([
+        'approval_status' => FabaMovement::STATUS_REJECTED,
         'transaction_date' => '2026-03-10',
         'material_type' => FabaMovement::MATERIAL_FLY_ASH,
         'movement_type' => FabaMovement::TYPE_UTILIZATION_INTERNAL,
@@ -514,6 +515,18 @@ test('faba dashboard exposes verification queues and latest movements', function
         'status' => FabaMonthlyApproval::STATUS_SUBMITTED,
     ]);
 
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-05-05',
+        'material_type' => FabaMovement::MATERIAL_FLY_ASH,
+        'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN,
+        'period_year' => 2026,
+        'period_month' => 5,
+        'quantity' => 4,
+        'created_by' => $this->operator->id,
+        'approval_status' => FabaMovement::STATUS_APPROVED,
+    ]);
+
     $this->tenantService->switchToPublic();
 
     $response = $this->actingAs($this->supervisor)
@@ -527,8 +540,8 @@ test('faba dashboard exposes verification queues and latest movements', function
         ->has('readyClosingPeriods', 1)
         ->has('latestMovements')
         ->where('pendingApprovals.0.period_label', 'Maret 2026')
-        ->where('readyClosingPeriods.0.period_label', 'April 2026')
-        ->where('latestMovements.0.period_label', 'April 2026')
+        ->where('readyClosingPeriods.0.period_label', 'Mei 2026')
+        ->where('latestMovements.0.period_label', 'Mei 2026')
     );
 });
 
@@ -1023,6 +1036,7 @@ test('reject requires rejection note', function () {
 test('cannot move utilization into locked period', function () {
     $this->tenantService->switchToSchema($this->organization->schema_name);
     $entry = FabaMovement::factory()->create([
+        'approval_status' => FabaMovement::STATUS_REJECTED,
         'transaction_date' => '2026-02-10',
         'movement_type' => FabaMovement::TYPE_UTILIZATION_INTERNAL,
         'stock_effect' => FabaMovement::STOCK_EFFECT_OUT,
@@ -1494,13 +1508,13 @@ test('faba demo seed command creates deterministic tenant data', function () {
     )->toBeFalse();
 
     $recapService = app(\App\Services\FabaRecapService::class);
-    $firstRecap = $recapService->getMonthlyRecap(2025, 3);
-    $rejectedRecap = $recapService->getMonthlyRecap(2025, 7);
+    $firstRecap = $recapService->getMonthlyRecap(2025, 4);
+    $rejectedRecap = $recapService->getMonthlyRecap(2025, 8);
     $latestClosedRecap = $recapService->getMonthlyRecap(2026, 2);
 
     expect($firstRecap['opening_balance'])->toBe(200.0);
     expect($rejectedRecap['opening_balance'])->toBe(256.0);
-    expect($latestClosedRecap['opening_balance'])->toBe(354.0);
+    expect($latestClosedRecap['opening_balance'])->toBe(340.0);
     expect(collect($latestClosedRecap['warnings'])->pluck('code')->contains('missing_opening_balance'))->toBeFalse();
 
     $this->tenantService->switchToPublic();

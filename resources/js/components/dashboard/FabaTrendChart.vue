@@ -11,7 +11,10 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import type { DashboardEChartsOption } from '@/composables/useDashboardEChart';
-import { dashboardChartPalette, dashboardChartPreset } from '@/composables/useDashboardEChart';
+import {
+    dashboardChartPalette,
+    dashboardChartPreset,
+} from '@/composables/useDashboardEChart';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { FabaChartData } from '@/types';
 
@@ -38,7 +41,9 @@ const warningPeriods = computed(() =>
 const latestCapacity = computed(
     () => props.data.at(-1)?.capacity_utilization_percentage ?? 0,
 );
-const latestCapacityStatus = computed(() => props.data.at(-1)?.capacity_status ?? 'normal');
+const latestCapacityStatus = computed(
+    () => props.data.at(-1)?.capacity_status ?? 'normal',
+);
 const capacityWarningThreshold = computed(
     () => props.data.at(-1)?.capacity_warning_threshold ?? 80,
 );
@@ -84,8 +89,12 @@ const fabaChartOption = computed<DashboardEChartsOption>(() => {
     const productionData = rows.map((item) => item.material_production);
     const utilizationData = rows.map((item) => item.material_utilization);
     const balanceData = rows.map((item) => item.material_balance);
-    const capacityData = rows.map((item) => item.capacity_utilization_percentage);
-    const tonMax = getNiceAxisMax(Math.max(...productionData, ...utilizationData, 0));
+    const capacityData = rows.map(
+        (item) => item.capacity_utilization_percentage,
+    );
+    const tonMax = getNiceAxisMax(
+        Math.max(...productionData, ...utilizationData, 0),
+    );
     const balanceMax = getNiceAxisMax(Math.max(...balanceData, 0));
     const rightMax = getNiceAxisMax(
         Math.max(...capacityData, capacityCriticalThreshold.value, 100),
@@ -262,7 +271,9 @@ const fabaChartOption = computed<DashboardEChartsOption>(() => {
         tooltip: {
             ...(dashboardChartPreset.tooltip as object),
             formatter: (params) => {
-                const entries = (Array.isArray(params) ? params : [params]) as Array<{
+                const entries = (
+                    Array.isArray(params) ? params : [params]
+                ) as Array<{
                     axisValue?: string | number;
                     axisValueLabel?: string;
                     seriesName?: string;
@@ -278,9 +289,13 @@ const fabaChartOption = computed<DashboardEChartsOption>(() => {
                 ];
 
                 for (const point of entries) {
-                    const value = typeof point.value === 'number' ? point.value : Number(point.value ?? 0);
+                    const value =
+                        typeof point.value === 'number'
+                            ? point.value
+                            : Number(point.value ?? 0);
                     const normalizedValue = Number.isFinite(value) ? value : 0;
-                    const suffix = point.seriesName === 'Utilisasi TPS' ? '%' : ' ton';
+                    const suffix =
+                        point.seriesName === 'Utilisasi TPS' ? '%' : ' ton';
                     lines.push(
                         `<div style="display:flex;justify-content:space-between;gap:16px;"><span>${point.seriesName ?? '-'}</span><strong>${formatNumber(normalizedValue)}${suffix}</strong></div>`,
                     );
@@ -305,13 +320,7 @@ function getNiceAxisMax(value: number): number {
     const magnitude = 10 ** Math.floor(Math.log10(padded));
     const normalized = padded / magnitude;
     const niceFactor =
-        normalized <= 1
-            ? 1
-            : normalized <= 2
-              ? 2
-              : normalized <= 5
-                ? 5
-                : 10;
+        normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
 
     return niceFactor * magnitude;
 }
@@ -325,35 +334,80 @@ function formatPercentage(value: number): string {
 </script>
 
 <template>
-    <Card class="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/50 dark:bg-slate-900/40">
-        <CardHeader class="border-b border-slate-200/80 bg-slate-50/60 pb-4 dark:border-slate-700/50 dark:bg-slate-900/40">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <Card
+        class="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/50 dark:bg-slate-900/40"
+    >
+        <CardHeader
+            class="border-b border-slate-200/80 bg-slate-50/60 pb-4 dark:border-slate-700/50 dark:bg-slate-900/40"
+        >
+            <div
+                class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
+            >
                 <div class="space-y-1.5">
-                    <CardTitle class="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                    <CardTitle
+                        class="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100"
+                    >
                         Produksi, Pemanfaatan, dan Saldo FABA
                     </CardTitle>
-                    <CardDescription class="max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-300">
-                        Ringkasan tonase per bulan untuk membaca arus produksi, pemanfaatan, posisi saldo akhir,
-                        utilisasi kapasitas TPS, dan periode yang memerlukan perhatian.
+                    <CardDescription
+                        class="max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-300"
+                    >
+                        Ringkasan tonase per bulan untuk membaca arus produksi,
+                        pemanfaatan, posisi saldo akhir, utilisasi kapasitas
+                        TPS, dan periode yang memerlukan perhatian.
                     </CardDescription>
                 </div>
 
                 <div class="grid gap-2 text-xs sm:grid-cols-2">
                     <div class="flex items-center gap-1.5">
-                        <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: dashboardChartPalette.production }" />
-                        <span class="font-semibold text-slate-700 dark:text-slate-200">Produksi</span>
+                        <span
+                            class="h-2.5 w-2.5 rounded-full"
+                            :style="{
+                                backgroundColor:
+                                    dashboardChartPalette.production,
+                            }"
+                        />
+                        <span
+                            class="font-semibold text-slate-700 dark:text-slate-200"
+                            >Produksi</span
+                        >
                     </div>
                     <div class="flex items-center gap-1.5">
-                        <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: dashboardChartPalette.utilization }" />
-                        <span class="font-semibold text-slate-700 dark:text-slate-200">Pemanfaatan</span>
+                        <span
+                            class="h-2.5 w-2.5 rounded-full"
+                            :style="{
+                                backgroundColor:
+                                    dashboardChartPalette.utilization,
+                            }"
+                        />
+                        <span
+                            class="font-semibold text-slate-700 dark:text-slate-200"
+                            >Pemanfaatan</span
+                        >
                     </div>
                     <div class="flex items-center gap-1.5">
-                        <span class="h-0.5 w-4 rounded-full" :style="{ backgroundColor: dashboardChartPalette.balance }" />
-                        <span class="font-semibold text-slate-700 dark:text-slate-200">Saldo akhir</span>
+                        <span
+                            class="h-0.5 w-4 rounded-full"
+                            :style="{
+                                backgroundColor: dashboardChartPalette.balance,
+                            }"
+                        />
+                        <span
+                            class="font-semibold text-slate-700 dark:text-slate-200"
+                            >Saldo akhir</span
+                        >
                     </div>
                     <div class="flex items-center gap-1.5">
-                        <span class="h-0.5 w-4 rounded-full border-t border-dashed" :style="{ borderColor: dashboardChartPalette.capacity }" />
-                        <span class="font-semibold text-slate-700 dark:text-slate-200">Utilisasi TPS</span>
+                        <span
+                            class="h-0.5 w-4 rounded-full border-t border-dashed"
+                            :style="{
+                                borderColor: dashboardChartPalette.capacity,
+                            }"
+                        />
+                        <span
+                            class="font-semibold text-slate-700 dark:text-slate-200"
+                            >Utilisasi TPS</span
+                        >
                     </div>
                 </div>
             </div>
@@ -367,13 +421,24 @@ function formatPercentage(value: number): string {
                 >
                     <div class="flex items-start justify-between gap-3">
                         <div>
-                            <p class="text-[11px] font-semibold tracking-[0.1em] text-slate-500 uppercase">Total Produksi</p>
-                            <p class="mt-2 text-2xl font-semibold leading-none tracking-tight text-slate-900 dark:text-slate-100">
+                            <p
+                                class="text-[11px] font-semibold tracking-[0.1em] text-slate-500 uppercase"
+                            >
+                                Total Produksi
+                            </p>
+                            <p
+                                class="mt-2 text-2xl leading-none font-semibold tracking-tight text-slate-900 dark:text-slate-100"
+                            >
                                 {{ formatNumber(totalProduction) }}
-                                <span class="ml-1 text-base font-medium text-slate-500">ton</span>
+                                <span
+                                    class="ml-1 text-base font-medium text-slate-500"
+                                    >ton</span
+                                >
                             </p>
                         </div>
-                        <div class="flex h-14 w-14 items-center justify-center rounded-xl bg-blue-100/90 text-blue-500 dark:bg-blue-900/40">
+                        <div
+                            class="flex h-14 w-14 items-center justify-center rounded-xl bg-blue-100/90 text-blue-500 dark:bg-blue-900/40"
+                        >
                             <BarChart3 class="h-7 w-7" />
                         </div>
                     </div>
@@ -385,13 +450,24 @@ function formatPercentage(value: number): string {
                 >
                     <div class="flex items-start justify-between gap-3">
                         <div>
-                            <p class="text-[11px] font-semibold tracking-[0.1em] text-slate-500 uppercase">Total Pemanfaatan</p>
-                            <p class="mt-2 text-2xl font-semibold leading-none tracking-tight text-slate-900 dark:text-slate-100">
+                            <p
+                                class="text-[11px] font-semibold tracking-[0.1em] text-slate-500 uppercase"
+                            >
+                                Total Pemanfaatan
+                            </p>
+                            <p
+                                class="mt-2 text-2xl leading-none font-semibold tracking-tight text-slate-900 dark:text-slate-100"
+                            >
                                 {{ formatNumber(totalUtilization) }}
-                                <span class="ml-1 text-base font-medium text-slate-500">ton</span>
+                                <span
+                                    class="ml-1 text-base font-medium text-slate-500"
+                                    >ton</span
+                                >
                             </p>
                         </div>
-                        <div class="flex h-14 w-14 items-center justify-center rounded-xl bg-amber-100/90 text-amber-500 dark:bg-amber-900/40">
+                        <div
+                            class="flex h-14 w-14 items-center justify-center rounded-xl bg-amber-100/90 text-amber-500 dark:bg-amber-900/40"
+                        >
                             <Recycle class="h-7 w-7" />
                         </div>
                     </div>
@@ -403,9 +479,13 @@ function formatPercentage(value: number): string {
                 >
                     <div class="flex items-start justify-between gap-3">
                         <div>
-                            <p class="text-[11px] font-semibold tracking-[0.1em] text-slate-500 uppercase">Utilisasi TPS</p>
                             <p
-                                class="mt-2 text-2xl font-semibold leading-none tracking-tight"
+                                class="text-[11px] font-semibold tracking-[0.1em] text-slate-500 uppercase"
+                            >
+                                Utilisasi TPS
+                            </p>
+                            <p
+                                class="mt-2 text-2xl leading-none font-semibold tracking-tight"
                                 :class="
                                     latestCapacityStatus === 'critical'
                                         ? 'text-red-600 dark:text-red-400'
@@ -416,9 +496,13 @@ function formatPercentage(value: number): string {
                             >
                                 {{ formatPercentage(latestCapacity) }}
                             </p>
-                            <p class="mt-1 text-base text-slate-500">{{ formatNumber(warningPeriods) }} bulan warning</p>
+                            <p class="mt-1 text-base text-slate-500">
+                                {{ formatNumber(warningPeriods) }} bulan warning
+                            </p>
                         </div>
-                        <div class="flex h-14 w-14 items-center justify-center rounded-xl bg-red-100/90 text-red-500 dark:bg-red-900/40">
+                        <div
+                            class="flex h-14 w-14 items-center justify-center rounded-xl bg-red-100/90 text-red-500 dark:bg-red-900/40"
+                        >
                             <Gauge class="h-7 w-7" />
                         </div>
                     </div>
@@ -464,24 +548,41 @@ function formatPercentage(value: number): string {
                 </button>
             </div>
 
-            <div class="rounded-2xl border border-slate-200/90 bg-white p-3 dark:border-slate-700/50 dark:bg-slate-900/40">
-                <BaseEChart :option="fabaChartOption" height-class="h-[330px] sm:h-[350px]" />
-                <div class="mt-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 border-t border-slate-200/80 pt-4 text-sm dark:border-slate-700/50">
+            <div
+                class="rounded-2xl border border-slate-200/90 bg-white p-3 dark:border-slate-700/50 dark:bg-slate-900/40"
+            >
+                <BaseEChart
+                    :option="fabaChartOption"
+                    height-class="h-[330px] sm:h-[350px]"
+                />
+                <div
+                    class="mt-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 border-t border-slate-200/80 pt-4 text-sm dark:border-slate-700/50"
+                >
                     <div class="flex items-center gap-2">
                         <span class="h-4 w-4 rounded bg-blue-600" />
-                        <span class="text-slate-600 dark:text-slate-300">Produksi (ton)</span>
+                        <span class="text-slate-600 dark:text-slate-300"
+                            >Produksi (ton)</span
+                        >
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="h-4 w-4 rounded bg-amber-500" />
-                        <span class="text-slate-600 dark:text-slate-300">Pemanfaatan (ton)</span>
+                        <span class="text-slate-600 dark:text-slate-300"
+                            >Pemanfaatan (ton)</span
+                        >
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="h-0.5 w-7 rounded-full bg-emerald-600" />
-                        <span class="text-slate-600 dark:text-slate-300">Saldo akhir (ton)</span>
+                        <span class="text-slate-600 dark:text-slate-300"
+                            >Saldo akhir (ton)</span
+                        >
                     </div>
                     <div class="flex items-center gap-2">
-                        <span class="h-0.5 w-7 rounded-full border-t-2 border-dashed border-red-600" />
-                        <span class="text-slate-600 dark:text-slate-300">Utilisasi TPS (%)</span>
+                        <span
+                            class="h-0.5 w-7 rounded-full border-t-2 border-dashed border-red-600"
+                        />
+                        <span class="text-slate-600 dark:text-slate-300"
+                            >Utilisasi TPS (%)</span
+                        >
                     </div>
                 </div>
             </div>
