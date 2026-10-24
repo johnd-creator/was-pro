@@ -130,6 +130,7 @@ class FabaUtilizationController extends ApiController
                 'faba/utilization-attachments',
                 config('filesystems.default'),
             );
+            app(\App\Services\OperationalFiles::class)->track($attachmentPath, config('filesystems.default'));
         }
 
         $movement = FabaMovement::query()->create([
@@ -245,6 +246,7 @@ class FabaUtilizationController extends ApiController
                 'faba/utilization-attachments',
                 config('filesystems.default'),
             );
+            app(\App\Services\OperationalFiles::class)->track($attachmentPath, config('filesystems.default'));
         }
 
         $movement->update([

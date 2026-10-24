@@ -11,7 +11,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class WasteRecord extends Model
 {
-    use HasFactory, HasUuids, SoftDeletes;
+    use \App\Concerns\RestoresOperationalWrites, \App\Concerns\SerializesOperationalWrites, HasFactory, HasUuids, SoftDeletes {
+        SoftDeletes::restore as protected restoreWithSoftDeletes;
+        \App\Concerns\RestoresOperationalWrites::restore insteadof SoftDeletes;
+    }
 
     /**
      * The "booted" method of the model.
@@ -447,15 +450,7 @@ class WasteRecord extends Model
      */
     public function submitForApproval(string $submittedBy): bool
     {
-        if (! $this->canBeSubmitted()) {
-            return false;
-        }
-
-        $this->status = 'pending_review';
-        $this->submitted_by = $submittedBy;
-        $this->submitted_at = now();
-
-        return $this->save();
+        return $this->transitionOperationally('canBeSubmitted', ['status' => 'pending_review', 'submitted_by' => $submittedBy, 'submitted_at' => now()]);
     }
 
     /**
@@ -463,16 +458,7 @@ class WasteRecord extends Model
      */
     public function approve(string $approvedBy, ?string $notes = null): bool
     {
-        if (! $this->canBeApproved()) {
-            return false;
-        }
-
-        $this->status = 'approved';
-        $this->approved_by = $approvedBy;
-        $this->approved_at = now();
-        $this->approval_notes = $notes;
-
-        return $this->save();
+        return $this->transitionOperationally('canBeApproved', ['status' => 'approved', 'approved_by' => $approvedBy, 'approved_at' => now(), 'approval_notes' => $notes]);
     }
 
     /**
@@ -480,15 +466,7 @@ class WasteRecord extends Model
      */
     public function reject(string $rejectedBy, string $reason): bool
     {
-        if (! $this->canBeRejected()) {
-            return false;
-        }
-
-        $this->status = 'rejected';
-        $this->rejection_reason = $reason;
-        $this->approved_by = $rejectedBy;
-
-        return $this->save();
+        return $this->transitionOperationally('canBeRejected', ['status' => 'rejected', 'rejection_reason' => $reason, 'approved_by' => $rejectedBy]);
     }
 
     /**
@@ -496,13 +474,6 @@ class WasteRecord extends Model
      */
     public function returnToDraft(): bool
     {
-        if (! $this->isRejected()) {
-            return false;
-        }
-
-        $this->status = 'draft';
-        $this->rejection_reason = null;
-
-        return $this->save();
+        return $this->transitionOperationally('isRejected', ['status' => 'draft', 'rejection_reason' => null]);
     }
 }

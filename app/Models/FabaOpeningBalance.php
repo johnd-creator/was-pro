@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FabaOpeningBalance extends Model
 {
+    use \App\Concerns\SerializesOperationalWrites;
     use HasFactory, HasUuids;
 
     protected $fillable = [
@@ -40,7 +41,9 @@ class FabaOpeningBalance extends Model
     protected static function booted(): void
     {
         static::saved(function (self $balance): void {
-            app(FabaMovementLedgerService::class)->syncOpeningBalance($balance);
+            if ($balance->isDirty(['year', 'month', 'material_type', 'quantity', 'note', 'set_by'])) {
+                app(FabaMovementLedgerService::class)->syncOpeningBalance($balance);
+            }
         });
 
         static::deleted(function (self $balance): void {

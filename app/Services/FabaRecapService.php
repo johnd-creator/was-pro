@@ -430,10 +430,15 @@ class FabaRecapService
             ->when($month, fn ($query) => $query->where('period_month', $month))
             ->when($materialType, fn ($query) => $query->where('material_type', $materialType))
             ->orderBy('transaction_date')
+            ->orderByRaw("CASE WHEN movement_type = 'opening_balance' THEN 0 ELSE 1 END")
             ->orderBy('created_at');
 
         $movements = $baseQuery->get();
-        $runningBalances = [];
+        $start = CarbonImmutable::create($year, $month ?? 1, 1)->subDay();
+        $runningBalances = collect(FabaMovement::materialOptions())
+            ->filter(fn (string $type): bool => $materialType === null || $type === $materialType)
+            ->mapWithKeys(fn (string $type): array => [$type => app(FabaMovementLedgerService::class)->calculateAvailableStock($type, $start)])
+            ->all();
 
         $rows = $movements->map(function (FabaMovement $movement) use (&$runningBalances): array {
             $materialType = $movement->material_type;
@@ -441,7 +446,9 @@ class FabaRecapService
             $delta = $movement->stock_effect === FabaMovement::STOCK_EFFECT_IN
                 ? (float) $movement->quantity
                 : -1 * (float) $movement->quantity;
-            $runningBalances[$materialType] = round($runningBalances[$materialType] + $delta, 2);
+            $runningBalances[$materialType] = $movement->movement_type === FabaMovement::TYPE_OPENING_BALANCE
+                ? (float) $movement->quantity
+                : round($runningBalances[$materialType] + $delta, 2);
 
             return [
                 'id' => $movement->id,
@@ -859,6 +866,7 @@ class FabaRecapService
                 'approved_at' => now(),
                 'warning_summary' => $recap['warnings'],
                 'snapshot_payload' => [
+                    'calculation_version' => 2,
                     'period_label' => $recap['period_label'],
                     'recap' => $recap,
                     'opening_balances' => $detail['opening_balances'],
@@ -884,21 +892,30 @@ class FabaRecapService
 
     public function setOpeningBalance(int $year, int $month, string $materialType, float $quantity, ?string $note, ?string $userId): FabaOpeningBalance
     {
-        $balance = FabaOpeningBalance::query()->updateOrCreate(
-            [
-                'year' => $year,
-                'month' => $month,
-                'material_type' => $materialType,
-            ],
-            [
-                'quantity' => round($quantity, 2),
-                'note' => $note,
-                'set_by' => $userId,
-                'set_at' => now(),
-            ]
-        );
+        return app(OperationalTransactionService::class)->run(function () use ($year, $month, $materialType, $quantity, $note, $userId): FabaOpeningBalance {
+            if ($this->isPeriodLocked($year, $month)) {
+                throw new \App\Exceptions\OperationalConflict('Saldo awal periode terkunci tidak dapat diubah.');
+            }
+            $integrity = app(FabaIntegrityService::class);
+            $before = $integrity->capture();
+            $balance = FabaOpeningBalance::query()->updateOrCreate(
+                [
+                    'year' => $year,
+                    'month' => $month,
+                    'material_type' => $materialType,
+                ],
+                [
+                    'quantity' => round($quantity, 2),
+                    'note' => $note,
+                    'set_by' => $userId,
+                    'set_at' => now(),
+                ]
+            );
 
-        return $balance;
+            $integrity->validate($before);
+
+            return $balance;
+        });
     }
 
     public function getOpeningBalance(int $year, int $month): float
@@ -964,34 +981,15 @@ class FabaRecapService
             ->forPeriod($year, $month)
             ->where('material_type', $materialType)
             ->where('movement_type', FabaMovement::TYPE_OPENING_BALANCE)
-            ->sum('quantity');
+            ->orderByDesc('created_at')->orderByDesc('id')->first();
 
-        if ($explicit > 0) {
-            return round((float) $explicit, 2);
+        if ($explicit) {
+            return round((float) $explicit->quantity, 2);
         }
 
         $previousPeriod = CarbonImmutable::create($year, $month, 1)->subMonth();
 
-        if (! $this->hasPriorActivity($year, $month, $materialType)) {
-            return 0.0;
-        }
-
-        return round(
-            $this->getOpeningBalanceForMaterial(
-                (int) $previousPeriod->format('Y'),
-                (int) $previousPeriod->format('n'),
-                $materialType,
-            )
-            + $this->sumInflows(
-                FabaMovement::query()->approved()->forPeriod((int) $previousPeriod->format('Y'), (int) $previousPeriod->format('n')),
-                $materialType
-            )
-            - $this->sumOutflows(
-                FabaMovement::query()->approved()->forPeriod((int) $previousPeriod->format('Y'), (int) $previousPeriod->format('n')),
-                $materialType
-            ),
-            2
-        );
+        return app(FabaMovementLedgerService::class)->calculateAvailableStock($materialType, $previousPeriod->endOfMonth());
     }
 
     protected function hasPriorActivity(int $year, int $month, string $materialType): bool

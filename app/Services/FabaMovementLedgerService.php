@@ -64,6 +64,13 @@ class FabaMovementLedgerService
             $query->whereKeyNot($excludeMovementId);
         }
 
+        $opening = (clone $query)->where('movement_type', FabaMovement::TYPE_OPENING_BALANCE)
+            ->orderByDesc('transaction_date')->orderByDesc('created_at')->orderByDesc('id')->first();
+        if ($opening) {
+            $query->whereDate('transaction_date', '>=', $opening->transaction_date->toDateString());
+        }
+        $query->where('movement_type', '!=', FabaMovement::TYPE_OPENING_BALANCE);
+
         $inflow = (clone $query)
             ->where('stock_effect', FabaMovement::STOCK_EFFECT_IN)
             ->sum('quantity');
@@ -72,7 +79,7 @@ class FabaMovementLedgerService
             ->where('stock_effect', FabaMovement::STOCK_EFFECT_OUT)
             ->sum('quantity');
 
-        return round((float) $inflow - (float) $outflow, 2);
+        return round((float) ($opening?->quantity ?? 0) + (float) $inflow - (float) $outflow, 2);
     }
 
     /**

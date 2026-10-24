@@ -109,8 +109,7 @@ class WasteRecordsController extends Controller
 
         // Generate record number: WR-{ORG_CODE}-{YYYY}-{MM}-{SEQ}
         $prefix = 'WR-'.$organization->code.'-'.now()->format('Y-m');
-        $seq = WasteRecord::where('record_number', 'like', $prefix.'%')->count() + 1;
-        $recordNumber = $prefix.'-'.str_pad($seq, 4, '0', STR_PAD_LEFT);
+        $recordNumber = app(\App\Services\DocumentNumberService::class)->next(WasteRecord::class, 'record_number', $prefix);
 
         $wasteRecord = WasteRecord::create([
             'record_number' => $recordNumber,

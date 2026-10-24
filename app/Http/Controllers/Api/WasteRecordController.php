@@ -71,10 +71,10 @@ class WasteRecordController extends ApiController
 
         $organization = $user->organization;
         $prefix = 'WR-'.($organization?->code ?? 'ORG').'-'.now()->format('Y-m');
-        $sequence = WasteRecord::query()->where('record_number', 'like', $prefix.'%')->count() + 1;
+        $number = app(\App\Services\DocumentNumberService::class)->next(WasteRecord::class, 'record_number', $prefix);
 
         $record = WasteRecord::query()->create([
-            'record_number' => $prefix.'-'.str_pad((string) $sequence, 4, '0', STR_PAD_LEFT),
+            'record_number' => $number,
             'date' => $request->validated('date'),
             'waste_type_id' => $request->validated('waste_type_id'),
             'quantity' => $request->validated('quantity'),
