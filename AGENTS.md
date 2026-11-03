@@ -1,5 +1,13 @@
 # AGENTS.md
 
+## Active development workflow
+
+The active directory is `F:\was-pro`, and routine development uses local `main`.
+Follow [docs/development-workflow.md](docs/development-workflow.md) for preservation,
+local application verification, focused commits, direct push, and exact-commit CI.
+Do not create worktrees, preview applications, or PRs by default. Use a separate
+branch or PR only for substantial/risky work or an explicit owner request.
+
 Guidance for agentic coding agents working in this repository.
 
 ## Project Overview
