@@ -838,6 +838,12 @@ class UnifiedDashboardService
                     'closing_backlog_quantity' => round((float) $closingBacklogQuantity, 2),
                     'expired_backlog_quantity' => round((float) $expiredBacklogQuantity, 2),
                     'expiring_soon_backlog_quantity' => round((float) $expiringSoonBacklogQuantity, 2),
+                    'snapshot_date' => $periodEnd->toDateString(),
+                    'snapshot_label' => ($date->isSameMonth(CarbonImmutable::now()) ? 'Data sampai ' : 'Snapshot akhir periode ')
+                        .$periodEnd->locale('id')->translatedFormat('j F Y'),
+                    'is_partial_period' => $date->isSameMonth(CarbonImmutable::now()),
+                    'active_backlog_unit_count' => $unitRecords->filter(fn (WasteRecord $record): bool => $this->remainingQuantityAtDate($record, $periodEnd) > 0)->count(),
+                    'expired_backlog_count' => $unitRecords->filter(fn (WasteRecord $record): bool => $this->remainingQuantityAtDate($record, $periodEnd) > 0 && $this->backlogUrgencyLabel($record, $periodEnd) === 'Expired')->count(),
                     'unit' => $chartUnit,
                     'other_units_count' => $otherUnitsCount,
                 ];

@@ -371,6 +371,11 @@ export interface WasteChartData {
     expiring_soon_backlog_quantity: number;
     unit: string;
     other_units_count: number;
+    snapshot_date: string;
+    snapshot_label: string;
+    is_partial_period: boolean;
+    active_backlog_unit_count: number;
+    expired_backlog_count: number;
     unit_series?: Record<string, WasteChartData>;
 }
 

@@ -14,7 +14,7 @@ import WasteFlowChart from '@/components/dashboard/WasteFlowChart.vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard as dashboardRoute } from '@/routes';
-import type { BreadcrumbItem, FabaChartData } from '@/types';
+import type { BreadcrumbItem, FabaChartData, WasteChartData } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -117,21 +117,7 @@ interface Props {
         message: string;
         closing_balance: number;
     }>;
-    wasteChart: Array<{
-        label: string;
-        month: number;
-        year: number;
-        approved_input_count: number;
-        completed_count: number;
-        closing_backlog_count: number;
-        approved_input_quantity: number;
-        hauled_quantity: number;
-        closing_backlog_quantity: number;
-        expired_backlog_quantity: number;
-        expiring_soon_backlog_quantity: number;
-        unit: string;
-        other_units_count: number;
-    }>;
+    wasteChart: WasteChartData[];
     tasks: DashboardTaskItem[];
     taskContext: 'operator' | 'approver';
     wasteTasks: DashboardTaskItem[];
@@ -295,7 +281,10 @@ const wasteStatsContext = computed(() => {
                         class="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(340px,1fr)]"
                     >
                         <div class="min-w-0 space-y-6">
-                            <WasteFlowChart :data="wasteChart" />
+                            <WasteFlowChart
+                                :data="wasteChart"
+                                :organization-id="filters.organization_id"
+                            />
                         </div>
 
                         <div class="space-y-4">

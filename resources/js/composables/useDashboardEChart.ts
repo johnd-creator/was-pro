@@ -27,7 +27,7 @@ export const dashboardChartPalette = {
     utilization: '#d97706',
     backlog: '#2563eb',
     intake: '#0d9488',
-    completed: '#059669',
+    completed: '#d97706',
     balance: '#059669',
     capacity: '#dc2626',
     warning: '#d97706',
