@@ -93,7 +93,7 @@ const kpis = computed(() => [
     {
         label: 'Backlog Expired',
         value: latestExpiredBacklog.value,
-        context: `${latest.value?.expired_backlog_count ?? 0} catatan · perlu penanganan`,
+        context: `${latest.value?.expired_backlog_count ?? 0} catatan · ${latestExpiredBacklog.value > 0 ? 'perlu penanganan' : 'snapshot terakhir'}`,
         tone:
             latestExpiredBacklog.value > 0
                 ? 'text-red-700 dark:text-red-300'
@@ -223,15 +223,15 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
                             : Number(point.value ?? 0);
                     const normalizedValue = Number.isFinite(value) ? value : 0;
                     lines.push(
-                        `<div style="display:flex;justify-content:space-between;gap:16px;"><span>${point.marker ?? ''}${point.seriesName ?? '-'}</span><strong>${formatNumber(normalizedValue)} ${chartUnit.value}</strong></div>`,
+                        `<div style="display:flex;justify-content:space-between;gap:16px;"><span>${tooltipMarker(point.seriesName ?? '')}${point.seriesName ?? '-'}</span><strong>${formatNumber(normalizedValue)} ${chartUnit.value}</strong></div>`,
                     );
                 }
 
                 lines.push(
-                    `<div style="display:flex;justify-content:space-between;gap:16px;"><span>Backlog expired</span><strong>${formatNumber(row?.expired_backlog_quantity ?? 0)} ${chartUnit.value}</strong></div>`,
+                    `<div style="display:flex;justify-content:space-between;gap:16px;"><span>${tooltipMarker('Risiko Expired')}Backlog expired</span><strong>${formatNumber(row?.expired_backlog_quantity ?? 0)} ${chartUnit.value}</strong></div>`,
                 );
                 lines.push(
-                    `<div style="display:flex;justify-content:space-between;gap:16px;"><span>Mendekati batas</span><strong>${formatNumber(row?.expiring_soon_backlog_quantity ?? 0)} ${chartUnit.value}</strong></div>`,
+                    `<div style="display:flex;justify-content:space-between;gap:16px;"><span>${tooltipMarker('Risiko Mendekati Batas')}Mendekati batas</span><strong>${formatNumber(row?.expiring_soon_backlog_quantity ?? 0)} ${chartUnit.value}</strong></div>`,
                 );
 
                 return lines.join('');
@@ -314,6 +314,17 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
     } as DashboardEChartsOption;
 });
 
+function tooltipMarker(series: string): string {
+    const colors: Record<string, string> = {
+        'Intake approved': dashboardChartPalette.intake,
+        'Selesai diangkut': dashboardChartPalette.completed,
+        'Backlog akhir': dashboardChartPalette.backlog,
+        'Risiko Expired': dashboardChartPalette.critical,
+        'Risiko Mendekati Batas': dashboardChartPalette.warning,
+    };
+    return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:${colors[series] ?? dashboardChartPalette.axisLabel}"></span>`;
+}
+
 function formatNumber(value: number): string {
     return value.toLocaleString('id-ID', { maximumFractionDigits: 2 });
 }
@@ -348,8 +359,8 @@ function formatQuantity(value: number): string {
                         v-if="hasOtherUnits"
                         class="text-xs font-medium text-amber-700 dark:text-amber-300"
                     >
-                        Kuantitas ditampilkan per satuan {{ chartUnit }}. Jumlah
-                        catatan mencakup semua satuan.
+                        Kuantitas dan jumlah catatan KPI mengikuti satuan
+                        {{ chartUnit }}. Distribusi mencakup semua satuan.
                     </p>
                 </div>
 
