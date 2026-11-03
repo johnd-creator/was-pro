@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import BaseEChart from '@/components/dashboard/BaseEChart.vue';
 import {
     Card,
@@ -23,37 +23,53 @@ interface Props {
 
 const props = defineProps<Props>();
 
+const selectedUnit = ref('');
+const availableUnits = computed(() =>
+    Object.keys(props.data.at(-1)?.unit_series ?? {}),
+);
+const rows = computed(() =>
+    props.data.map((row) => row.unit_series?.[selectedUnit.value] ?? row),
+);
+const latestSoon = computed(
+    () => rows.value.at(-1)?.expiring_soon_backlog_quantity ?? 0,
+);
+const backlogChange = computed(
+    () =>
+        (rows.value.at(-1)?.closing_backlog_quantity ?? 0) -
+        (rows.value.at(-2)?.closing_backlog_quantity ?? 0),
+);
+
 const totalInput = computed(() =>
-    props.data.reduce((sum, item) => sum + item.approved_input_quantity, 0),
+    rows.value.reduce((sum, item) => sum + item.approved_input_quantity, 0),
 );
 const totalCompleted = computed(() =>
-    props.data.reduce((sum, item) => sum + item.hauled_quantity, 0),
+    rows.value.reduce((sum, item) => sum + item.hauled_quantity, 0),
 );
 const latestBacklog = computed(
-    () => props.data.at(-1)?.closing_backlog_quantity ?? 0,
+    () => rows.value.at(-1)?.closing_backlog_quantity ?? 0,
 );
 const latestBacklogCount = computed(
-    () => props.data.at(-1)?.closing_backlog_count ?? 0,
+    () => rows.value.at(-1)?.closing_backlog_count ?? 0,
 );
 const latestExpiredBacklog = computed(
-    () => props.data.at(-1)?.expired_backlog_quantity ?? 0,
+    () => rows.value.at(-1)?.expired_backlog_quantity ?? 0,
 );
-const chartUnit = computed(() => props.data.at(-1)?.unit ?? 'ton');
+const chartUnit = computed(() => rows.value.at(-1)?.unit ?? 'ton');
 const hasOtherUnits = computed(() =>
-    props.data.some((item) => item.other_units_count > 0),
+    rows.value.some((item) => item.other_units_count > 0),
 );
 
 const wasteChartOption = computed<DashboardEChartsOption>(() => {
-    const labels = props.data.map((item) => item.label);
-    const inputData = props.data.map((item) => item.approved_input_quantity);
-    const completedData = props.data.map((item) => item.hauled_quantity);
-    const backlogData = props.data.map((item) => item.closing_backlog_quantity);
-    const expiredMarkers = props.data.map((item) =>
+    const labels = rows.value.map((item) => item.label);
+    const inputData = rows.value.map((item) => item.approved_input_quantity);
+    const completedData = rows.value.map((item) => item.hauled_quantity);
+    const backlogData = rows.value.map((item) => item.closing_backlog_quantity);
+    const expiredMarkers = rows.value.map((item) =>
         item.expired_backlog_quantity > 0
             ? item.closing_backlog_quantity
             : null,
     );
-    const expiringMarkers = props.data.map((item) =>
+    const expiringMarkers = rows.value.map((item) =>
         item.expiring_soon_backlog_quantity > 0
             ? item.closing_backlog_quantity
             : null,
@@ -67,7 +83,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
             right: 24,
             bottom: 72,
             left: 52,
-            containLabel: false,
+            containLabel: true,
         },
         xAxis: {
             type: 'category' as const,
@@ -91,7 +107,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
         yAxis: {
             type: 'value' as const,
             min: 0,
-            max: Math.ceil(leftMax * 1.15),
+            max: Math.max(1, Math.ceil(leftMax * 1.15)),
             name: chartUnit.value,
             nameLocation: 'end' as const,
             nameGap: 18,
@@ -121,6 +137,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
         },
         tooltip: {
             ...(dashboardChartPreset.tooltip as object),
+            confine: true,
             formatter: (params) => {
                 const entries = (
                     Array.isArray(params) ? params : [params]
@@ -137,7 +154,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
                 }
 
                 const index = entries[0].dataIndex ?? 0;
-                const row = props.data[index];
+                const row = rows.value[index];
                 const lines = [
                     `<div style="font-weight:700;margin-bottom:6px;">${entries[0].axisValueLabel ?? entries[0].axisValue ?? ''}</div>`,
                 ];
@@ -194,7 +211,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
             {
                 name: 'Backlog akhir',
                 type: 'line',
-                smooth: true,
+                smooth: false,
                 symbol: 'circle',
                 symbolSize: 7,
                 lineStyle: {
@@ -212,6 +229,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
                 name: 'Risiko Expired',
                 type: 'scatter',
                 symbolSize: 8,
+                symbolOffset: [-6, -5],
                 itemStyle: {
                     color: dashboardChartPalette.critical,
                 },
@@ -222,6 +240,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
                 name: 'Risiko Mendekati Batas',
                 type: 'scatter',
                 symbolSize: 8,
+                symbolOffset: [6, 5],
                 itemStyle: {
                     color: dashboardChartPalette.warning,
                 },
@@ -266,8 +285,8 @@ function formatQuantity(value: number): string {
                         v-if="hasOtherUnits"
                         class="text-xs font-medium text-amber-700 dark:text-amber-300"
                     >
-                        Chart kuantitas memakai unit dominan {{ chartUnit }}.
-                        Unit lain tetap dihitung pada record dan backlog.
+                        Kuantitas ditampilkan per satuan {{ chartUnit }}. Jumlah
+                        catatan mencakup semua satuan.
                     </p>
                 </div>
 
@@ -333,6 +352,65 @@ function formatQuantity(value: number): string {
         </CardHeader>
 
         <CardContent class="space-y-5 pt-5">
+            <div
+                class="wm-text-secondary flex flex-wrap items-center gap-3 text-sm"
+            >
+                <label
+                    v-if="availableUnits.length > 1"
+                    class="flex items-center gap-2"
+                    >Satuan
+                    <select
+                        v-model="selectedUnit"
+                        class="wm-panel rounded-lg border px-3 py-2"
+                    >
+                        <option value="">{{ data.at(-1)?.unit }} (awal)</option>
+                        <option
+                            v-for="unit in availableUnits"
+                            :key="unit"
+                            :value="unit"
+                        >
+                            {{ unit }}
+                        </option>
+                    </select>
+                </label>
+                <span
+                    >{{ rows[0]?.label }} - {{ rows.at(-1)?.label }} | enam
+                    bulan; bulan berjalan sampai hari ini</span
+                >
+            </div>
+            <div class="wm-surface-subtle rounded-xl border p-3 text-xs">
+                <p class="wm-text-primary">
+                    Backlog
+                    {{
+                        backlogChange > 0
+                            ? 'naik'
+                            : backlogChange < 0
+                              ? 'turun'
+                              : 'tetap'
+                    }}
+                    {{ formatQuantity(Math.abs(backlogChange)) }} dibanding
+                    bulan sebelumnya.
+                </p>
+                <p class="mt-1 text-red-700 dark:text-red-300">
+                    Expired {{ formatQuantity(latestExpiredBacklog) }}
+                </p>
+                <p class="mt-1 text-amber-700 dark:text-amber-300">
+                    Mendekati batas (7 hari) {{ formatQuantity(latestSoon) }}
+                </p>
+            </div>
+            <p
+                v-if="
+                    !rows.some(
+                        (row) =>
+                            row.approved_input_quantity ||
+                            row.hauled_quantity ||
+                            row.closing_backlog_quantity,
+                    )
+                "
+                class="wm-text-muted text-sm"
+            >
+                Belum ada kuantitas pada satuan dan periode ini.
+            </p>
             <div class="grid gap-3 sm:grid-cols-3">
                 <Link
                     :href="wasteManagementRoutes.records.index.url()"

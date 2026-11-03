@@ -297,8 +297,10 @@ export interface FabaChartData {
     utilization_bottom_ash: number;
     closing_fly_ash: number;
     closing_bottom_ash: number;
-    capacity_utilization_percentage: number;
-    capacity_status: 'normal' | 'warning' | 'critical';
+    capacity_utilization_percentage: number | null;
+    capacity_status: 'normal' | 'warning' | 'critical' | 'unavailable';
+    capacity: Record<'total' | 'fly_ash' | 'bottom_ash', DashboardCapacity>;
+    has_capacity_warning: boolean;
     capacity_warning_threshold: number;
     capacity_critical_threshold: number;
     warning_count: number;
@@ -369,4 +371,18 @@ export interface WasteChartData {
     expiring_soon_backlog_quantity: number;
     unit: string;
     other_units_count: number;
+    unit_series?: Record<string, WasteChartData>;
+}
+
+export interface DashboardCapacity {
+    balance: number;
+    capacity: number;
+    available: boolean;
+    occupied_quantity: number;
+    remaining_capacity: number;
+    excess_quantity: number;
+    utilization_percentage: number | null;
+    warning_threshold: number;
+    critical_threshold: number;
+    status: 'normal' | 'warning' | 'critical' | 'unavailable';
 }

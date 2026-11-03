@@ -14,7 +14,7 @@ import WasteFlowChart from '@/components/dashboard/WasteFlowChart.vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard as dashboardRoute } from '@/routes';
-import type { BreadcrumbItem } from '@/types';
+import type { BreadcrumbItem, FabaChartData } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -107,26 +107,7 @@ interface Props {
     fabaHeroStats: FabaStats & {
         year: number;
     };
-    fabaChart: Array<{
-        label: string;
-        month: number;
-        year: number;
-        production: number;
-        utilization: number;
-        closing_balance: number;
-        production_fly_ash: number;
-        production_bottom_ash: number;
-        utilization_fly_ash: number;
-        utilization_bottom_ash: number;
-        closing_fly_ash: number;
-        closing_bottom_ash: number;
-        capacity_utilization_percentage: number;
-        capacity_status: 'normal' | 'warning' | 'critical';
-        capacity_warning_threshold: number;
-        capacity_critical_threshold: number;
-        warning_count: number;
-        has_warning: boolean;
-    }>;
+    fabaChart: FabaChartData[];
     fabaMaterialBalanceDistribution: CategoryData[];
     fabaUtilizationDistribution: CategoryData[];
     fabaPendingApprovals: ApprovalItem[];
@@ -305,7 +286,7 @@ const wasteStatsContext = computed(() => {
                             <h3
                                 class="wm-text-primary mt-1 text-base font-semibold tracking-tight"
                             >
-                                Donut Distribusi
+                                Distribusi Operasional
                             </h3>
                         </div>
                     </div>
@@ -313,9 +294,8 @@ const wasteStatsContext = computed(() => {
                     <div
                         class="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(340px,1fr)]"
                     >
-                        <div class="space-y-6">
+                        <div class="min-w-0 space-y-6">
                             <WasteFlowChart :data="wasteChart" />
-                            <FabaTrendChart :data="fabaChart" />
                         </div>
 
                         <div class="space-y-4">
@@ -338,6 +318,7 @@ const wasteStatsContext = computed(() => {
                                             :data="
                                                 wasteHaulingStatusDistribution
                                             "
+                                            variant="bars"
                                             total-label="Catatan"
                                             value-suffix="catatan"
                                         />
@@ -361,6 +342,7 @@ const wasteStatsContext = computed(() => {
                                             :data="
                                                 wasteBacklogUrgencyDistribution
                                             "
+                                            variant="bars"
                                             total-label="Backlog"
                                             value-suffix="record"
                                         />
@@ -405,6 +387,7 @@ const wasteStatsContext = computed(() => {
                                     <CardContent>
                                         <DistributionDonut
                                             :data="fabaUtilizationDistribution"
+                                            variant="stacked"
                                             total-label="Pemanfaatan"
                                             value-suffix="ton"
                                         />
@@ -413,6 +396,7 @@ const wasteStatsContext = computed(() => {
                             </div>
                         </div>
                     </div>
+                    <FabaTrendChart :data="fabaChart" />
                 </section>
             </div>
         </div>
