@@ -1185,7 +1185,7 @@ test('expired action preserves snapshot partial hauling unit and authorized tena
     $type = createDashboardWasteType(5);
     $expired = WasteRecord::factory()->approved()->create(['waste_type_id' => $type->id, 'date' => '2026-01-01', 'quantity' => 10, 'unit' => 'kg']);
     WasteRecord::factory()->approved()->create(['waste_type_id' => $type->id, 'date' => '2026-01-01', 'quantity' => 2, 'unit' => 'ton']);
-    WasteRecord::factory()->create(['waste_type_id' => $type->id, 'date' => '2026-01-01', 'quantity' => 5, 'unit' => 'kg']);
+    WasteRecord::factory()->draft()->create(['waste_type_id' => $type->id, 'date' => '2026-01-01', 'quantity' => 5, 'unit' => 'kg']);
     WasteRecord::factory()->approved()->create(['waste_type_id' => $type->id, 'date' => '2026-02-25', 'quantity' => 6, 'unit' => 'kg']);
     foreach ([['2026-02-10', 4], ['2026-03-10', 6]] as [$date, $quantity]) {
         WasteHauling::factory()->create(['waste_record_id' => $expired->id, 'hauling_date' => $date, 'quantity' => $quantity, 'unit' => 'kg', 'status' => 'approved']);
