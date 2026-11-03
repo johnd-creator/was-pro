@@ -324,8 +324,10 @@ class UnifiedDashboardService
                     'utilization_bottom_ash' => $monthlyRecap['utilization_bottom_ash'],
                     'closing_fly_ash' => $monthlyRecap['closing_fly_ash'],
                     'closing_bottom_ash' => $monthlyRecap['closing_bottom_ash'],
-                    'capacity_utilization_percentage' => $capacitySummary['total']['utilization_percentage'],
-                    'capacity_status' => $capacitySummary['total']['status'],
+                    'capacity' => $this->dashboardCapacity($capacitySummary),
+                    'capacity_utilization_percentage' => $capacitySummary['total']['available'] ? $capacitySummary['total']['utilization_percentage'] : null,
+                    'capacity_status' => $capacitySummary['total']['available'] ? $capacitySummary['total']['status'] : 'unavailable',
+                    'has_capacity_warning' => collect([$capacitySummary['total'], ...$capacitySummary['materials']])->contains(fn (array $item): bool => $item['available'] && $item['status'] !== 'normal'),
                     'capacity_warning_threshold' => $capacitySummary['thresholds']['warning'],
                     'capacity_critical_threshold' => $capacitySummary['thresholds']['critical'],
                     'warning_count' => $warningCount,
@@ -334,6 +336,24 @@ class UnifiedDashboardService
             })
             ->values()
             ->all();
+    }
+
+    private function dashboardCapacity(array $summary): array
+    {
+        $items = ['total' => [
+            ...$summary['total'],
+            'warning_threshold' => $summary['thresholds']['warning'],
+            'critical_threshold' => $summary['thresholds']['critical'],
+        ]];
+        foreach ($summary['materials'] as $material) {
+            $items[$material['material_type']] = $material;
+        }
+
+        return collect($items)->map(fn (array $item): array => [
+            ...$item,
+            'utilization_percentage' => $item['available'] ? $item['utilization_percentage'] : null,
+            'status' => $item['available'] ? $item['status'] : 'unavailable',
+        ])->all();
     }
 
     private function getFabaMaterialBalanceDistribution(): array
@@ -724,8 +744,26 @@ class UnifiedDashboardService
 
     private function getWasteChartData(): array
     {
+        $units = WasteRecord::query()->approved()
+            ->whereDate('date', '<=', $this->snapshotDate()->toDateString())
+            ->distinct()->orderBy('unit')->pluck('unit')->all();
+        $anchor = CarbonImmutable::create($this->selectedYear, $this->selectedMonth, 1);
+        $primaryUnit = $this->resolveWasteChartUnit($anchor);
+        $series = [];
+        foreach ($units as $unit) {
+            $series[$unit] = $this->getWasteChartDataForUnit($unit);
+        }
+
+        return collect($series[$primaryUnit] ?? $this->getWasteChartDataForUnit($primaryUnit))
+            ->map(fn (array $row, int $index): array => [
+                ...$row,
+                'unit_series' => collect($series)->map(fn (array $rows): array => $rows[$index])->all(),
+            ])->all();
+    }
+
+    private function getWasteChartDataForUnit(string $chartUnit): array
+    {
         $anchorDate = CarbonImmutable::create($this->selectedYear, $this->selectedMonth, 1);
-        $chartUnit = $this->resolveWasteChartUnit($anchorDate);
 
         return collect(range(5, 0))
             ->map(function (int $offset) use ($anchorDate, $chartUnit): array {
@@ -738,11 +776,13 @@ class UnifiedDashboardService
                 $approvedInputCount = WasteRecord::query()
                     ->whereYear('date', $year)
                     ->whereMonth('date', $month)
+                    ->whereDate('date', '<=', $periodEnd->toDateString())
                     ->approved()
                     ->count();
                 $approvedInputQuantity = WasteRecord::query()
                     ->whereYear('date', $year)
                     ->whereMonth('date', $month)
+                    ->whereDate('date', '<=', $periodEnd->toDateString())
                     ->approved()
                     ->where('unit', $chartUnit)
                     ->sum('quantity');
@@ -750,11 +790,12 @@ class UnifiedDashboardService
                     ->approved()
                     ->whereYear('hauling_date', $year)
                     ->whereMonth('hauling_date', $month)
+                    ->whereDate('hauling_date', '<=', $periodEnd->toDateString())
+                    ->whereHas('wasteRecord', fn ($query) => $query->approved()->whereDate('date', '<=', $periodEnd->toDateString()))
                     ->where('unit', $chartUnit)
                     ->sum('quantity');
                 $otherUnitsCount = WasteRecord::query()
-                    ->whereYear('date', $year)
-                    ->whereMonth('date', $month)
+                    ->whereDate('date', '<=', $periodEnd->toDateString())
                     ->approved()
                     ->where('unit', '!=', $chartUnit)
                     ->distinct('unit')
@@ -797,6 +838,12 @@ class UnifiedDashboardService
                     'closing_backlog_quantity' => round((float) $closingBacklogQuantity, 2),
                     'expired_backlog_quantity' => round((float) $expiredBacklogQuantity, 2),
                     'expiring_soon_backlog_quantity' => round((float) $expiringSoonBacklogQuantity, 2),
+                    'snapshot_date' => $periodEnd->toDateString(),
+                    'snapshot_label' => ($date->isSameMonth(CarbonImmutable::now()) ? 'Data sampai ' : 'Snapshot akhir periode ')
+                        .$periodEnd->locale('id')->translatedFormat('j F Y'),
+                    'is_partial_period' => $date->isSameMonth(CarbonImmutable::now()),
+                    'active_backlog_unit_count' => $unitRecords->filter(fn (WasteRecord $record): bool => $this->remainingQuantityAtDate($record, $periodEnd) > 0)->count(),
+                    'expired_backlog_count' => $unitRecords->filter(fn (WasteRecord $record): bool => $this->remainingQuantityAtDate($record, $periodEnd) > 0 && $this->backlogUrgencyLabel($record, $periodEnd) === 'Expired')->count(),
                     'unit' => $chartUnit,
                     'other_units_count' => $otherUnitsCount,
                 ];
@@ -886,11 +933,15 @@ class UnifiedDashboardService
     {
         $user = Auth::user();
         $notificationSummary = $this->getNotificationSummary();
+        $capacity = $this->fabaRecapService->getTpsCapacitySummary($this->selectedYear, $this->selectedMonth);
+        $capacityItems = collect([$capacity['total'], ...$capacity['materials']]);
+        $capacityCritical = $capacityItems->contains(fn (array $item): bool => $item['available'] && $item['status'] === 'critical');
+        $capacityWarning = $capacityItems->contains(fn (array $item): bool => ! $item['available'] || $item['status'] === 'warning');
         $riskStatus = 'normal';
 
-        if ($notificationSummary['expired_waste_count'] > 0 || $notificationSummary['faba_warnings_count'] > 0) {
+        if ($capacityCritical || $notificationSummary['expired_waste_count'] > 0 || $notificationSummary['faba_warnings_count'] > 0) {
             $riskStatus = 'critical';
-        } elseif ($notificationSummary['expiring_soon_waste_count'] > 0 ||
+        } elseif ($capacityWarning || $notificationSummary['expiring_soon_waste_count'] > 0 ||
                    $notificationSummary['pending_waste_approvals_count'] > 5 ||
                    $notificationSummary['pending_faba_approvals_count'] > 2) {
             $riskStatus = 'warning';
@@ -1046,7 +1097,7 @@ class UnifiedDashboardService
                 ->pluck('period')
                 ->all(),
             ...FabaMovement::query()
-                ->selectRaw("format('%s-%02s', period_year, period_month) as period")
+                ->selectRaw("to_char(make_date(period_year, period_month, 1), 'YYYY-MM') as period")
                 ->groupBy('period_year', 'period_month')
                 ->pluck('period')
                 ->all(),
@@ -1061,6 +1112,13 @@ class UnifiedDashboardService
                 'year' => $currentDate->year,
                 'month' => $currentDate->month,
             ]];
+        }
+
+        $firstMonth = CarbonImmutable::createFromFormat('!Y-m', $periods->last());
+        $lastMonth = CarbonImmutable::createFromFormat('!Y-m', $periods->first());
+        $periods = collect();
+        for ($date = $lastMonth; $date->gte($firstMonth); $date = $date->subMonth()) {
+            $periods->push($date->format('Y-m'));
         }
 
         return $periods

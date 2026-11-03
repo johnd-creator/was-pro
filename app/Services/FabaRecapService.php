@@ -554,12 +554,17 @@ class FabaRecapService
 
         $materials = collect($materials)
             ->map(function (array $item): array {
+                $item['capacity'] = is_finite($item['capacity']) && $item['capacity'] > 0 ? $item['capacity'] : 0.0;
                 $utilization = $item['capacity'] > 0
-                    ? round(($item['balance'] / $item['capacity']) * 100, 2)
+                    ? round((max(0, $item['balance']) / $item['capacity']) * 100, 2)
                     : 0.0;
 
                 return [
                     ...$item,
+                    'available' => is_finite($item['capacity']) && $item['capacity'] > 0,
+                    'occupied_quantity' => max(0, $item['balance']),
+                    'remaining_capacity' => max(0, $item['capacity'] - max(0, $item['balance'])),
+                    'excess_quantity' => max(0, $item['balance'] - $item['capacity']),
                     'utilization_percentage' => $utilization,
                     'status' => $this->resolveCapacityStatus($utilization, $item['warning_threshold'], $item['critical_threshold']),
                 ];
@@ -567,10 +572,12 @@ class FabaRecapService
             ->values()
             ->all();
 
-        $totalCapacity = round((float) collect($materials)->sum('capacity'), 2);
+        $totalCapacity = round((float) collect($materials)->sum(fn (array $item): float => max(0, $item['capacity'])), 2);
+        $totalAvailable = collect($materials)->every(fn (array $item): bool => $item['available']);
         $totalBalance = round((float) collect($materials)->sum('balance'), 2);
+        $totalOccupied = (float) collect($materials)->sum('occupied_quantity');
         $totalUtilization = $totalCapacity > 0
-            ? round(($totalBalance / $totalCapacity) * 100, 2)
+            ? round(($totalOccupied / $totalCapacity) * 100, 2)
             : 0.0;
 
         return [
@@ -583,6 +590,10 @@ class FabaRecapService
             'total' => [
                 'balance' => $totalBalance,
                 'capacity' => $totalCapacity,
+                'available' => $totalAvailable,
+                'occupied_quantity' => $totalOccupied,
+                'remaining_capacity' => max(0, $totalCapacity - $totalOccupied),
+                'excess_quantity' => max(0, $totalOccupied - $totalCapacity),
                 'utilization_percentage' => $totalUtilization,
                 'status' => $this->resolveCapacityStatus($totalUtilization, $warningThreshold, $criticalThreshold),
             ],
@@ -954,7 +965,7 @@ class FabaRecapService
 
     protected function resolveCapacityStatus(float $utilization, float $warningThreshold, float $criticalThreshold): string
     {
-        if ($utilization >= $criticalThreshold) {
+        if ($utilization > 100 || $utilization >= $criticalThreshold) {
             return 'critical';
         }
 

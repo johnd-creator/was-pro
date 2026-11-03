@@ -1077,3 +1077,138 @@ test('dashboard exposes normal risk metadata when no active compliance issues ex
 
     CarbonImmutable::setTestNow();
 });
+
+test('dashboard separates material capacity risk from integrity warnings across six months', function () {
+    $organization = Organization::factory()->create(['code' => 'CAPBUNDLE', 'schema_name' => 'tenant_capacity_bundle']);
+    migrateTenantSchema($organization);
+    $tenant = app(TenantService::class);
+    $tenant->switchToSchema($organization->schema_name);
+    app(\App\Services\FabaRecapService::class)->setTpsCapacity('fly_ash', 100, 70, 90, null);
+    app(\App\Services\FabaRecapService::class)->setTpsCapacity('bottom_ash', 100, 60, 85, null);
+    FabaMovement::factory()->create([
+        'transaction_date' => '2026-02-01', 'period_year' => 2026, 'period_month' => 2,
+        'material_type' => 'fly_ash', 'movement_type' => FabaMovement::TYPE_PRODUCTION,
+        'stock_effect' => FabaMovement::STOCK_EFFECT_IN, 'quantity' => 196,
+    ]);
+    WasteRecord::factory()->create(['date' => '2026-03-01']);
+    $tenant->switchToPublic();
+    $user = User::factory()->create(['organization_id' => $organization->id]);
+    $this->actingAs($user)->get(route('dashboard', ['month' => '2026-03']))
+        ->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('header.risk_status', 'critical')
+        ->where('fabaChart.5.capacity.fly_ash.utilization_percentage', 196)
+        ->where('fabaChart.5.capacity.fly_ash.excess_quantity', 96)
+        ->where('fabaChart.5.capacity.bottom_ash.utilization_percentage', 0)
+        ->where('fabaChart.5.capacity.total.capacity', 200)
+        ->where('fabaChart.4.has_capacity_warning', true)
+        ->where('fabaChart.5.has_capacity_warning', true)
+        );
+});
+
+test('dashboard keeps mixed units and partial expired backlog separate at historical snapshots', function () {
+    $organization = Organization::factory()->create(['code' => 'UNITBUNDLE', 'schema_name' => 'tenant_units_bundle']);
+    migrateTenantSchema($organization);
+    $tenant = app(TenantService::class);
+    $tenant->switchToSchema($organization->schema_name);
+    $type = createDashboardWasteType(5);
+    $record = WasteRecord::factory()->approved()->create(['waste_type_id' => $type->id, 'date' => '2025-12-01', 'quantity' => 10, 'unit' => 'kg']);
+    WasteRecord::factory()->approved()->create(['waste_type_id' => $type->id, 'date' => '2026-01-01', 'quantity' => 2, 'unit' => 'ton']);
+    foreach ([['2026-01-10', 4], ['2026-03-10', 6]] as [$date, $quantity]) {
+        WasteHauling::factory()->create(['waste_record_id' => $record->id, 'hauling_date' => $date, 'quantity' => $quantity, 'unit' => 'kg', 'status' => 'approved']);
+    }
+    $tenant->switchToPublic();
+    $user = User::factory()->create(['organization_id' => $organization->id]);
+    $this->actingAs($user)->get(route('dashboard', ['month' => '2026-02']))
+        ->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('wasteChart.5.unit_series.kg.closing_backlog_quantity', 6)
+        ->where('wasteChart.5.unit_series.kg.expired_backlog_quantity', 6)
+        ->where('wasteChart.5.unit_series.ton.closing_backlog_quantity', 2)
+        ->where('wasteChart.5.unit_series.ton.expired_backlog_quantity', 2)
+        );
+});
+
+test('dashboard marks unavailable capacity without reporting a genuine zero percent', function () {
+    $organization = Organization::factory()->create(['code' => 'NOCAPBUNDLE', 'schema_name' => 'tenant_no_capacity_bundle']);
+    migrateTenantSchema($organization);
+    $tenant = app(TenantService::class);
+    $tenant->switchToSchema($organization->schema_name);
+    app(\App\Services\FabaRecapService::class)->setTpsCapacity('fly_ash', 0, 70, 90, null);
+    $tenant->switchToPublic();
+    $user = User::factory()->create(['organization_id' => $organization->id]);
+    $this->actingAs($user)->get(route('dashboard'))->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('fabaChart.5.capacity.total.utilization_percentage', null)
+            ->where('fabaChart.5.capacity.total.status', 'unavailable')
+            ->where('fabaChart.5.capacity.fly_ash.utilization_percentage', null)
+            ->where('header.risk_status', 'warning')
+        );
+});
+
+test('waste chart snapshot labels use the backend date across year boundaries', function () {
+    CarbonImmutable::setTestNow('2027-01-12 10:00:00');
+    try {
+        $organization = Organization::factory()->create(['code' => 'SNAPLABEL', 'schema_name' => 'tenant_snapshot_labels']);
+        migrateTenantSchema($organization);
+        $tenant = app(TenantService::class);
+        $tenant->switchToSchema($organization->schema_name);
+        $type = createDashboardWasteType(5);
+        WasteRecord::factory()->approved()->create(['waste_type_id' => $type->id, 'date' => '2026-12-01', 'quantity' => 10, 'unit' => 'kg']);
+        WasteRecord::factory()->create(['waste_type_id' => $type->id, 'date' => '2027-01-01']);
+        $tenant->switchToPublic();
+        $user = User::factory()->create(['organization_id' => $organization->id]);
+        $this->actingAs($user)->get(route('dashboard', ['month' => '2026-12']))->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('wasteChart.5.snapshot_date', '2026-12-31')
+                ->where('wasteChart.5.is_partial_period', false)
+                ->where('wasteChart.5.snapshot_label', 'Snapshot akhir periode 31 Desember 2026')
+                ->where('wasteChart.5.active_backlog_unit_count', 1)
+                ->where('wasteChart.5.expired_backlog_count', 1)
+            );
+        $this->get(route('dashboard', ['month' => '2027-01']))->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('wasteChart.5.snapshot_date', '2027-01-12')
+                ->where('wasteChart.5.is_partial_period', true)
+                ->where('wasteChart.5.snapshot_label', 'Data sampai 12 Januari 2027')
+            );
+    } finally {
+        CarbonImmutable::setTestNow();
+    }
+});
+
+test('expired action preserves snapshot partial hauling unit and authorized tenant boundaries', function () {
+    $organization = Organization::factory()->create(['code' => 'EXPIREDACTION', 'schema_name' => 'tenant_expired_action']);
+    $other = Organization::factory()->create(['code' => 'EXPIREDOTHER', 'schema_name' => 'tenant_expired_other']);
+    migrateTenantSchema($organization);
+    migrateTenantSchema($other);
+    $tenant = app(TenantService::class);
+    $tenant->switchToSchema($organization->schema_name);
+    $type = createDashboardWasteType(5);
+    $expired = WasteRecord::factory()->approved()->create(['waste_type_id' => $type->id, 'date' => '2026-01-01', 'quantity' => 10, 'unit' => 'kg']);
+    WasteRecord::factory()->approved()->create(['waste_type_id' => $type->id, 'date' => '2026-01-01', 'quantity' => 2, 'unit' => 'ton']);
+    WasteRecord::factory()->create(['waste_type_id' => $type->id, 'date' => '2026-01-01', 'quantity' => 5, 'unit' => 'kg']);
+    WasteRecord::factory()->approved()->create(['waste_type_id' => $type->id, 'date' => '2026-02-25', 'quantity' => 6, 'unit' => 'kg']);
+    foreach ([['2026-02-10', 4], ['2026-03-10', 6]] as [$date, $quantity]) {
+        WasteHauling::factory()->create(['waste_record_id' => $expired->id, 'hauling_date' => $date, 'quantity' => $quantity, 'unit' => 'kg', 'status' => 'approved']);
+    }
+    $tenant->switchToSchema($other->schema_name);
+    $otherType = createDashboardWasteType(5);
+    WasteRecord::factory()->approved()->create(['waste_type_id' => $otherType->id, 'date' => '2026-01-01', 'quantity' => 100, 'unit' => 'kg']);
+    $tenant->switchToPublic();
+    $admin = User::factory()->create(['organization_id' => $other->id, 'is_super_admin' => true]);
+    $parameters = ['expiry' => 'expired', 'as_of' => '2026-02-28', 'unit' => 'kg', 'organization_id' => $organization->id];
+    $this->actingAs($admin)->get(route('waste-management.records.index', $parameters))->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('waste-management/records/ExpiredSnapshot')
+            ->has('records', 1)
+            ->where('records.0.id', $expired->id)
+            ->where('records.0.remaining_quantity', 6)
+            ->where('snapshot.date', '2026-02-28')
+            ->where('snapshot.organization_id', $organization->id)
+        );
+    $parameters['as_of'] = '2026-03-31';
+    $this->get(route('waste-management.records.index', $parameters))->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page->has('records', 1)->where('records.0.remaining_quantity', 6));
+    $operator = User::factory()->create(['organization_id' => $other->id, 'role_id' => Role::where('slug', 'operator')->value('id')]);
+    $this->actingAs($operator)->get(route('waste-management.records.index', $parameters))->assertForbidden();
+    $this->actingAs($admin)->get(route('waste-management.records.index', ['expiry' => 'expired']))->assertSessionHasErrors('as_of');
+});

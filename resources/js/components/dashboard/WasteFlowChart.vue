@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import BaseEChart from '@/components/dashboard/BaseEChart.vue';
 import {
     Card,
@@ -19,41 +19,99 @@ import type { WasteChartData } from '@/types';
 
 interface Props {
     data: WasteChartData[];
+    organizationId?: string | null;
 }
 
 const props = defineProps<Props>();
 
-const totalInput = computed(() =>
-    props.data.reduce((sum, item) => sum + item.approved_input_quantity, 0),
+const selectedUnit = ref('');
+const availableUnits = computed(() =>
+    Object.keys(props.data.at(-1)?.unit_series ?? {}),
 );
-const totalCompleted = computed(() =>
-    props.data.reduce((sum, item) => sum + item.hauled_quantity, 0),
+const rows = computed(() =>
+    props.data.map((row) => row.unit_series?.[selectedUnit.value] ?? row),
 );
-const latestBacklog = computed(
-    () => props.data.at(-1)?.closing_backlog_quantity ?? 0,
+const latestSoon = computed(
+    () => rows.value.at(-1)?.expiring_soon_backlog_quantity ?? 0,
 );
-const latestBacklogCount = computed(
-    () => props.data.at(-1)?.closing_backlog_count ?? 0,
-);
-const latestExpiredBacklog = computed(
-    () => props.data.at(-1)?.expired_backlog_quantity ?? 0,
-);
-const chartUnit = computed(() => props.data.at(-1)?.unit ?? 'ton');
-const hasOtherUnits = computed(() =>
-    props.data.some((item) => item.other_units_count > 0),
+const backlogChange = computed(
+    () =>
+        (rows.value.at(-1)?.closing_backlog_quantity ?? 0) -
+        (rows.value.at(-2)?.closing_backlog_quantity ?? 0),
 );
 
+const totalInput = computed(() =>
+    rows.value.reduce((sum, item) => sum + item.approved_input_quantity, 0),
+);
+const totalCompleted = computed(() =>
+    rows.value.reduce((sum, item) => sum + item.hauled_quantity, 0),
+);
+const latestBacklog = computed(
+    () => rows.value.at(-1)?.closing_backlog_quantity ?? 0,
+);
+const latestBacklogCount = computed(
+    () => rows.value.at(-1)?.active_backlog_unit_count ?? 0,
+);
+const latestExpiredBacklog = computed(
+    () => rows.value.at(-1)?.expired_backlog_quantity ?? 0,
+);
+const chartUnit = computed(() => rows.value.at(-1)?.unit ?? 'ton');
+const hasOtherUnits = computed(() =>
+    rows.value.some((item) => item.other_units_count > 0),
+);
+
+const latest = computed(() => rows.value.at(-1));
+const expiredHref = computed(() =>
+    wasteManagementRoutes.records.index.url({
+        query: {
+            expiry: 'expired',
+            as_of: latest.value?.snapshot_date,
+            unit: chartUnit.value,
+            organization_id: props.organizationId ?? undefined,
+        },
+    }),
+);
+const kpis = computed(() => [
+    {
+        label: 'Limbah Masuk',
+        value: totalInput.value,
+        context: 'Approved · enam bulan',
+        tone: 'wm-text-primary',
+    },
+    {
+        label: 'Terangkut',
+        value: totalCompleted.value,
+        context: 'Approved · enam bulan',
+        tone: 'wm-text-primary',
+    },
+    {
+        label: 'Backlog Aktif',
+        value: latestBacklog.value,
+        context: `${latestBacklogCount.value} catatan · snapshot terakhir`,
+        tone: 'text-blue-700 dark:text-blue-300',
+    },
+    {
+        label: 'Backlog Expired',
+        value: latestExpiredBacklog.value,
+        context: `${latest.value?.expired_backlog_count ?? 0} catatan · ${latestExpiredBacklog.value > 0 ? 'perlu penanganan' : 'snapshot terakhir'}`,
+        tone:
+            latestExpiredBacklog.value > 0
+                ? 'text-red-700 dark:text-red-300'
+                : 'wm-text-primary',
+    },
+]);
+
 const wasteChartOption = computed<DashboardEChartsOption>(() => {
-    const labels = props.data.map((item) => item.label);
-    const inputData = props.data.map((item) => item.approved_input_quantity);
-    const completedData = props.data.map((item) => item.hauled_quantity);
-    const backlogData = props.data.map((item) => item.closing_backlog_quantity);
-    const expiredMarkers = props.data.map((item) =>
+    const labels = rows.value.map((item) => item.label);
+    const inputData = rows.value.map((item) => item.approved_input_quantity);
+    const completedData = rows.value.map((item) => item.hauled_quantity);
+    const backlogData = rows.value.map((item) => item.closing_backlog_quantity);
+    const expiredMarkers = rows.value.map((item) =>
         item.expired_backlog_quantity > 0
             ? item.closing_backlog_quantity
             : null,
     );
-    const expiringMarkers = props.data.map((item) =>
+    const expiringMarkers = rows.value.map((item) =>
         item.expiring_soon_backlog_quantity > 0
             ? item.closing_backlog_quantity
             : null,
@@ -63,18 +121,19 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
     return {
         ...dashboardChartPreset,
         grid: {
-            top: 24,
-            right: 24,
-            bottom: 72,
-            left: 52,
-            containLabel: false,
+            top: 30,
+            right: 12,
+            bottom: 12,
+            left: 8,
+            containLabel: true,
         },
         xAxis: {
             type: 'category' as const,
             data: labels,
             axisLabel: {
                 color: dashboardChartPalette.axisLabel,
-                fontSize: 12,
+                fontSize: 10,
+                hideOverlap: true,
                 margin: 12,
                 fontWeight: 600,
             },
@@ -91,7 +150,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
         yAxis: {
             type: 'value' as const,
             min: 0,
-            max: Math.ceil(leftMax * 1.15),
+            max: Math.max(1, Math.ceil(leftMax * 1.15)),
             name: chartUnit.value,
             nameLocation: 'end' as const,
             nameGap: 18,
@@ -104,6 +163,11 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
                 color: dashboardChartPalette.axisLabel,
                 fontSize: 12,
                 fontWeight: 500,
+                formatter: (value: number) =>
+                    new Intl.NumberFormat('id-ID', {
+                        notation: 'compact',
+                        maximumFractionDigits: 1,
+                    }).format(value),
             },
             splitLine: {
                 lineStyle: {
@@ -121,6 +185,8 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
         },
         tooltip: {
             ...(dashboardChartPreset.tooltip as object),
+            confine: true,
+            appendToBody: false,
             formatter: (params) => {
                 const entries = (
                     Array.isArray(params) ? params : [params]
@@ -129,6 +195,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
                     axisValueLabel?: string;
                     dataIndex?: number;
                     seriesName?: string;
+                    marker?: string;
                     value?: unknown;
                 }>;
 
@@ -137,7 +204,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
                 }
 
                 const index = entries[0].dataIndex ?? 0;
-                const row = props.data[index];
+                const row = rows.value[index];
                 const lines = [
                     `<div style="font-weight:700;margin-bottom:6px;">${entries[0].axisValueLabel ?? entries[0].axisValue ?? ''}</div>`,
                 ];
@@ -156,15 +223,15 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
                             : Number(point.value ?? 0);
                     const normalizedValue = Number.isFinite(value) ? value : 0;
                     lines.push(
-                        `<div style="display:flex;justify-content:space-between;gap:16px;"><span>${point.seriesName ?? '-'}</span><strong>${formatNumber(normalizedValue)} ${chartUnit.value}</strong></div>`,
+                        `<div style="display:flex;justify-content:space-between;gap:16px;"><span>${tooltipMarker(point.seriesName ?? '')}${point.seriesName ?? '-'}</span><strong>${formatNumber(normalizedValue)} ${chartUnit.value}</strong></div>`,
                     );
                 }
 
                 lines.push(
-                    `<div style="display:flex;justify-content:space-between;gap:16px;"><span>Backlog expired</span><strong>${formatNumber(row?.expired_backlog_quantity ?? 0)} ${chartUnit.value}</strong></div>`,
+                    `<div style="display:flex;justify-content:space-between;gap:16px;"><span>${tooltipMarker('Risiko Expired')}Backlog expired</span><strong>${formatNumber(row?.expired_backlog_quantity ?? 0)} ${chartUnit.value}</strong></div>`,
                 );
                 lines.push(
-                    `<div style="display:flex;justify-content:space-between;gap:16px;"><span>Mendekati batas</span><strong>${formatNumber(row?.expiring_soon_backlog_quantity ?? 0)} ${chartUnit.value}</strong></div>`,
+                    `<div style="display:flex;justify-content:space-between;gap:16px;"><span>${tooltipMarker('Risiko Mendekati Batas')}Mendekati batas</span><strong>${formatNumber(row?.expiring_soon_backlog_quantity ?? 0)} ${chartUnit.value}</strong></div>`,
                 );
 
                 return lines.join('');
@@ -194,7 +261,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
             {
                 name: 'Backlog akhir',
                 type: 'line',
-                smooth: true,
+                smooth: false,
                 symbol: 'circle',
                 symbolSize: 7,
                 lineStyle: {
@@ -207,11 +274,25 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
                     borderWidth: 2,
                 },
                 data: backlogData,
+                markLine: {
+                    silent: true,
+                    symbol: 'none',
+                    label: { show: false },
+                    lineStyle: {
+                        color: dashboardChartPalette.backlog,
+                        opacity: 0.35,
+                        type: 'dashed',
+                    },
+                    data: rows.value.length
+                        ? [{ xAxis: rows.value.at(-1)!.label }]
+                        : [],
+                },
             },
             {
                 name: 'Risiko Expired',
                 type: 'scatter',
                 symbolSize: 8,
+                symbolOffset: [-6, -5],
                 itemStyle: {
                     color: dashboardChartPalette.critical,
                 },
@@ -222,6 +303,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
                 name: 'Risiko Mendekati Batas',
                 type: 'scatter',
                 symbolSize: 8,
+                symbolOffset: [6, 5],
                 itemStyle: {
                     color: dashboardChartPalette.warning,
                 },
@@ -232,8 +314,19 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
     } as DashboardEChartsOption;
 });
 
+function tooltipMarker(series: string): string {
+    const colors: Record<string, string> = {
+        'Intake approved': dashboardChartPalette.intake,
+        'Selesai diangkut': dashboardChartPalette.completed,
+        'Backlog akhir': dashboardChartPalette.backlog,
+        'Risiko Expired': dashboardChartPalette.critical,
+        'Risiko Mendekati Batas': dashboardChartPalette.warning,
+    };
+    return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:${colors[series] ?? dashboardChartPalette.axisLabel}"></span>`;
+}
+
 function formatNumber(value: number): string {
-    return value.toLocaleString('id-ID');
+    return value.toLocaleString('id-ID', { maximumFractionDigits: 2 });
 }
 
 function formatQuantity(value: number): string {
@@ -243,7 +336,7 @@ function formatQuantity(value: number): string {
 
 <template>
     <Card
-        class="wm-panel-elevated wm-card-overlay-blue overflow-hidden rounded-2xl border shadow-sm dark:border-slate-700/50 dark:bg-slate-900/40"
+        class="wm-panel-elevated wm-card-overlay-blue min-w-0 overflow-hidden rounded-2xl border shadow-sm dark:border-slate-700/50 dark:bg-slate-900/40"
     >
         <CardHeader
             class="wm-border-default border-b bg-slate-50/40 pb-4 dark:border-slate-700/50 dark:bg-slate-900/60"
@@ -266,8 +359,8 @@ function formatQuantity(value: number): string {
                         v-if="hasOtherUnits"
                         class="text-xs font-medium text-amber-700 dark:text-amber-300"
                     >
-                        Chart kuantitas memakai unit dominan {{ chartUnit }}.
-                        Unit lain tetap dihitung pada record dan backlog.
+                        Kuantitas dan jumlah catatan KPI mengikuti satuan
+                        {{ chartUnit }}. Distribusi mencakup semua satuan.
                     </p>
                 </div>
 
@@ -332,66 +425,122 @@ function formatQuantity(value: number): string {
             </div>
         </CardHeader>
 
-        <CardContent class="space-y-5 pt-5">
-            <div class="grid gap-3 sm:grid-cols-3">
-                <Link
-                    :href="wasteManagementRoutes.records.index.url()"
-                    class="wm-surface-subtle rounded-2xl border px-4 py-3 transition-colors hover:border-teal-200 hover:bg-white dark:hover:border-teal-900 dark:hover:bg-slate-950/80"
+        <CardContent class="space-y-4 pt-4">
+            <div
+                class="wm-text-secondary flex flex-wrap items-center gap-3 text-sm"
+            >
+                <label
+                    v-if="availableUnits.length > 1"
+                    class="flex items-center gap-2"
+                    >Satuan
+                    <select
+                        v-model="selectedUnit"
+                        class="wm-panel rounded-lg border px-3 py-2"
+                    >
+                        <option value="">{{ data.at(-1)?.unit }} (awal)</option>
+                        <option
+                            v-for="unit in availableUnits"
+                            :key="unit"
+                            :value="unit"
+                        >
+                            {{ unit }}
+                        </option>
+                    </select>
+                </label>
+                <span
+                    >{{ rows[0]?.label }} - {{ rows.at(-1)?.label }} · enam
+                    bulan</span
                 >
-                    <p
-                        class="wm-text-muted text-[11px] font-semibold tracking-[0.12em] uppercase"
-                    >
-                        Limbah Masuk
-                    </p>
-                    <p
-                        class="wm-text-primary mt-2 text-2xl font-semibold tracking-tight"
-                    >
-                        {{ formatQuantity(totalInput) }}
-                    </p>
-                </Link>
-
-                <Link
-                    :href="wasteManagementRoutes.haulings.index.url()"
-                    class="wm-surface-subtle rounded-2xl border px-4 py-3 transition-colors hover:border-amber-200 hover:bg-white dark:hover:border-amber-900 dark:hover:bg-slate-950/80"
+                <span class="text-xs">{{
+                    latest?.snapshot_label ?? 'Snapshot belum tersedia'
+                }}</span>
+            </div>
+            <p
+                v-if="
+                    !rows.some(
+                        (row) =>
+                            row.approved_input_quantity ||
+                            row.hauled_quantity ||
+                            row.closing_backlog_quantity,
+                    )
+                "
+                class="wm-text-muted text-sm"
+            >
+                Belum ada kuantitas pada satuan dan periode ini.
+            </p>
+            <div
+                class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4"
+                data-testid="waste-kpis"
+            >
+                <div
+                    v-for="kpi in kpis"
+                    :key="kpi.label"
+                    class="wm-surface-subtle flex min-w-0 flex-col gap-2 rounded-xl border p-4"
                 >
-                    <p
-                        class="wm-text-muted text-[11px] font-semibold tracking-[0.14em] uppercase"
-                    >
-                        Terangkut
+                    <p class="wm-text-secondary text-xs font-semibold">
+                        {{ kpi.label }}
                     </p>
                     <p
-                        class="wm-text-primary mt-2 text-2xl font-semibold tracking-tight"
+                        :class="[
+                            'text-2xl font-semibold tracking-tight tabular-nums',
+                            kpi.tone,
+                        ]"
                     >
-                        {{ formatQuantity(totalCompleted) }}
+                        {{ formatNumber(kpi.value) }}
+                        <span class="text-sm font-medium">{{ chartUnit }}</span>
                     </p>
-                </Link>
-
+                    <p class="wm-text-muted mt-auto text-xs">
+                        {{ kpi.context }}
+                    </p>
+                </div>
+            </div>
+            <div
+                class="flex flex-wrap items-start justify-between gap-3 rounded-xl border p-3 text-sm"
+                :class="
+                    latestExpiredBacklog > 0
+                        ? 'border-red-200 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200'
+                        : 'wm-surface-subtle wm-text-secondary'
+                "
+                role="status"
+            >
+                <div class="space-y-1">
+                    <p class="font-semibold">
+                        {{
+                            latestExpiredBacklog > 0
+                                ? `${formatQuantity(latestExpiredBacklog)} expired dari ${formatQuantity(latestBacklog)} backlog aktif (${latest?.expired_backlog_count ?? 0} catatan). Prioritaskan pengangkutan.`
+                                : 'Tidak ada backlog expired pada snapshot ini.'
+                        }}
+                    </p>
+                    <p class="text-xs">
+                        {{ latest?.snapshot_label }} · {{ chartUnit }} · catatan
+                        pada halaman tujuan mengikuti hak akses Anda.
+                    </p>
+                    <p class="text-xs">
+                        Backlog
+                        {{
+                            backlogChange > 0
+                                ? 'naik'
+                                : backlogChange < 0
+                                  ? 'turun'
+                                  : 'tetap'
+                        }}
+                        {{ formatQuantity(Math.abs(backlogChange)) }} dibanding
+                        bulan sebelumnya. Mendekati batas (7 hari):
+                        {{ formatQuantity(latestSoon) }}.
+                    </p>
+                </div>
                 <Link
-                    :href="wasteManagementRoutes.haulings.index.url()"
-                    class="wm-surface-subtle rounded-2xl border px-4 py-3 transition-colors hover:border-red-200 hover:bg-white dark:hover:border-red-900 dark:hover:bg-slate-950/80"
+                    v-if="latestExpiredBacklog > 0"
+                    :href="expiredHref"
+                    class="shrink-0 rounded-lg border border-current px-3 py-2 text-xs font-semibold"
+                    >Lihat Limbah Expired</Link
                 >
-                    <p
-                        class="wm-text-muted text-[11px] font-semibold tracking-[0.14em] uppercase"
-                    >
-                        Backlog Expired
-                    </p>
-                    <p
-                        class="mt-2 text-2xl font-semibold tracking-tight text-red-700 dark:text-red-300"
-                    >
-                        {{ formatQuantity(latestExpiredBacklog) }}
-                    </p>
-                    <p class="wm-text-muted mt-1 text-xs">
-                        Backlog akhir {{ formatQuantity(latestBacklog) }} dari
-                        {{ formatNumber(latestBacklogCount) }}
-                        record
-                    </p>
-                </Link>
             </div>
 
             <div class="wm-panel rounded-2xl border p-3">
                 <BaseEChart
                     :option="wasteChartOption"
-                    height-class="h-[320px] sm:h-[340px]"
+                    height-class="h-[270px] sm:h-[300px]"
                 />
             </div>
         </CardContent>

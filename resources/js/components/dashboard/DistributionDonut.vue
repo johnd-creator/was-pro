@@ -5,6 +5,7 @@ interface DistributionItem {
     label: string;
     value: number;
     percentage: number;
+    color?: string;
 }
 
 interface Props {
@@ -12,12 +13,14 @@ interface Props {
     totalLabel?: string;
     valueSuffix?: string;
     emptyLabel?: string;
+    variant?: 'donut' | 'bars' | 'stacked';
 }
 
 const props = withDefaults(defineProps<Props>(), {
     totalLabel: 'Total',
     valueSuffix: '',
     emptyLabel: '-',
+    variant: 'donut',
 });
 
 const chartColors = [
@@ -41,7 +44,23 @@ const segments = computed(() => {
     let start = 0;
 
     return props.data.map((item, index) => {
-        const color = chartColors[index % chartColors.length];
+        const semanticColors: Record<string, string> = {
+            Expired: '#dc2626',
+            'Mendekati Batas Simpan': '#d97706',
+            'Masih Aman': '#059669',
+            'Menunggu Persetujuan': '#d97706',
+            Selesai: '#059669',
+            'Belum Diangkut': '#2563eb',
+            'Sebagian Diangkut': '#0891b2',
+            'Fly Ash': '#2563eb',
+            'Bottom Ash': '#0f766e',
+            'Pemanfaatan Eksternal': '#2563eb',
+            'Pemanfaatan Internal': '#0f766e',
+        };
+        const color =
+            item.color ??
+            semanticColors[item.label] ??
+            chartColors[index % chartColors.length];
         const normalizedPercentage =
             totalValue.value > 0 ? (item.value / totalValue.value) * 100 : 0;
         const end = start + normalizedPercentage;
@@ -91,9 +110,14 @@ function formatValue(value: number): string {
 <template>
     <div class="space-y-4">
         <div
-            class="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)] lg:items-start"
+            :class="[
+                'grid gap-4',
+                variant === 'donut'
+                    ? '2xl:grid-cols-[180px_minmax(0,1fr)] 2xl:items-start'
+                    : 'grid-cols-1',
+            ]"
         >
-            <div class="flex justify-center lg:pt-1">
+            <div v-if="variant === 'donut'" class="flex justify-center lg:pt-1">
                 <div
                     class="wm-panel-elevated relative flex h-44 w-44 items-center justify-center rounded-full border"
                     :style="donutStyle"
@@ -122,6 +146,20 @@ function formatValue(value: number): string {
             </div>
 
             <div class="space-y-1.5">
+                <div
+                    v-if="variant === 'stacked' && !isEmpty"
+                    class="mb-3 flex h-5 overflow-hidden rounded-full"
+                    aria-hidden="true"
+                >
+                    <div
+                        v-for="item in segments"
+                        :key="item.label"
+                        :style="{
+                            width: `${item.normalizedPercentage}%`,
+                            backgroundColor: item.color,
+                        }"
+                    />
+                </div>
                 <div
                     v-if="isEmpty"
                     class="wm-panel rounded-lg border border-dashed px-3 py-4 text-center text-sm"
@@ -153,11 +191,20 @@ function formatValue(value: number): string {
                             class="wm-text-secondary mt-0.5 text-[11px] leading-tight"
                         >
                             {{ formatValue(item.value) }} {{ valueSuffix }}
-                            <span class="text-slate-400 dark:text-slate-600"
-                                >•</span
-                            >
-                            {{ item.normalizedPercentage.toFixed(1) }}%
                         </p>
+                    </div>
+                    <div
+                        v-if="variant === 'bars'"
+                        class="h-2 w-16 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
+                        aria-hidden="true"
+                    >
+                        <div
+                            class="h-full"
+                            :style="{
+                                width: `${item.normalizedPercentage}%`,
+                                backgroundColor: item.color,
+                            }"
+                        />
                     </div>
                     <div class="shrink-0 text-right">
                         <p

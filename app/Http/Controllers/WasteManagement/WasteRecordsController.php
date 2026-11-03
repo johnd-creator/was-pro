@@ -6,10 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\WasteManagement\ApproveWasteRecordRequest;
 use App\Http\Requests\WasteManagement\RejectWasteRecordRequest;
 use App\Http\Requests\WasteManagement\SubmitWasteRecordRequest;
+use App\Http\Requests\WasteManagement\WasteRecordIndexRequest;
 use App\Http\Requests\WasteManagement\WasteRecordRequest;
+use App\Models\Organization;
 use App\Models\User;
 use App\Models\WasteRecord;
 use App\Models\WasteType;
+use App\Services\TenantService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
@@ -61,8 +65,12 @@ class WasteRecordsController extends Controller
     /**
      * Display a listing of waste records.
      */
-    public function index(): Response
+    public function index(WasteRecordIndexRequest $request): Response
     {
+        if ($request->validated('expiry') === 'expired') {
+            return $this->expiredSnapshot($request);
+        }
+
         $query = WasteRecord::with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser', 'haulings'])
             ->orderBy('date', 'desc')
             ->orderBy('created_at', 'desc');
@@ -83,6 +91,52 @@ class WasteRecordsController extends Controller
             'wasteRecords' => $wasteRecords->map(fn (WasteRecord $record): array => $this->serializeWasteRecord($record))->all(),
             'wasteTypes' => $wasteTypes,
         ]);
+    }
+
+    private function expiredSnapshot(WasteRecordIndexRequest $request): Response
+    {
+        $organization = $request->validated('organization_id')
+            ? Organization::query()->active()->findOrFail($request->validated('organization_id'))
+            : $request->user()->organization;
+        abort_unless($organization && $request->user()->canAccessOrganization($organization->id), 403);
+        $tenant = app(TenantService::class);
+        abort_unless($tenant->schemaExists($organization->schema_name), 503);
+        $originalSchema = $tenant->getCurrentSchema();
+
+        try {
+            $tenant->switchToSchema($organization->schema_name);
+            $date = CarbonImmutable::parse($request->validated('as_of'))->endOfDay();
+            $query = WasteRecord::query()->approved()->with(['wasteType', 'haulings' => fn ($query) => $query->approved()->whereDate('hauling_date', '<=', $date->toDateString())])
+                ->whereDate('date', '<=', $date->toDateString())
+                ->whereDate('expiry_date', '<', $date->toDateString())
+                ->when($request->validated('unit'), fn ($query, $unit) => $query->where('unit', $unit))
+                ->orderBy('expiry_date');
+            if (! $this->canViewAllRecords()) {
+                $query->byUser(Auth::id());
+            }
+            $records = $query->get()->filter(fn (WasteRecord $record): bool => $record->getRemainingQuantity() > 0)
+                ->map(fn (WasteRecord $record): array => [
+                    'id' => $record->id,
+                    'record_number' => $record->record_number,
+                    'waste_type' => $record->wasteType?->name,
+                    'expiry_date' => $record->expiry_date->toDateString(),
+                    'remaining_quantity' => $record->getRemainingQuantity(),
+                    'unit' => $record->unit,
+                ])->values()->all();
+
+            return Inertia::render('waste-management/records/ExpiredSnapshot', [
+                'records' => $records,
+                'snapshot' => [
+                    'date' => $date->toDateString(),
+                    'label' => $date->locale('id')->translatedFormat('j F Y'),
+                    'organization_id' => $organization->id,
+                    'organization_name' => $organization->name,
+                    'unit' => $request->validated('unit'),
+                ],
+            ]);
+        } finally {
+            $tenant->switchToSchema($originalSchema ?? 'public');
+        }
     }
 
     /**
