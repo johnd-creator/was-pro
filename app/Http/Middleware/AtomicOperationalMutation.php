@@ -13,6 +13,7 @@ use Symfony\Component\HttpFoundation\Response;
 class AtomicOperationalMutation
 {
     private const CONTROLLERS = [
+        'MobileWasteCategoryController', 'MobileWasteCharacteristicController', 'MobileWasteTypeController', 'MobileVendorController',
         'FabaAdjustmentController', 'FabaAdjustmentsController', 'FabaProductionController',
         'FabaProductionMovementsController', 'FabaUtilizationController', 'FabaUtilizationMovementsController',
         'FabaMovementApprovalController', 'FabaMovementApprovalsController', 'FabaApprovalController',
@@ -44,6 +45,19 @@ class AtomicOperationalMutation
                     return $replay;
                 }
 
+                if ($request->filled('_source_version')) {
+                    $models = ['category' => \App\Models\WasteCategory::class, 'characteristic' => \App\Models\WasteCharacteristic::class,
+                        'wasteType' => \App\Models\WasteType::class, 'vendor' => \App\Models\Vendor::class, 'wasteRecord' => \App\Models\WasteRecord::class, 'production' => \App\Models\FabaMovement::class,
+                        'utilization' => \App\Models\FabaMovement::class, 'adjustment' => \App\Models\FabaMovement::class];
+                    foreach ($models as $parameter => $model) {
+                        if ($id = $request->route($parameter)) {
+                            $record = $id instanceof Model ? $id : $model::query()->findOrFail($id);
+                            if (\App\Services\ResourceVersion::of($record) !== $request->input('_source_version')) {
+                                throw new OperationalConflict('Data berubah di server. Muat ulang detail dan tinjau kembali input.');
+                            }
+                        }
+                    }
+                }
                 $faba = str_starts_with(class_basename(explode('@', $request->route()->getActionName())[0]), 'Faba');
                 $integrity = $faba ? app(\App\Services\FabaIntegrityService::class) : null;
                 $before = $integrity?->capture();

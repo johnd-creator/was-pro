@@ -51,7 +51,7 @@ class FabaUtilizationController extends ApiController
                 'rejectedByUser:id,name',
             ])
             ->orderByDesc('transaction_date')
-            ->orderByDesc('created_at');
+            ->orderByDesc('created_at')->orderByDesc('id');
 
         $materialType = $request->string('material_type')->toString();
         $movementType = $request->string('movement_type')->toString();
@@ -376,6 +376,7 @@ class FabaUtilizationController extends ApiController
 
         return [
             'id' => $movement->id,
+            'resource_version' => \App\Services\ResourceVersion::of($movement),
             'display_number' => sprintf('FM-UTL-%s-%s', $movement->transaction_date->format('Ymd'), strtoupper(substr(str_replace('-', '', $movement->id), -6))),
             'transaction_date' => $movement->transaction_date->format('Y-m-d'),
             'material_type' => $movement->material_type,
@@ -433,6 +434,15 @@ class FabaUtilizationController extends ApiController
 
         if ($this->canAccessMovement($movement, $user, 'faba_utilization.delete') && ! $this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month)) {
             $actions[] = 'delete';
+        }
+
+        if ($movement->canApprove() && ! $this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month)) {
+            if ($user->hasPermission('faba_approvals.approve') && app(\App\Services\ApprovalSeparation::class)->canApprove($user, $movement)) {
+                $actions[] = 'approve';
+            }
+            if ($user->hasPermission('faba_approvals.reject')) {
+                $actions[] = 'reject';
+            }
         }
 
         return $actions;

@@ -20,6 +20,18 @@ class ApiController extends Controller
         ], $status);
     }
 
+    protected function collection(array $items, \Illuminate\Http\Request $request, array $meta = []): JsonResponse
+    {
+        if (! $request->boolean('paginate')) {
+            return $this->success($items, meta: $meta);
+        }
+        $perPage = max(1, min(100, $request->integer('per_page', 15)));
+        $page = max(1, $request->integer('page', 1));
+        $meta['pagination'] = ['current_page' => $page, 'per_page' => $perPage, 'total' => count($items), 'last_page' => max(1, (int) ceil(count($items) / $perPage))];
+
+        return $this->success(array_values(array_slice($items, ($page - 1) * $perPage, $perPage)), meta: $meta);
+    }
+
     /**
      * @param  array<string, mixed>  $errors
      */

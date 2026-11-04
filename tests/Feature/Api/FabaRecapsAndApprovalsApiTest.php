@@ -44,6 +44,9 @@ beforeEach(function () {
         'faba_recaps.view',
         'faba_approvals.view',
         'faba_approvals.approve',
+        'faba_approvals.submit',
+        'faba_approvals.reject',
+        'faba_approvals.reopen',
         'faba_opening_balance.manage',
     ])->map(function (string $slug) {
         [$module] = explode('.', $slug);
@@ -66,6 +69,9 @@ beforeEach(function () {
         'role_id' => $supervisorRole->id,
     ]);
 
+    $reviewer = User::factory()->create(['organization_id' => $this->organization->id, 'role_id' => $supervisorRole->id]);
+    $this->reviewerToken = Str::random(40);
+    ApiToken::create(['user_id' => $reviewer->id, 'name' => 'reviewer', 'token' => hash('sha256', $this->reviewerToken), 'expires_at' => now()->addDay()]);
     $this->token = 'faba-recap-token';
     ApiToken::query()->create([
         'user_id' => $this->supervisor->id,
@@ -208,10 +214,10 @@ test('supervisor can submit and approve monthly faba period via api', function (
 
     $submitResponse->assertSuccessful()
         ->assertJsonPath('data.status', FabaMonthlyApproval::STATUS_SUBMITTED)
-        ->assertJsonFragment(['approve'])
+        ->assertJsonMissing(['allowed_actions' => ['approve']])
         ->assertJsonFragment(['reject']);
 
-    $approveResponse = $this->withToken($this->token)
+    $approveResponse = $this->withToken($this->reviewerToken)
         ->postJson('/api/v1/faba/approvals/2026/3/approve', [
             'approval_note' => 'Siap closing',
         ]);
@@ -253,7 +259,7 @@ test('approved monthly period can be reopened and review endpoint returns snapsh
         'month' => 3,
     ])->assertSuccessful();
 
-    $this->withToken($this->token)->postJson('/api/v1/faba/approvals/2026/3/approve', [
+    $this->withToken($this->reviewerToken)->postJson('/api/v1/faba/approvals/2026/3/approve', [
         'approval_note' => 'Approved',
     ])->assertSuccessful();
 

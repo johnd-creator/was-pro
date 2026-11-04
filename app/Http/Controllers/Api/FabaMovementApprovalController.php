@@ -142,7 +142,7 @@ class FabaMovementApprovalController extends ApiController
             ->pendingApproval()
             ->with(['createdByUser:id,name'])
             ->orderByDesc('transaction_date')
-            ->orderByDesc('submitted_at')
+            ->orderByDesc('submitted_at')->orderByDesc('id')
             ->get()
             ->map(fn (FabaMovement $movement): array => [
                 'id' => $movement->id,
@@ -159,7 +159,7 @@ class FabaMovementApprovalController extends ApiController
             ])
             ->values();
 
-        return $this->success($entries->all(), meta: [
+        return $this->collection($entries->all(), $request, meta: [
             'server_time' => now()->toIso8601String(),
         ]);
     }

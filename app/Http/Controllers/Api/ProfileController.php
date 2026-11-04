@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Requests\Settings\PasswordUpdateRequest;
+use App\Http\Requests\Api\MobilePasswordRequest;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -50,12 +50,14 @@ class ProfileController extends ApiController
         ], 'Profil berhasil diperbarui.');
     }
 
-    public function updatePassword(PasswordUpdateRequest $request): JsonResponse
+    public function updatePassword(MobilePasswordRequest $request): JsonResponse
     {
         $request->user()->update([
             'password' => $request->validated('password'),
         ]);
 
-        return $this->success(message: 'Password berhasil diperbarui.');
+        \App\Models\ApiToken::query()->where('user_id', $request->user()->id)->delete();
+
+        return $this->success(message: 'Password berhasil diperbarui. Silakan masuk kembali.');
     }
 }

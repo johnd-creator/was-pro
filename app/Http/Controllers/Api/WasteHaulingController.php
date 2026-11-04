@@ -29,7 +29,7 @@ class WasteHaulingController extends ApiController
                 'haulings' => fn ($query) => $query->orderByDesc('hauling_date')->orderByDesc('created_at'),
             ])
             ->approved()
-            ->orderByDesc('date');
+            ->orderByDesc('date')->orderByDesc('id');
 
         if (! $user->hasPermission('waste_hauling.view_all')) {
             $query->where('created_by', $user->id);
@@ -42,7 +42,7 @@ class WasteHaulingController extends ApiController
             ->map(fn (WasteRecord $record): array => $this->serializeBacklogRecord($record, $user))
             ->all();
 
-        return $this->success($records, meta: [
+        return $this->collection($records, $request, meta: [
             'count' => count($records),
             'server_time' => now()->toIso8601String(),
         ]);
@@ -337,7 +337,7 @@ class WasteHaulingController extends ApiController
             $actions[] = 'view';
         }
 
-        if ($user->hasPermission('waste_hauling.approve') && $hauling->canBeApproved()) {
+        if ($user->hasPermission('waste_hauling.approve') && app(\App\Services\ApprovalSeparation::class)->canApprove($user, $hauling) && $hauling->canBeApproved()) {
             $actions[] = 'approve';
         }
 

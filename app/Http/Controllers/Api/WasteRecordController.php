@@ -27,7 +27,7 @@ class WasteRecordController extends ApiController
         $query = WasteRecord::query()
             ->with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser', 'createdBy', 'haulings'])
             ->orderByDesc('date')
-            ->orderByDesc('created_at');
+            ->orderByDesc('created_at')->orderByDesc('id');
 
         if (! $this->canViewAllRecords($user)) {
             $query->byUser($user->id);
@@ -296,7 +296,10 @@ class WasteRecordController extends ApiController
     {
         return [
             'id' => $record->id,
+            'resource_version' => \App\Services\ResourceVersion::of($record),
             'record_number' => $record->record_number,
+            'waste_type_id' => $record->waste_type_id,
+            'updated_at' => $record->updated_at?->toIso8601String(),
             'date' => $record->date?->format('Y-m-d'),
             'status' => $record->status,
             'status_label' => $record->getStatusLabel(),
@@ -394,7 +397,7 @@ class WasteRecordController extends ApiController
             $actions[] = 'return_to_draft';
         }
 
-        if ($user->hasPermission('waste_records.approve') && $record->canBeApproved()) {
+        if ($user->hasPermission('waste_records.approve') && app(\App\Services\ApprovalSeparation::class)->canApprove($user, $record) && $record->canBeApproved()) {
             $actions[] = 'approve';
         }
 

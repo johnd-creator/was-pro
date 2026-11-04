@@ -329,22 +329,18 @@ class FabaRecapController extends ApiController
             $actions[] = 'review';
         }
 
-        if ($user->hasPermission('faba_approvals.approve')) {
-            if (($approval['can_submit'] ?? false) === true) {
-                $actions[] = 'submit';
-            }
-
-            if (($approval['can_approve'] ?? false) === true) {
-                $actions[] = 'approve';
-            }
-
-            if (($approval['can_reject'] ?? false) === true) {
-                $actions[] = 'reject';
-            }
-
-            if (($approval['can_reopen'] ?? false) === true) {
-                $actions[] = 'reopen';
-            }
+        if ($user->hasPermission('faba_approvals.submit') && ($approval['can_submit'] ?? false)) {
+            $actions[] = 'submit';
+        }
+        $submitter = $approval['submitted_by_user']['id'] ?? null;
+        if ($user->hasPermission('faba_approvals.approve') && ($approval['can_approve'] ?? false) && (string) $submitter !== (string) $user->id) {
+            $actions[] = 'approve';
+        }
+        if ($user->hasPermission('faba_approvals.reject') && ($approval['can_reject'] ?? false)) {
+            $actions[] = 'reject';
+        }
+        if ($user->hasPermission('faba_approvals.reopen') && ($approval['can_reopen'] ?? false)) {
+            $actions[] = 'reopen';
         }
 
         return $actions;

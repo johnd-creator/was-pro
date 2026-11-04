@@ -108,7 +108,7 @@ class FabaApprovalController extends ApiController
     {
         $user = $request->user();
 
-        if (! $user->hasPermission('faba_approvals.approve')) {
+        if (! $user->hasPermission('faba_approvals.submit')) {
             return $this->error('Anda tidak memiliki izin untuk mengajukan approval FABA.', 'FORBIDDEN', status: 403);
         }
 
@@ -225,7 +225,7 @@ class FabaApprovalController extends ApiController
     {
         $user = $request->user();
 
-        if (! $user->hasPermission('faba_approvals.approve')) {
+        if (! $user->hasPermission('faba_approvals.reject')) {
             return $this->error('Anda tidak memiliki izin untuk menolak approval FABA.', 'FORBIDDEN', status: 403);
         }
 
@@ -268,7 +268,7 @@ class FabaApprovalController extends ApiController
     {
         $user = $request->user();
 
-        if (! $user->hasPermission('faba_approvals.approve')) {
+        if (! $user->hasPermission('faba_approvals.reopen')) {
             return $this->error('Anda tidak memiliki izin untuk membuka kembali approval FABA.', 'FORBIDDEN', status: 403);
         }
 
@@ -363,23 +363,17 @@ class FabaApprovalController extends ApiController
             $actions[] = 'review';
         }
 
-        if (! $user->hasPermission('faba_approvals.approve')) {
-            return $actions;
-        }
-
-        if (($period['can_submit'] ?? false) === true) {
+        if ($user->hasPermission('faba_approvals.submit') && ($period['can_submit'] ?? false)) {
             $actions[] = 'submit';
         }
-
-        if (($period['can_approve'] ?? false) === true) {
+        $submitter = $period['submitted_by_user']['id'] ?? $period['submitted_by'] ?? null;
+        if ($user->hasPermission('faba_approvals.approve') && ($period['can_approve'] ?? false) && (string) $submitter !== (string) $user->id) {
             $actions[] = 'approve';
         }
-
-        if (($period['can_reject'] ?? false) === true) {
+        if ($user->hasPermission('faba_approvals.reject') && ($period['can_reject'] ?? false)) {
             $actions[] = 'reject';
         }
-
-        if (($period['can_reopen'] ?? false) === true) {
+        if ($user->hasPermission('faba_approvals.reopen') && ($period['can_reopen'] ?? false)) {
             $actions[] = 'reopen';
         }
 

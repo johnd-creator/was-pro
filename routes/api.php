@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     Route::prefix('auth')->group(function () {
-        Route::post('/login', [AuthController::class, 'login'])->name('api.v1.auth.login');
+        Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:6,1')->name('api.v1.auth.login');
 
         Route::middleware(['auth.api'])->group(function () {
             Route::post('/logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
@@ -25,6 +25,34 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::middleware(['auth.api', 'tenant.schema', 'operational.atomic'])->group(function () {
+
+        Route::get('/waste-records/export/csv', [\App\Http\Controllers\WasteManagement\WasteRecordsController::class, 'exportCsv'])->middleware('permission:waste_records.view_all|waste_records.view_own');
+        Route::get('/faba/production/export/csv', [\App\Http\Controllers\WasteManagement\FabaProductionMovementsController::class, 'exportCsv'])->middleware('permission:faba_production.view');
+        Route::get('/faba/utilization/export/csv', [\App\Http\Controllers\WasteManagement\FabaUtilizationMovementsController::class, 'exportCsv'])->middleware('permission:faba_utilization.view');
+        Route::get('/users', [\App\Http\Controllers\Api\MobileReferenceController::class, 'users']);
+        Route::get('/users/{id}', [\App\Http\Controllers\Api\MobileReferenceController::class, 'user']);
+        Route::get('/roles', [\App\Http\Controllers\Api\MobileReferenceController::class, 'roles']);
+        Route::get('/roles/{id}', [\App\Http\Controllers\Api\MobileReferenceController::class, 'role']);
+        Route::get('/faba/reports/{report}.{format}', [\App\Http\Controllers\Api\MobileReportsController::class, 'report']);
+        Route::get('/faba/utilization/{utilization}/attachment', [\App\Http\Controllers\Api\MobileReportsController::class, 'attachment']);
+        Route::post('/faba/utilization/{utilization}', [FabaUtilizationController::class, 'update']);
+        Route::get('/master-data/categories', [\App\Http\Controllers\Api\MobileWasteCategoryController::class, 'index']);
+        Route::post('/master-data/categories', [\App\Http\Controllers\Api\MobileWasteCategoryController::class, 'store']);
+        Route::get('/master-data/categories/{category}', [\App\Http\Controllers\Api\MobileWasteCategoryController::class, 'show']);
+        Route::put('/master-data/categories/{category}', [\App\Http\Controllers\Api\MobileWasteCategoryController::class, 'update']);
+        Route::get('/master-data/characteristics', [\App\Http\Controllers\Api\MobileWasteCharacteristicController::class, 'index']);
+        Route::post('/master-data/characteristics', [\App\Http\Controllers\Api\MobileWasteCharacteristicController::class, 'store']);
+        Route::get('/master-data/characteristics/{characteristic}', [\App\Http\Controllers\Api\MobileWasteCharacteristicController::class, 'show']);
+        Route::put('/master-data/characteristics/{characteristic}', [\App\Http\Controllers\Api\MobileWasteCharacteristicController::class, 'update']);
+        Route::get('/master-data/types', [\App\Http\Controllers\Api\MobileWasteTypeController::class, 'index']);
+        Route::post('/master-data/types', [\App\Http\Controllers\Api\MobileWasteTypeController::class, 'store']);
+        Route::get('/master-data/types/{wasteType}', [\App\Http\Controllers\Api\MobileWasteTypeController::class, 'show']);
+        Route::put('/master-data/types/{wasteType}', [\App\Http\Controllers\Api\MobileWasteTypeController::class, 'update']);
+        Route::get('/master-data/vendors', [\App\Http\Controllers\Api\MobileVendorController::class, 'index']);
+        Route::post('/master-data/vendors', [\App\Http\Controllers\Api\MobileVendorController::class, 'store']);
+        Route::get('/master-data/vendors/{vendor}', [\App\Http\Controllers\Api\MobileVendorController::class, 'show']);
+        Route::put('/master-data/vendors/{vendor}', [\App\Http\Controllers\Api\MobileVendorController::class, 'update']);
+
         Route::get('/me', [BootstrapController::class, 'me'])->name('api.v1.me');
         Route::get('/dashboard', [BootstrapController::class, 'dashboard'])->name('api.v1.dashboard');
         Route::get('/lookups', [BootstrapController::class, 'lookups'])->name('api.v1.lookups');

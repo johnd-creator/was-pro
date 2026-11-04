@@ -284,7 +284,9 @@ test('api draft waste update accepts string route identifiers and cannot change 
     $this->withToken($this->token)->putJson('/api/v1/waste-records/'.$record->id, $body)->assertOk();
     app(TenantService::class)->switchToSchema($this->organization->schema_name);
     expect($record->fresh()->quantity)->toBe('12.00');
-    $record->fresh()->update(['status' => 'approved']);
+    $reviewer = User::factory()->create(['organization_id' => $this->organization->id, 'role_id' => $this->actor->role_id]);
+    auth()->setUser($reviewer);
+    $record->fresh()->update(['status' => 'approved', 'approved_by' => $reviewer->id]);
     app(TenantService::class)->switchToPublic();
     $this->withToken($this->token)->putJson('/api/v1/waste-records/'.$record->id, $body)->assertConflict();
 });

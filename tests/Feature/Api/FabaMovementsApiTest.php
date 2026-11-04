@@ -235,7 +235,10 @@ test('pending faba movement can be approved via api', function () {
     ]);
     $this->tenantService->switchToPublic();
 
-    $response = $this->withToken($this->token)->postJson("/api/v1/faba/movements/{$movement->id}/approve", [
+    $reviewer = User::factory()->create(['organization_id' => $this->organization->id, 'role_id' => $this->operator->role_id]);
+    $reviewerToken = Str::random(40);
+    ApiToken::create(['user_id' => $reviewer->id, 'name' => 'reviewer', 'token' => hash('sha256', $reviewerToken), 'expires_at' => now()->addDay()]);
+    $response = $this->withToken($reviewerToken)->postJson("/api/v1/faba/movements/{$movement->id}/approve", [
         'approval_note' => 'Valid',
     ]);
 
