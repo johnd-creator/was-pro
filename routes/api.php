@@ -35,7 +35,6 @@ Route::prefix('v1')->group(function () {
         Route::get('/roles/{id}', [\App\Http\Controllers\Api\MobileReferenceController::class, 'role']);
         Route::get('/faba/reports/{report}.{format}', [\App\Http\Controllers\Api\MobileReportsController::class, 'report']);
         Route::get('/faba/utilization/{utilization}/attachment', [\App\Http\Controllers\Api\MobileReportsController::class, 'attachment']);
-        Route::post('/faba/utilization/{utilization}', [FabaUtilizationController::class, 'update']);
         Route::get('/master-data/categories', [\App\Http\Controllers\Api\MobileWasteCategoryController::class, 'index']);
         Route::post('/master-data/categories', [\App\Http\Controllers\Api\MobileWasteCategoryController::class, 'store']);
         Route::get('/master-data/categories/{category}', [\App\Http\Controllers\Api\MobileWasteCategoryController::class, 'show']);
