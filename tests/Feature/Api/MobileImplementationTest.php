@@ -156,3 +156,13 @@ test('multipart method override updates external utilization and attachment rema
     ])->assertSuccessful()->assertJsonPath('data.document_number', 'MOBILE-2');
     $this->withToken($token)->get("/api/v1/faba/utilization/{$id}/attachment")->assertSuccessful();
 });
+
+test('password change rolls back if token revocation fails', function () {
+    $token = mobileImplementationToken($this->maker);
+    \Illuminate\Support\Facades\DB::unprepared("CREATE FUNCTION public.mobile_revocation_failure() RETURNS trigger LANGUAGE plpgsql AS \$\$ BEGIN RAISE EXCEPTION 'synthetic token revocation failure'; END \$\$; CREATE TRIGGER mobile_revocation_failure BEFORE DELETE ON public.api_tokens FOR EACH ROW EXECUTE FUNCTION public.mobile_revocation_failure()");
+    $this->withToken($token)->putJson('/api/v1/profile/password', [
+        'current_password' => 'existing-password', 'password' => 'new-password-123', 'password_confirmation' => 'new-password-123',
+    ])->assertServerError();
+    expect(Hash::check('existing-password', $this->maker->fresh()->password))->toBeTrue();
+    expect(ApiToken::where('user_id', $this->maker->id)->count())->toBe(1);
+});

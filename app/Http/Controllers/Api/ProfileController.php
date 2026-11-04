@@ -52,11 +52,12 @@ class ProfileController extends ApiController
 
     public function updatePassword(MobilePasswordRequest $request): JsonResponse
     {
-        $request->user()->update([
-            'password' => $request->validated('password'),
-        ]);
-
-        \App\Models\ApiToken::query()->where('user_id', $request->user()->id)->delete();
+        $request->user()->getConnection()->transaction(function () use ($request): void {
+            $request->user()->update([
+                'password' => $request->validated('password'),
+            ]);
+            \App\Models\ApiToken::query()->where('user_id', $request->user()->id)->delete();
+        });
 
         return $this->success(message: 'Password berhasil diperbarui. Silakan masuk kembali.');
     }
