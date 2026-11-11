@@ -17,12 +17,13 @@ class VendorsController extends Controller
      */
     public function index(): Response
     {
-        $vendors = Vendor::withCount('transportations')
+        $vendors = Vendor::withCount(['fabaMovements', 'fabaMovements as transportations_count'])
             ->orderBy('name')
             ->get();
 
         return Inertia::render('waste-management/master-data/Vendors', [
-            'vendors' => $vendors,
+            'vendors' => $vendors->map(fn (Vendor $vendor) => [...$vendor->toArray(), 'license_expiry_day' => $vendor->license_expiry_date?->format('Y-m-d')]),
+            'licenseReferenceDate' => now()->toDateString(),
         ]);
     }
 
@@ -78,10 +79,10 @@ class VendorsController extends Controller
      */
     public function destroy(Vendor $vendor): RedirectResponse
     {
-        // Check if vendor has transportations
-        if ($vendor->transportations()->count() > 0) {
+        // Preserve vendor references in operational history.
+        if ($vendor->fabaMovements()->exists() || (\Illuminate\Support\Facades\Schema::hasColumn('waste_haulings', 'vendor_id') && \App\Models\WasteHauling::withTrashed()->where('vendor_id', $vendor->id)->exists())) {
             return Redirect::back()
-                ->with('error', 'Cannot delete vendor with associated transportations. Please delete the transportations first.');
+                ->with('error', 'Vendor memiliki riwayat transaksi FABA atau pengangkutan dan tidak dapat dihapus. Nonaktifkan vendor bila tidak lagi digunakan.');
         }
 
         $vendor->delete();

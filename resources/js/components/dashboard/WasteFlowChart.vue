@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import BaseEChart from '@/components/dashboard/BaseEChart.vue';
+import Link from '@/components/OrganizationLink.vue';
 import {
     Card,
     CardContent,
@@ -336,17 +336,17 @@ function formatQuantity(value: number): string {
 
 <template>
     <Card
-        class="wm-panel-elevated wm-card-overlay-blue min-w-0 overflow-hidden rounded-2xl border shadow-sm dark:border-slate-700/50 dark:bg-slate-900/40"
+        class="min-w-0 gap-0 overflow-hidden rounded-2xl border border-slate-200 bg-white py-0 shadow-none dark:border-slate-800 dark:bg-slate-900"
     >
         <CardHeader
-            class="wm-border-default border-b bg-slate-50/40 pb-4 dark:border-slate-700/50 dark:bg-slate-900/60"
+            class="border-b border-slate-100 px-5 py-5 dark:border-slate-800"
         >
             <div
                 class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
             >
                 <div class="space-y-1.5">
                     <CardTitle class="wm-text-primary text-base">
-                        Intake Approved, Penyelesaian, dan Backlog Limbah
+                        Intake, pengangkutan & backlog
                     </CardTitle>
                     <CardDescription
                         class="wm-text-secondary text-sm leading-6"
@@ -425,7 +425,7 @@ function formatQuantity(value: number): string {
             </div>
         </CardHeader>
 
-        <CardContent class="space-y-4 pt-4">
+        <CardContent class="space-y-5 px-5 py-5">
             <div
                 class="wm-text-secondary flex flex-wrap items-center gap-3 text-sm"
             >
@@ -435,7 +435,8 @@ function formatQuantity(value: number): string {
                     >Satuan
                     <select
                         v-model="selectedUnit"
-                        class="wm-panel rounded-lg border px-3 py-2"
+                        aria-label="Satuan limbah"
+                        class="wm-panel min-h-11 rounded-lg border px-3 py-2"
                     >
                         <option value="">{{ data.at(-1)?.unit }} (awal)</option>
                         <option
@@ -475,7 +476,7 @@ function formatQuantity(value: number): string {
                 <div
                     v-for="kpi in kpis"
                     :key="kpi.label"
-                    class="wm-surface-subtle flex min-w-0 flex-col gap-2 rounded-xl border p-4"
+                    class="flex min-w-0 flex-col gap-2 rounded-xl bg-slate-50 p-4 dark:bg-slate-950"
                 >
                     <p class="wm-text-secondary text-xs font-semibold">
                         {{ kpi.label }}
@@ -532,7 +533,7 @@ function formatQuantity(value: number): string {
                 <Link
                     v-if="latestExpiredBacklog > 0"
                     :href="expiredHref"
-                    class="shrink-0 rounded-lg border border-current px-3 py-2 text-xs font-semibold"
+                    class="inline-flex min-h-11 shrink-0 items-center rounded-lg border border-current px-3 py-2 text-xs font-semibold"
                     >Lihat Limbah Expired</Link
                 >
             </div>

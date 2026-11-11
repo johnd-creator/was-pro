@@ -22,9 +22,26 @@ class FabaAdjustmentRequest extends FormRequest
                 FabaMovement::TYPE_ADJUSTMENT_IN,
                 FabaMovement::TYPE_ADJUSTMENT_OUT,
             ])],
-            'quantity' => ['required', 'numeric', 'gt:0'],
+            'quantity' => ['required', 'numeric', 'gt:0', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (is_numeric($value) && round((float) $value, 2) <= 0) {
+                    $fail('Jumlah setelah pembulatan dua desimal harus lebih besar dari 0.');
+                }
+            }],
             'unit' => ['nullable', Rule::in([FabaMovement::DEFAULT_UNIT])],
             'note' => ['required', 'string'],
+            'source_movement_id' => ['nullable', 'uuid'],
+            'reference_type' => ['prohibited'],
+            'reference_id' => ['prohibited'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'note.required' => 'Alasan koreksi wajib diisi.',
+            'source_movement_id.uuid' => 'ID transaksi asal tidak valid.',
+            'reference_type.prohibited' => 'Jenis referensi ditentukan oleh sistem.',
+            'reference_id.prohibited' => 'Gunakan pilihan transaksi asal.',
         ];
     }
 }

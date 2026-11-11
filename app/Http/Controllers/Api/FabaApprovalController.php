@@ -94,6 +94,8 @@ class FabaApprovalController extends ApiController
             'approval' => $this->serializePeriod($this->fabaRecapService->getPeriodMeta($year, $month), $user),
             'recap' => $detail['recap'],
             'snapshot' => $detail['snapshot'],
+            'archive_available' => $detail['archive_available'],
+            'closing_versions' => $detail['closing_versions'],
             'vendor_breakdown' => $detail['vendor_breakdown'],
             'internal_destination_breakdown' => $detail['internal_destination_breakdown'],
             'purpose_breakdown' => $detail['purpose_breakdown'],

@@ -29,11 +29,15 @@ class VendorRequest extends FormRequest
 
         // Handle unique validation for updates
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
-            $vendorId = $this->route('vendor')?->id;
+            $vendor = $this->route('vendor');
+            $vendorId = $vendor?->id;
+            if ($vendor && $this->input('license_expiry_date') === $vendor->license_expiry_date?->format('Y-m-d')) {
+                $rules['license_expiry_date'] = ['nullable', 'date'];
+            }
             $rules['code'] = ['required', 'string', 'max:50', Rule::unique('vendors')->ignore($vendorId)];
             $rules['license_number'] = ['nullable', 'string', 'max:100', Rule::unique('vendors')->ignore($vendorId)];
         } else {
-            // Only validate license_expiry_date after today for new records
+            // Preserve existing create validation; unchanged expired dates are allowed on update.
             $rules['license_expiry_date'] = ['nullable', 'date'];
         }
 

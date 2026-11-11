@@ -7,6 +7,7 @@ import {
     Sparkles,
 } from 'lucide-vue-next';
 import { computed, reactive } from 'vue';
+import FabaBalanceReconciliation from '@/components/FabaBalanceReconciliation.vue';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,9 +19,11 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
+import type { FabaYearlyTotals } from '@/types/faba';
 
 const props = defineProps<{
     recap: {
@@ -33,7 +36,7 @@ const props = defineProps<{
             closing_balance: number;
             warnings?: Array<{ code: string; message: string }>;
         }>;
-        totals: Record<string, number>;
+        totals: FabaYearlyTotals;
     };
     filters: { year: number };
 }>();
@@ -54,8 +57,9 @@ const warningPeriods = computed(
 );
 
 function applyFilters(): void {
-    router.get(wasteManagementRoutes.faba.recaps.yearly(), form);
+    router.get(scopedUrl(wasteManagementRoutes.faba.recaps.yearly()), form);
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>
@@ -229,6 +233,12 @@ function applyFilters(): void {
                         </div>
                     </div>
                 </section>
+
+                <FabaBalanceReconciliation
+                    :summary="recap.totals"
+                    :period-label="String(recap.year)"
+                    yearly
+                />
 
                 <div
                     v-if="warningPeriods > 0"

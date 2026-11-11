@@ -46,11 +46,11 @@ class Vendor extends Model
     }
 
     /**
-     * Get the transportations for the vendor.
+     * Get the FABA movements that reference the vendor.
      */
-    public function transportations(): HasMany
+    public function fabaMovements(): HasMany
     {
-        return $this->hasMany(WasteTransportation::class);
+        return $this->hasMany(FabaMovement::class);
     }
 
     /**
@@ -82,6 +82,17 @@ class Vendor extends Model
      */
     public function hasValidLicense(): bool
     {
-        return ! $this->license_expiry_date || $this->license_expiry_date->isFuture();
+        return $this->licenseExpiryStatus() === 'not_expired';
+    }
+
+    /** Recorded expiry only, not legal verification. Calendar expiry day is inclusive. */
+    public function licenseExpiryStatus(?string $referenceDate = null): string
+    {
+        if (! $this->license_expiry_date) {
+            return 'unknown';
+        }
+        $date = $referenceDate ?? now()->toDateString();
+
+        return $this->license_expiry_date->format('Y-m-d') < $date ? 'expired' : 'not_expired';
     }
 }

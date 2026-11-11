@@ -82,38 +82,42 @@ defineProps<{
                     </div>
                 </section>
 
-                <section class="w-full">
+                <section class="mx-auto w-full max-w-[460px] lg:max-w-none">
                     <div
                         class="overflow-hidden rounded-[32px] border border-slate-200/85 bg-white/95 shadow-[0_34px_90px_-42px_rgba(15,23,42,0.42)] backdrop-blur-xl dark:border-slate-800/85 dark:bg-slate-950/90 dark:shadow-[0_34px_90px_-42px_rgba(2,6,23,0.92)]"
                     >
                         <div
                             class="border-b border-slate-200/80 px-6 py-5 sm:px-8 dark:border-slate-800/80"
                         >
-                            <div class="flex items-center gap-3">
+                            <div
+                                class="flex flex-wrap items-center justify-between gap-4"
+                            >
                                 <Link
                                     :href="home()"
-                                    class="inline-flex rounded-full border border-slate-200/80 bg-white/85 px-3 py-1.5 shadow-sm lg:hidden dark:border-slate-800/80 dark:bg-slate-950/80"
+                                    class="inline-flex items-center gap-1 lg:hidden"
                                 >
                                     <AppLogoAuth />
                                 </Link>
-                                <div
-                                    class="hidden h-11 w-11 items-center justify-center rounded-2xl border border-slate-200/80 bg-slate-50 shadow-sm lg:flex dark:border-slate-800/80 dark:bg-slate-900"
-                                >
-                                    <Building2
-                                        class="size-5 text-slate-700 dark:text-slate-200"
-                                    />
-                                </div>
-                                <div class="min-w-0">
+                                <div class="hidden min-w-0 lg:block">
                                     <p
                                         class="text-xs font-semibold tracking-[0.18em] text-cyan-700/80 uppercase dark:text-cyan-300/80"
                                     >
                                         Account Access
                                     </p>
                                     <p
-                                        class="truncate text-sm text-slate-600 dark:text-slate-300"
+                                        class="mt-1 text-sm text-slate-600 dark:text-slate-300"
                                     >
-                                        Sistem pengelolaan limbah dan FABA
+                                        {{ appName }}
                                     </p>
+                                </div>
+                                <div
+                                    class="flex shrink-0 items-center justify-center rounded-xl bg-white px-3 py-2"
+                                >
+                                    <img
+                                        src="/logo_ip.png"
+                                        alt="PLN Indonesia Power"
+                                        class="h-auto w-28 object-contain sm:w-32"
+                                    />
                                 </div>
                             </div>
                         </div>

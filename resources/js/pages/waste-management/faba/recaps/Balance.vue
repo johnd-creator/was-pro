@@ -14,6 +14,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import { formatFabaMaterial } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
@@ -80,7 +81,9 @@ const netFlow = computed(
 );
 
 function submit(): void {
-    form.post(wasteManagementRoutes.faba.recaps.openingBalance.store.url());
+    form.post(
+        scopedUrl(wasteManagementRoutes.faba.recaps.openingBalance.store.url()),
+    );
 }
 
 function syncCapacityForm(
@@ -104,9 +107,10 @@ function syncCapacityForm(
 
 function submitCapacity(): void {
     capacityForm.post(
-        wasteManagementRoutes.faba.recaps.tpsCapacity.store.url(),
+        scopedUrl(wasteManagementRoutes.faba.recaps.tpsCapacity.store.url()),
     );
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>

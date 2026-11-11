@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import {
     AlertCircle,
     CircleCheck,
@@ -12,6 +12,7 @@ import {
 import { computed, ref } from 'vue';
 import WasteRecordsController from '@/actions/App/Http/Controllers/WasteManagement/WasteRecordsController';
 import Heading from '@/components/Heading.vue';
+import Link from '@/components/OrganizationLink.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,6 +26,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import ExpiryBadge from '@/components/waste-management/ExpiryBadge.vue';
 import StatusBadge from '@/components/waste-management/StatusBadge.vue';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
@@ -44,6 +46,7 @@ interface WasteRecord {
     operational_status_label: string;
     approved_hauled_quantity: number;
     remaining_quantity: number;
+    has_simulated_hauling: boolean;
     reserved_quantity: number;
     rejection_reason: string | null;
     submitted_at: string | null;
@@ -213,54 +216,65 @@ function haulingStatusClass(status: WasteRecord['operational_status']): string {
 
 function submitForApproval(): void {
     resetMessages();
-    submitForm.post(WasteRecordsController.submit(props.wasteRecord.id).url, {
-        preserveScroll: true,
-        onSuccess: () => {
-            statusMessage.value =
-                'Catatan berhasil diajukan untuk ditinjau oleh approver.';
+    submitForm.post(
+        scopedUrl(WasteRecordsController.submit(props.wasteRecord.id).url),
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                statusMessage.value =
+                    'Catatan berhasil diajukan untuk ditinjau oleh approver.';
+            },
+            onError: () => {
+                errorMessage.value =
+                    'Catatan belum dapat diajukan. Periksa kembali data lalu coba lagi.';
+            },
         },
-        onError: () => {
-            errorMessage.value =
-                'Catatan belum dapat diajukan. Periksa kembali data lalu coba lagi.';
-        },
-    });
+    );
 }
 
 function approveRecord(): void {
     resetMessages();
     reviewForm.clearErrors('rejection_reason');
-    reviewForm.post(WasteRecordsController.approve(props.wasteRecord.id).url, {
-        preserveScroll: true,
-        onSuccess: () => {
-            statusMessage.value = 'Catatan berhasil disetujui.';
+    reviewForm.post(
+        scopedUrl(WasteRecordsController.approve(props.wasteRecord.id).url),
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                statusMessage.value = 'Catatan berhasil disetujui.';
+            },
+            onError: () => {
+                errorMessage.value =
+                    'Persetujuan gagal diproses. Periksa kembali data lalu coba lagi.';
+            },
         },
-        onError: () => {
-            errorMessage.value =
-                'Persetujuan gagal diproses. Periksa kembali data lalu coba lagi.';
-        },
-    });
+    );
 }
 
 function rejectRecord(): void {
     resetMessages();
     reviewForm.clearErrors('approval_notes');
-    reviewForm.post(WasteRecordsController.reject(props.wasteRecord.id).url, {
-        preserveScroll: true,
-        onSuccess: () => {
-            statusMessage.value =
-                'Catatan berhasil ditolak dan alasan penolakan telah disimpan.';
+    reviewForm.post(
+        scopedUrl(WasteRecordsController.reject(props.wasteRecord.id).url),
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                statusMessage.value =
+                    'Catatan berhasil ditolak dan alasan penolakan telah disimpan.';
+            },
+            onError: () => {
+                errorMessage.value =
+                    'Penolakan belum dapat diproses. Periksa alasan penolakan lalu coba lagi.';
+            },
         },
-        onError: () => {
-            errorMessage.value =
-                'Penolakan belum dapat diproses. Periksa alasan penolakan lalu coba lagi.';
-        },
-    });
+    );
 }
 
 function returnToDraft(): void {
     resetMessages();
     returnForm.post(
-        WasteRecordsController.returnToDraft(props.wasteRecord.id).url,
+        scopedUrl(
+            WasteRecordsController.returnToDraft(props.wasteRecord.id).url,
+        ),
         {
             preserveScroll: true,
             onSuccess: () => {
@@ -274,6 +288,7 @@ function returnToDraft(): void {
         },
     );
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>
@@ -666,6 +681,12 @@ function returnToDraft(): void {
                                         <ExpiryBadge
                                             :expiry-date="
                                                 wasteRecord.expiry_date
+                                            "
+                                            :remaining-quantity="
+                                                wasteRecord.remaining_quantity
+                                            "
+                                            :simulated="
+                                                wasteRecord.has_simulated_hauling
                                             "
                                         />
                                     </div>

@@ -186,7 +186,7 @@ class UnifiedDashboardService
 
         foreach ($records as $record) {
             $approvedQuantity = $record->getApprovedHauledQuantity();
-            $reservedQuantity = $record->getReservedHaulingQuantity();
+            $reservedQuantity = (float) $record->haulings->whereIn('status', ['pending_approval', 'approved'])->sum('quantity');
             $remainingQuantity = $record->getRemainingQuantity();
 
             $label = match (true) {
@@ -1070,6 +1070,7 @@ class UnifiedDashboardService
                     SELECT SUM(waste_haulings.quantity)
                     FROM waste_haulings
                     WHERE waste_haulings.waste_record_id = waste_records.id
+                        AND waste_haulings.deleted_at IS NULL
                         AND waste_haulings.status = ?
                         AND waste_haulings.hauling_date <= ?
                 ), 0) < waste_records.quantity',

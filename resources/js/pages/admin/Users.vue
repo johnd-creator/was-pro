@@ -75,6 +75,7 @@ type Props = {
     users: User[];
     organizations: Organization[];
     roles: Role[];
+    canManageSuperAdmins: boolean;
 };
 
 const props = defineProps<Props>();
@@ -243,6 +244,10 @@ function openPasswordDialog(user: User) {
 
 function submit(): void {
     resetMessages();
+    userForm.transform((data) => ({
+        ...data,
+        organization_id: data.is_super_admin ? null : data.organization_id,
+    }));
 
     if (editingUser.value) {
         userForm.put(UsersController.update(editingUser.value.id).url, {
@@ -572,7 +577,10 @@ function changePage(page: number): void {
                                             </div>
                                         </template>
 
-                                        <div class="grid gap-2">
+                                        <div
+                                            v-if="!userForm.is_super_admin"
+                                            class="grid gap-2"
+                                        >
                                             <Label for="organization_id"
                                                 >Organisasi *</Label
                                             >
@@ -647,7 +655,16 @@ function changePage(page: number): void {
                                             </p>
                                         </div>
 
+                                        <p
+                                            v-if="userForm.is_super_admin"
+                                            class="text-xs text-muted-foreground"
+                                        >
+                                            Super admin tidak memiliki
+                                            organisasi. Pilih konteks organisasi
+                                            melalui pengaturan profil.
+                                        </p>
                                         <div
+                                            v-if="canManageSuperAdmins"
                                             class="flex items-center justify-between rounded-md border px-3 py-2"
                                         >
                                             <div>
@@ -1059,7 +1076,9 @@ function changePage(page: number): void {
                                     }}</TableCell>
                                     <TableCell>{{ user.email }}</TableCell>
                                     <TableCell>{{
-                                        user.organization?.name ?? '-'
+                                        user.is_super_admin
+                                            ? 'Tanpa organisasi'
+                                            : (user.organization?.name ?? '-')
                                     }}</TableCell>
                                     <TableCell>{{
                                         user.role?.name ?? '-'
@@ -1088,6 +1107,10 @@ function changePage(page: number): void {
                                         <Button
                                             variant="ghost"
                                             size="sm"
+                                            :disabled="
+                                                user.is_super_admin &&
+                                                !canManageSuperAdmins
+                                            "
                                             @click="openEditDialog(user)"
                                         >
                                             Ubah
@@ -1095,6 +1118,10 @@ function changePage(page: number): void {
                                         <Button
                                             variant="ghost"
                                             size="sm"
+                                            :disabled="
+                                                user.is_super_admin &&
+                                                !canManageSuperAdmins
+                                            "
                                             @click="openPasswordDialog(user)"
                                         >
                                             Kata sandi
@@ -1103,6 +1130,10 @@ function changePage(page: number): void {
                                             variant="ghost"
                                             size="sm"
                                             class="text-destructive"
+                                            :disabled="
+                                                user.is_super_admin &&
+                                                !canManageSuperAdmins
+                                            "
                                             @click="confirmDelete(user)"
                                         >
                                             Hapus

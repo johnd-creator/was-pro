@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\WasteManagement\ApproveWasteRecordRequest;
 use App\Http\Requests\WasteManagement\RejectWasteRecordRequest;
 use App\Http\Requests\WasteManagement\SubmitWasteRecordRequest;
+use App\Http\Requests\WasteManagement\WasteRecordExportRequest;
 use App\Http\Requests\WasteManagement\WasteRecordIndexRequest;
 use App\Http\Requests\WasteManagement\WasteRecordRequest;
 use App\Models\Organization;
@@ -95,9 +96,7 @@ class WasteRecordsController extends Controller
 
     private function expiredSnapshot(WasteRecordIndexRequest $request): Response
     {
-        $organization = $request->validated('organization_id')
-            ? Organization::query()->active()->findOrFail($request->validated('organization_id'))
-            : $request->user()->organization;
+        $organization = $request->attributes->get(\App\Http\Middleware\UseOrganizationContext::ATTRIBUTE);
         abort_unless($organization && $request->user()->canAccessOrganization($organization->id), 403);
         $tenant = app(TenantService::class);
         abort_unless($tenant->schemaExists($organization->schema_name), 503);
@@ -159,7 +158,8 @@ class WasteRecordsController extends Controller
      */
     public function store(WasteRecordRequest $request): RedirectResponse
     {
-        $organization = Auth::user()->organization;
+        $organization = $request->attributes->get(\App\Http\Middleware\UseOrganizationContext::ATTRIBUTE);
+        abort_unless($organization instanceof Organization, 409);
 
         // Generate record number: WR-{ORG_CODE}-{YYYY}-{MM}-{SEQ}
         $prefix = 'WR-'.$organization->code.'-'.now()->format('Y-m');
@@ -442,18 +442,46 @@ class WasteRecordsController extends Controller
     /**
      * Export waste records to CSV.
      */
-    public function exportCsv(): StreamedResponse
+    public function exportCsv(WasteRecordExportRequest $request): StreamedResponse
     {
-        $query = WasteRecord::with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser'])
+        $query = WasteRecord::with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser', 'haulings'])
             ->orderBy('date', 'desc')
             ->orderBy('created_at', 'desc');
 
-        // Filter by user permissions
         if (! $this->canViewAllRecords()) {
             $query->byUser(Auth::id());
         }
 
-        $wasteRecords = $query->get();
+        $search = mb_strtolower(trim($request->validated('search') ?? ''));
+        $storageStatus = $request->validated('storage_status') ?? 'all';
+        $storageDate = CarbonImmutable::parse($request->validated('storage_date') ?? today()->toDateString())->startOfDay();
+        $wasteRecords = $query->get()->filter(function (WasteRecord $record) use ($search, $storageStatus, $storageDate): bool {
+            $fields = [$record->record_number, $record->wasteType?->name, $record->wasteType?->code, $record->wasteType?->category?->name, $record->source];
+            if ($search !== '' && ! collect($fields)->contains(fn (?string $value): bool => str_contains(mb_strtolower($value ?? ''), $search))) {
+                return false;
+            }
+
+            if ($storageStatus === 'all') {
+                return true;
+            }
+
+            $status = match (true) {
+                $record->getRemainingQuantity() <= 0 => 'completed',
+                $record->expiry_date === null => 'na',
+                $record->expiry_date->toDateString() < $storageDate->toDateString() => 'expired',
+                $record->expiry_date->toDateString() <= $storageDate->addDays(7)->toDateString() => 'expiring_soon',
+                default => 'fresh',
+            };
+
+            return $status === $storageStatus;
+        });
+
+        $wasteRecords = match ($request->validated('sort') ?? 'latest') {
+            'oldest' => $wasteRecords->sortBy(fn (WasteRecord $record): string => $record->date->toDateString()),
+            'quantity_high' => $wasteRecords->sortByDesc(fn (WasteRecord $record): float => (float) $record->quantity),
+            'quantity_low' => $wasteRecords->sortBy(fn (WasteRecord $record): float => (float) $record->quantity),
+            default => $wasteRecords,
+        };
 
         $headers = [
             'Content-Type' => 'text/csv',
@@ -489,17 +517,17 @@ class WasteRecordsController extends Controller
                     $record->record_number,
                     $record->date->format('Y-m-d'),
                     $record->expiry_date ? $record->expiry_date->format('Y-m-d') : 'N/A',
-                    $record->waste_type->name ?? 'N/A',
-                    $record->waste_type->category->name ?? 'N/A',
-                    $record->waste_type->characteristic->name ?? 'N/A',
+                    $record->wasteType?->name ?? 'N/A',
+                    $record->wasteType?->category->name ?? 'N/A',
+                    $record->wasteType?->characteristic->name ?? 'N/A',
                     $record->quantity,
                     $record->unit,
                     $record->source ?? 'N/A',
                     $record->description ?? 'N/A',
                     $record->getStatusLabel(),
-                    $record->submitted_by_user->name ?? 'N/A',
+                    $record->submittedByUser?->name ?? 'N/A',
                     $record->submitted_at?->format('Y-m-d H:i:s') ?? 'N/A',
-                    $record->approved_by_user->name ?? 'N/A',
+                    $record->approvedByUser?->name ?? 'N/A',
                     $record->approved_at?->format('Y-m-d H:i:s') ?? 'N/A',
                     $record->created_at->format('Y-m-d H:i:s'),
                 ]);
@@ -536,7 +564,9 @@ class WasteRecordsController extends Controller
             'operational_status_label' => $record->getOperationalStatusLabel(),
             'approved_hauled_quantity' => $record->getApprovedHauledQuantity(),
             'remaining_quantity' => $record->getRemainingQuantity(),
+            'has_simulated_hauling' => $record->haulings->contains(fn ($hauling): bool => $hauling->status === 'approved' && str_starts_with((string) $hauling->hauling_number, 'SIMULASI-')),
             'reserved_quantity' => $record->getReservedHaulingQuantity(),
+            ...app(\App\Services\HaulingPlans::class)->summary($record),
             'waste_type' => $record->wasteType ? [
                 'name' => $record->wasteType->name,
                 'code' => $record->wasteType->code,

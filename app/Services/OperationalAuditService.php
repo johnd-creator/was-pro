@@ -11,10 +11,10 @@ class OperationalAuditService
 {
     public function record(Model $model, array $before, string $action): void
     {
-        if (! $model instanceof WasteRecord && ! $model instanceof WasteHauling) {
+        if (! $model instanceof WasteRecord && ! $model instanceof WasteHauling && ! $model instanceof \App\Models\WasteHaulingPlan) {
             return;
         }
-        $fields = array_flip(['quantity', 'unit', 'date', 'hauling_date', 'waste_record_id', 'waste_type_id', 'record_number', 'hauling_number', 'status', 'created_by', 'updated_by', 'submitted_by', 'approved_by', 'deleted_at']);
+        $fields = array_flip(['waste_hauling_plan_id', 'planned_date', 'closed_by', 'closed_at', 'closure_reason', 'quantity', 'unit', 'date', 'hauling_date', 'waste_record_id', 'waste_type_id', 'record_number', 'hauling_number', 'status', 'created_by', 'updated_by', 'submitted_by', 'approved_by', 'deleted_at', 'vendor_id', 'vehicle_number', 'driver_name', 'document_number', 'destination', 'receiver', 'attachment_path', 'source', 'description', 'notes', 'expiry_date', 'rejection_reason', 'approval_notes', 'submitted_at', 'approved_at']);
         $actor = auth()->id();
         if (! $actor && ($before['status'] ?? null) !== $model->status) {
             $actor = match ($model->status) {

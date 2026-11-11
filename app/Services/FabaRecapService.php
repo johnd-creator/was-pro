@@ -125,6 +125,9 @@ class FabaRecapService
         $openingBalance = round($openingFlyAsh + $openingBottomAsh, 2);
         $closingBalance = round($closingFlyAsh + $closingBottomAsh, 2);
 
+        $balanceComponents = $this->getBalanceComponents((clone $movements));
+        $totalInflows = round((float) collect($balanceComponents)->where('stock_effect', FabaMovement::STOCK_EFFECT_IN)->sum('total'), 2);
+
         $approval = $this->getMonthlyApproval($year, $month)?->load([
             'submittedByUser:id,name',
             'approvedByUser:id,name',
@@ -161,6 +164,7 @@ class FabaRecapService
                 ->whereIn('movement_type', [FabaMovement::TYPE_UTILIZATION_EXTERNAL, FabaMovement::TYPE_UTILIZATION_INTERNAL])
                 ->count(),
             'approval' => $approval,
+            'balance_components' => $balanceComponents,
             'movement_summary' => [
                 'inflow_fly_ash' => $this->sumInflows((clone $movements), FabaMovement::MATERIAL_FLY_ASH),
                 'inflow_bottom_ash' => $this->sumInflows((clone $movements), FabaMovement::MATERIAL_BOTTOM_ASH),
@@ -168,6 +172,7 @@ class FabaRecapService
                 'outflow_bottom_ash' => $this->sumOutflows((clone $movements), FabaMovement::MATERIAL_BOTTOM_ASH),
             ],
             'warnings' => $this->getWarnings($year, $month, [
+                'total_inflows' => $totalInflows,
                 'total_production' => $totalProduction,
                 'total_utilization' => $totalUtilization,
                 'opening_balance' => $openingBalance,
@@ -230,6 +235,8 @@ class FabaRecapService
 
         return [
             'recap' => $recap,
+            'archive_available' => app(FabaClosingArchiveService::class)->available(),
+            'closing_versions' => app(FabaClosingArchiveService::class)->versions($year, $month),
             'snapshot' => $snapshot ? [
                 'id' => $snapshot->id,
                 'year' => $snapshot->year,
@@ -264,10 +271,30 @@ class FabaRecapService
             ->map(fn (int $month): array => $this->getMonthlyRecap($year, $month))
             ->values();
 
+        $openingResets = ['fly_ash' => 0.0, 'bottom_ash' => 0.0];
+        foreach ($months->slice(1) as $index => $month) {
+            foreach (array_keys($openingResets) as $material) {
+                $openingResets[$material] += $month['opening_'.$material] - $months[$index - 1]['closing_'.$material];
+            }
+        }
+        $movementSummary = collect($months->first()['movement_summary'])
+            ->map(fn ($value, string $key): float => round((float) $months->sum('movement_summary.'.$key), 2))
+            ->all();
+
         return [
             'year' => $year,
             'months' => $months,
             'totals' => [
+                'opening_balance' => $months->first()['opening_balance'],
+                'opening_fly_ash' => $months->first()['opening_fly_ash'],
+                'opening_bottom_ash' => $months->first()['opening_bottom_ash'],
+                'closing_fly_ash' => $months->last()['closing_fly_ash'],
+                'closing_bottom_ash' => $months->last()['closing_bottom_ash'],
+                'opening_reset_fly_ash' => round($openingResets['fly_ash'], 2),
+                'opening_reset_bottom_ash' => round($openingResets['bottom_ash'], 2),
+                'opening_reset_total' => round(array_sum($openingResets), 2),
+                'balance_components' => $this->getBalanceComponents(FabaMovement::query()->approved()->where('period_year', $year)),
+                'movement_summary' => $movementSummary,
                 'total_production' => round((float) $months->sum('total_production'), 2),
                 'total_utilization' => round((float) $months->sum('total_utilization'), 2),
                 'closing_balance' => round((float) ($months->last()['closing_balance'] ?? 0), 2),
@@ -863,31 +890,36 @@ class FabaRecapService
             return null;
         }
 
-        $detail = $this->getMonthlyRecapDetail($year, $month);
-        $recap = $detail['recap'];
+        return app(OperationalTransactionService::class)->run(function () use ($year, $month, $approvedBy): FabaMonthlyClosingSnapshot {
+            $detail = $this->getMonthlyRecapDetail($year, $month);
+            $recap = $detail['recap'];
 
-        return FabaMonthlyClosingSnapshot::query()->updateOrCreate(
-            [
-                'year' => $year,
-                'month' => $month,
-            ],
-            [
-                'status' => FabaMonthlyApproval::STATUS_APPROVED,
-                'approved_by' => $approvedBy,
-                'approved_at' => now(),
-                'warning_summary' => $recap['warnings'],
-                'snapshot_payload' => [
-                    'calculation_version' => 2,
-                    'period_label' => $recap['period_label'],
-                    'recap' => $recap,
-                    'opening_balances' => $detail['opening_balances'],
-                    'vendor_breakdown' => $detail['vendor_breakdown'],
-                    'internal_destination_breakdown' => $detail['internal_destination_breakdown'],
-                    'purpose_breakdown' => $detail['purpose_breakdown'],
-                    'movement_summary' => $recap['movement_summary'] ?? [],
+            $snapshot = FabaMonthlyClosingSnapshot::query()->updateOrCreate(
+                [
+                    'year' => $year,
+                    'month' => $month,
                 ],
-            ]
-        );
+                [
+                    'status' => FabaMonthlyApproval::STATUS_APPROVED,
+                    'approved_by' => $approvedBy,
+                    'approved_at' => now(),
+                    'warning_summary' => $recap['warnings'],
+                    'snapshot_payload' => [
+                        'calculation_version' => 2,
+                        'period_label' => $recap['period_label'],
+                        'recap' => $recap,
+                        'opening_balances' => $detail['opening_balances'],
+                        'vendor_breakdown' => $detail['vendor_breakdown'],
+                        'internal_destination_breakdown' => $detail['internal_destination_breakdown'],
+                        'purpose_breakdown' => $detail['purpose_breakdown'],
+                        'movement_summary' => $recap['movement_summary'] ?? [],
+                    ],
+                ]
+            );
+            app(FabaClosingArchiveService::class)->append($snapshot);
+
+            return $snapshot;
+        });
     }
 
     public function deleteMonthlyClosingSnapshot(int $year, int $month): void
@@ -1035,17 +1067,17 @@ class FabaRecapService
             ];
         }
 
-        if ($context['total_utilization'] > ($context['opening_balance'] + $context['total_production'])) {
+        if ($context['total_utilization'] > ($context['opening_balance'] + $context['total_inflows'])) {
             $warnings[] = [
                 'code' => 'utilization_exceeds_stock',
                 'message' => 'Pemanfaatan melebihi stok yang tersedia.',
             ];
         }
 
-        if ($context['total_utilization'] > 0 && $context['total_production'] <= 0 && $context['opening_balance'] <= 0) {
+        if ($context['total_utilization'] > 0 && $context['total_inflows'] <= 0 && $context['opening_balance'] <= 0) {
             $warnings[] = [
                 'code' => 'utilization_without_stock_source',
-                'message' => 'Ada pemanfaatan tanpa produksi maupun saldo awal yang cukup.',
+                'message' => 'Ada pemanfaatan tanpa stok masuk maupun saldo awal yang cukup.',
             ];
         }
 
@@ -1092,8 +1124,8 @@ class FabaRecapService
                 FabaMovement::TYPE_REJECT,
                 FabaMovement::TYPE_DISPOSAL_POK,
             ])
-            ->selectRaw('material_type, movement_type, COALESCE(vendor_id::text, internal_destination_id::text, \'\') as destination_key, COALESCE(document_number, \'\') as document_number_key, COALESCE(document_date::text, \'\') as document_date_key, quantity, COUNT(*) as duplicate_count')
-            ->groupByRaw('material_type, movement_type, COALESCE(vendor_id::text, internal_destination_id::text, \'\'), COALESCE(document_number, \'\'), COALESCE(document_date::text, \'\'), quantity')
+            ->selectRaw('transaction_date, stock_effect, material_type, movement_type, COALESCE(vendor_id::text, internal_destination_id::text, \'\') as destination_key, COALESCE(document_number, \'\') as document_number_key, COALESCE(document_date::text, \'\') as document_date_key, quantity, COUNT(*) as duplicate_count')
+            ->groupByRaw('transaction_date, stock_effect, material_type, movement_type, COALESCE(vendor_id::text, internal_destination_id::text, \'\'), COALESCE(document_number, \'\'), COALESCE(document_date::text, \'\'), quantity')
             ->havingRaw('COUNT(*) > 1')
             ->count();
 
@@ -1136,6 +1168,35 @@ class FabaRecapService
                 return $purposeSlugs->isEmpty() && $destinationSlugs->isEmpty();
             })
             ->sum('quantity'), 2);
+    }
+
+    /**
+     * Group by the recorded stock effect, including reject movements in either direction.
+     */
+    protected function getBalanceComponents(\Illuminate\Database\Eloquent\Builder $query): array
+    {
+        return $query
+            ->where('movement_type', '!=', FabaMovement::TYPE_OPENING_BALANCE)
+            ->selectRaw('movement_type, stock_effect, material_type, SUM(quantity) as total_quantity')
+            ->groupBy('movement_type', 'stock_effect', 'material_type')
+            ->orderBy('movement_type')
+            ->orderBy('stock_effect')
+            ->get()
+            ->groupBy(fn (FabaMovement $movement): string => $movement->movement_type.':'.$movement->stock_effect)
+            ->map(function (Collection $group): array {
+                $flyAsh = round((float) $group->where('material_type', FabaMovement::MATERIAL_FLY_ASH)->sum('total_quantity'), 2);
+                $bottomAsh = round((float) $group->where('material_type', FabaMovement::MATERIAL_BOTTOM_ASH)->sum('total_quantity'), 2);
+
+                return [
+                    'movement_type' => $group->first()->movement_type,
+                    'stock_effect' => $group->first()->stock_effect,
+                    'fly_ash' => $flyAsh,
+                    'bottom_ash' => $bottomAsh,
+                    'total' => round($flyAsh + $bottomAsh, 2),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     protected function sumMovementTypes($query, string $materialType, array $movementTypes): float

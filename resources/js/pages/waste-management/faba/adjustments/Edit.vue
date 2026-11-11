@@ -15,6 +15,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import { formatFabaMaterial, formatFabaMovementType } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
@@ -30,10 +31,20 @@ const props = defineProps<{
         quantity: number;
         unit: string;
         note: string | null;
+        source_movement_id: string | null;
+        source_reference_reserved: boolean;
     };
     materialOptions: string[];
     movementTypeOptions: string[];
     defaultUnit: string;
+    sourceOptions: {
+        id: string;
+        transaction_date: string;
+        material_type: string;
+        movement_type: string;
+        quantity: number;
+        unit: string;
+    }[];
 }>();
 
 const breadcrumbItems: BreadcrumbItem[] = [
@@ -54,11 +65,17 @@ const form = useForm({
     quantity: String(props.entry.quantity),
     unit: props.entry.unit,
     note: props.entry.note ?? '',
+    source_movement_id: props.entry.source_movement_id ?? '',
 });
 
 function submit(): void {
-    form.put(wasteManagementRoutes.faba.adjustments.update(props.entry.id).url);
+    form.put(
+        scopedUrl(
+            wasteManagementRoutes.faba.adjustments.update(props.entry.id).url,
+        ),
+    );
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>
@@ -297,6 +314,68 @@ function submit(): void {
                                                         class="bg-white dark:bg-slate-950"
                                                     />
                                                 </div>
+                                            </div>
+                                            <div class="grid gap-2">
+                                                <Label for="source_movement_id"
+                                                    >Transaksi asal
+                                                    (opsional)</Label
+                                                >
+                                                <select
+                                                    id="source_movement_id"
+                                                    v-model="
+                                                        form.source_movement_id
+                                                    "
+                                                    class="h-11 rounded-md border bg-background px-3"
+                                                    :disabled="
+                                                        entry.source_reference_reserved
+                                                    "
+                                                >
+                                                    <option value="">
+                                                        Tanpa tautan transaksi
+                                                        asal
+                                                    </option>
+                                                    <option
+                                                        v-for="source in sourceOptions.filter(
+                                                            (item) =>
+                                                                item.material_type ===
+                                                                    form.material_type &&
+                                                                item.id !==
+                                                                    entry.id,
+                                                        )"
+                                                        :key="source.id"
+                                                        :value="source.id"
+                                                    >
+                                                        {{
+                                                            source.transaction_date.slice(
+                                                                0,
+                                                                10,
+                                                            )
+                                                        }}
+                                                        Â·
+                                                        {{
+                                                            formatFabaMovementType(
+                                                                source.movement_type,
+                                                            )
+                                                        }}
+                                                        Â· {{ source.quantity }}
+                                                        {{ source.unit }} Â·
+                                                        {{ source.id }}
+                                                    </option>
+                                                </select>
+                                                <p
+                                                    class="text-sm text-muted-foreground"
+                                                >
+                                                    Tautan ini menyimpan bukti
+                                                    transaksi asal, bukan
+                                                    menghitung pembalikan
+                                                    otomatis.
+                                                </p>
+                                                <InputError
+                                                    :message="
+                                                        form.errors
+                                                            .source_movement_id
+                                                    "
+                                                />
                                             </div>
                                             <div class="grid gap-2">
                                                 <Label for="note"

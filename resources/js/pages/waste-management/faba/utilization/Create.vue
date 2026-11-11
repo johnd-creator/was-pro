@@ -23,7 +23,10 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import VendorLicenseNotice from '@/components/VendorLicenseNotice.vue';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import { formatLocalDate } from '@/lib/date';
 import { formatFabaMovementType } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
@@ -67,7 +70,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
 ];
 
 const form = useForm({
-    transaction_date: new Date().toISOString().split('T')[0],
+    transaction_date: formatLocalDate(),
     material_type: '',
     movement_type: props.initialMovementType,
     vendor_id: NO_VENDOR,
@@ -95,7 +98,7 @@ function submit(): void {
                 ? null
                 : data.internal_destination_id,
         purpose_id: data.purpose_id === NO_PURPOSE ? null : data.purpose_id,
-    })).post(wasteManagementRoutes.faba.utilization.store.url());
+    })).post(scopedUrl(wasteManagementRoutes.faba.utilization.store.url()));
 }
 
 function updateAttachment(event: Event): void {
@@ -115,6 +118,7 @@ watch(
         }
     },
 );
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>
@@ -805,5 +809,10 @@ watch(
                 </form>
             </div>
         </div>
+        <VendorLicenseNotice
+            v-if="form.movement_type !== 'utilization_internal'"
+            :vendor="vendors.find((item) => item.id === form.vendor_id)"
+            :reference-date="form.transaction_date"
+        />
     </WasteManagementLayout>
 </template>

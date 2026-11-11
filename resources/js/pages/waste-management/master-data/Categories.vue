@@ -26,6 +26,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import type { BreadcrumbItem } from '@/types';
 
@@ -91,7 +92,7 @@ function openEditDialog(category: Category) {
 function submit() {
     if (editingCategory.value) {
         router.put(
-            CategoriesController.update(editingCategory.value.id),
+            scopedUrl(CategoriesController.update(editingCategory.value.id)),
             formData.value,
             {
                 onSuccess: () => {
@@ -100,7 +101,7 @@ function submit() {
             },
         );
     } else {
-        router.post(CategoriesController.store(), formData.value, {
+        router.post(scopedUrl(CategoriesController.store()), formData.value, {
             onSuccess: () => {
                 dialogOpen.value = false;
             },
@@ -110,9 +111,10 @@ function submit() {
 
 function deleteCategory(category: Category) {
     if (confirm(`Are you sure you want to delete ${category.name}?`)) {
-        router.delete(CategoriesController.destroy(category.id));
+        router.delete(scopedUrl(CategoriesController.destroy(category.id)));
     }
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>

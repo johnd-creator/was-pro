@@ -171,7 +171,7 @@ test('successful tenant migration preserves existing records and the caller cont
     expect(DB::table('public.migrations')->pluck('migration')->all())->toBe($publicMigrations);
 });
 
-test('organization provisioning preserves the existing caller tenant and its data', function () {
+test('organization provisioning stays global and preserves a legacy assigned tenant and its data', function () {
     $tenants = app(TenantService::class);
     $existing = Organization::factory()->create(['schema_name' => 'tenant_admin_'.Str::lower(Str::random(8))]);
     $tenants->createSchema($existing->schema_name);
@@ -179,13 +179,12 @@ test('organization provisioning preserves the existing caller tenant and its dat
     $this->admin->update(['organization_id' => $existing->id]);
     $tenants->switchToSchema($existing->schema_name);
     $record = \App\Models\WasteRecord::factory()->create(['quantity' => 11.5, 'created_by' => $this->admin->id]);
-    $expectedPath = DB::selectOne('SHOW search_path')->search_path;
     $tenants->switchToPublic();
 
     $this->actingAs($this->admin)->post(route('admin.organizations.store'), ['name' => 'Another Unit', 'code' => 'BE02FROMTENANT'])
         ->assertSessionHas('success')->assertSessionMissing('error');
 
-    expect(DB::selectOne('SHOW search_path')->search_path)->toBe($expectedPath);
+    expect(DB::selectOne('SHOW search_path')->search_path)->toBe('public');
     expect(DB::table($existing->schema_name.'.waste_records')->count())->toBe(1);
     expect((float) DB::table($existing->schema_name.'.waste_records')->where('id', $record->id)->value('quantity'))->toBe(11.5);
     $newSchema = DB::table('public.organizations')->where('code', 'BE02FROMTENANT')->value('schema_name');

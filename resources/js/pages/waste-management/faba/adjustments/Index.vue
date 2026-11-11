@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import { Plus, Search, Wrench } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import Heading from '@/components/Heading.vue';
+import Link from '@/components/OrganizationLink.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +22,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
     formatFabaDate,
@@ -81,6 +83,7 @@ const totalQuantity = computed(() =>
         0,
     ),
 );
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>
@@ -180,7 +183,9 @@ const totalQuantity = computed(() =>
                                 class="w-full justify-between"
                                 @click="
                                     router.get(
-                                        wasteManagementRoutes.faba.adjustments.create(),
+                                        scopedUrl(
+                                            wasteManagementRoutes.faba.adjustments.create(),
+                                        ),
                                     )
                                 "
                             >

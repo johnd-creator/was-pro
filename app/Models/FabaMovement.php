@@ -78,6 +78,11 @@ class FabaMovement extends Model
         'note',
     ];
 
+    protected static function booted(): void
+    {
+        static::deleting(fn (self $movement) => app(\App\Services\FabaCorrectionSource::class)->assertDeletable($movement));
+    }
+
     protected function casts(): array
     {
         return [

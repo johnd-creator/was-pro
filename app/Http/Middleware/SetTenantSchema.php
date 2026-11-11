@@ -25,7 +25,7 @@ class SetTenantSchema
     public function handle(Request $request, Closure $next): Response
     {
         // Only set tenant schema if user is authenticated and has an organization
-        if (Auth::check() && Auth::user()->organization_id) {
+        if (Auth::check() && Auth::user()->organization_id && ($request->is('api/*') || ! Auth::user()->isSuperAdmin())) {
             $organization = Auth::user()->organization;
 
             if (! $organization || ! $this->tenantService->schemaExists($organization->schema_name)) {

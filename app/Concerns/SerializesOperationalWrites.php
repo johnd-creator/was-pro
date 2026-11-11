@@ -48,6 +48,7 @@ trait SerializesOperationalWrites
             $guard->after($before);
             if ($saved && $changed) {
                 app(\App\Services\OperationalAuditService::class)->record($this, $current?->getAttributes() ?? [], $current ? 'update' : 'create');
+                app(\App\Services\OperationalInbox::class)->recordTransition($this, $current?->getAttributes() ?? [], (string) \Illuminate\Support\Str::uuid());
             }
 
             return $saved;
@@ -75,6 +76,7 @@ trait SerializesOperationalWrites
 
             $guard = app(\App\Services\OperationalModelGuard::class);
             $before = $guard->before($this, $current);
+            app(\App\Services\HaulingPlans::class)->beforeDelete($current);
             $deleted = parent::delete();
             $guard->after($before);
             if ($deleted) {

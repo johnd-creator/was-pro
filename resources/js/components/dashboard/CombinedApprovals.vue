@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
 import { ArrowRight, Clock3, FileText, ShieldAlert } from 'lucide-vue-next';
 import { computed } from 'vue';
+import Link from '@/components/OrganizationLink.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {

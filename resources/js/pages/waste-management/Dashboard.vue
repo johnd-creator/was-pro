@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ExpiryBadge from '@/components/waste-management/ExpiryBadge.vue';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
@@ -121,6 +122,7 @@ const hasAlerts = computed(() => {
 const hasPendingApprovals = computed(() => {
     return props.pendingApprovals.length > 0;
 });
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>
@@ -165,7 +167,9 @@ const hasPendingApprovals = computed(() => {
                             class="focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                             @click="
                                 router.get(
-                                    wasteManagementRoutes.haulings.create(),
+                                    scopedUrl(
+                                        wasteManagementRoutes.haulings.create(),
+                                    ),
                                 )
                             "
                         >
@@ -408,7 +412,9 @@ const hasPendingApprovals = computed(() => {
                                                 size="sm"
                                                 @click="
                                                     router.get(
-                                                        wasteManagementRoutes.records.pendingApproval(),
+                                                        scopedUrl(
+                                                            wasteManagementRoutes.records.pendingApproval(),
+                                                        ),
                                                     )
                                                 "
                                             >
@@ -464,8 +470,10 @@ const hasPendingApprovals = computed(() => {
                                     class="min-h-[44px] focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                                     @click="
                                         router.get(
-                                            wasteManagementRoutes.records.show(
-                                                record.id,
+                                            scopedUrl(
+                                                wasteManagementRoutes.records.show(
+                                                    record.id,
+                                                ),
                                             ),
                                         )
                                     "
@@ -519,8 +527,10 @@ const hasPendingApprovals = computed(() => {
                                     class="min-h-[44px] focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                                     @click="
                                         router.get(
-                                            wasteManagementRoutes.records.show(
-                                                record.id,
+                                            scopedUrl(
+                                                wasteManagementRoutes.records.show(
+                                                    record.id,
+                                                ),
                                             ),
                                         )
                                     "
@@ -545,7 +555,9 @@ const hasPendingApprovals = computed(() => {
                                 class="min-h-[44px] w-full justify-start focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                                 @click="
                                     router.get(
-                                        wasteManagementRoutes.records.create(),
+                                        scopedUrl(
+                                            wasteManagementRoutes.records.create(),
+                                        ),
                                     )
                                 "
                             >
@@ -560,7 +572,9 @@ const hasPendingApprovals = computed(() => {
                                 class="min-h-[44px] w-full justify-start focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                                 @click="
                                     router.get(
-                                        wasteManagementRoutes.haulings.create(),
+                                        scopedUrl(
+                                            wasteManagementRoutes.haulings.create(),
+                                        ),
                                     )
                                 "
                             >
@@ -575,7 +589,9 @@ const hasPendingApprovals = computed(() => {
                                 class="min-h-[44px] w-full justify-start focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                                 @click="
                                     router.get(
-                                        wasteManagementRoutes.records.pendingApproval(),
+                                        scopedUrl(
+                                            wasteManagementRoutes.records.pendingApproval(),
+                                        ),
                                     )
                                 "
                                 v-if="

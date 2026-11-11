@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Middleware\UseOrganizationContext;
 use App\Http\Requests\DashboardFilterRequest;
 use App\Models\Organization;
 use App\Services\UnifiedDashboardService;
@@ -90,27 +91,8 @@ class DashboardController extends Controller
 
     private function resolveSelectedOrganization(DashboardFilterRequest $request): Organization
     {
-        $user = $request->user();
-        $requestedOrganizationId = $request->validated('organization_id');
+        $organization = $request->attributes->get(UseOrganizationContext::ATTRIBUTE);
 
-        if (! $user->isSuperAdmin()) {
-            return $user->organization ?? abort(403);
-        }
-
-        if ($requestedOrganizationId) {
-            return Organization::query()
-                ->active()
-                ->whereKey($requestedOrganizationId)
-                ->first() ?? abort(403);
-        }
-
-        if ($user->organization && $user->organization->is_active) {
-            return $user->organization;
-        }
-
-        return Organization::query()
-            ->active()
-            ->orderBy('name')
-            ->first() ?? abort(403);
+        return $organization instanceof Organization ? $organization : abort(403);
     }
 }

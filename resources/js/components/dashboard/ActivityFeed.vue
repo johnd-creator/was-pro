@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
 import {
     ArrowRight,
     CheckCircle,
@@ -11,6 +10,7 @@ import {
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 import EmptyState from '@/components/dashboard/EmptyState.vue';
+import Link from '@/components/OrganizationLink.vue';
 
 interface Activity {
     id: string;

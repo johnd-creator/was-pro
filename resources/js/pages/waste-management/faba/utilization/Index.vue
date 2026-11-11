@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import { DownloadIcon, Factory, Plus, Search } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import Heading from '@/components/Heading.vue';
+import Link from '@/components/OrganizationLink.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +22,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
     formatFabaDate,
@@ -31,6 +33,8 @@ import {
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 import type { FabaUtilizationMovement, FabaVendor } from '@/types/faba';
+
+const { download, scopedUrl } = useOrganizationContext();
 
 const props = defineProps<{
     entries: FabaUtilizationMovement[];
@@ -179,8 +183,8 @@ const externalCount = computed(
                                 variant="outline"
                                 class="w-full justify-between border-white/90 bg-white/85 shadow-sm dark:bg-slate-950/80"
                                 @click="
-                                    router.get(
-                                        wasteManagementRoutes.faba.utilization.export.csv(),
+                                    download(
+                                        wasteManagementRoutes.faba.utilization.export.csv.url(),
                                     )
                                 "
                             >
@@ -191,16 +195,18 @@ const externalCount = computed(
                                 class="w-full justify-between"
                                 @click="
                                     router.get(
-                                        movementType !== 'all'
-                                            ? wasteManagementRoutes.faba.utilization.create.url(
-                                                  {
-                                                      query: {
-                                                          movement_type:
-                                                              movementType,
+                                        scopedUrl(
+                                            movementType !== 'all'
+                                                ? wasteManagementRoutes.faba.utilization.create.url(
+                                                      {
+                                                          query: {
+                                                              movement_type:
+                                                                  movementType,
+                                                          },
                                                       },
-                                                  },
-                                              )
-                                            : wasteManagementRoutes.faba.utilization.create(),
+                                                  )
+                                                : wasteManagementRoutes.faba.utilization.create(),
+                                        ),
                                     )
                                 "
                             >

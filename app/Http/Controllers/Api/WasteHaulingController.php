@@ -26,7 +26,7 @@ class WasteHaulingController extends ApiController
             ->with([
                 'wasteType.category',
                 'wasteType.characteristic',
-                'haulings' => fn ($query) => $query->orderByDesc('hauling_date')->orderByDesc('created_at'),
+                'haulings' => fn ($query) => $query->with('vendor')->orderByDesc('hauling_date')->orderByDesc('created_at'),
             ])
             ->approved()
             ->orderByDesc('date')->orderByDesc('id');
@@ -52,7 +52,7 @@ class WasteHaulingController extends ApiController
     {
         $user = $request->user();
         $record = WasteRecord::query()
-            ->with(['wasteType.category', 'haulings.createdBy', 'haulings.approvedByUser'])
+            ->with(['wasteType.category', 'haulings.vendor', 'haulings.createdBy', 'haulings.approvedByUser'])
             ->findOrFail($wasteRecord);
 
         if (! $this->canViewRecordForHauling($user, $record)) {
@@ -88,7 +88,7 @@ class WasteHaulingController extends ApiController
         }
 
         $quantity = (float) $request->validated('quantity');
-        $availableQuantity = max(0, (float) $record->quantity - $record->getReservedHaulingQuantity());
+        $availableQuantity = max(0, app(\App\Services\HaulingPlans::class)->availableFor($record, $request->validated('waste_hauling_plan_id')));
 
         if ($quantity > $availableQuantity) {
             $message = "Jumlah angkut melebihi sisa yang bisa diajukan. Tersedia {$availableQuantity} {$record->unit}.";
@@ -99,6 +99,8 @@ class WasteHaulingController extends ApiController
         }
 
         $hauling = WasteHauling::query()->create([
+            ...app(\App\Services\HaulingMetadata::class)->attributes($request),
+            ...($request->validated('waste_hauling_plan_id') ? ['waste_hauling_plan_id' => $request->validated('waste_hauling_plan_id')] : []),
             'hauling_number' => '',
             'waste_record_id' => $record->id,
             'hauling_date' => $request->validated('hauling_date'),
@@ -127,6 +129,15 @@ class WasteHaulingController extends ApiController
         return $this->success($this->serializeHauling($hauling, $user));
     }
 
+    public function attachment(Request $request, string $wasteHauling): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $hauling = $this->findHaulingOrFail($wasteHauling);
+        $user = $request->user();
+        abort_unless($this->canAccessHauling($user, $hauling) || $user->hasPermission('waste_hauling.approve') || $user->hasPermission('waste_hauling.reject'), 403);
+
+        return app(\App\Services\HaulingMetadata::class)->download($hauling);
+    }
+
     public function pendingApproval(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -137,7 +148,7 @@ class WasteHaulingController extends ApiController
 
         /** @var LengthAwarePaginator $haulings */
         $haulings = WasteHauling::query()
-            ->with(['wasteRecord.wasteType.category', 'createdBy', 'submittedByUser'])
+            ->with(['vendor', 'wasteRecord.wasteType.category', 'createdBy', 'submittedByUser'])
             ->pendingApproval()
             ->orderByDesc('submitted_at')
             ->paginate($this->resolvePerPage($request))
@@ -163,7 +174,7 @@ class WasteHaulingController extends ApiController
 
         $hauling->loadMissing('wasteRecord.haulings');
         $record = $hauling->wasteRecord;
-        $availableQuantity = max(0, (float) $record->quantity - $record->getReservedHaulingQuantity($hauling->id));
+        $availableQuantity = max(0, app(\App\Services\HaulingPlans::class)->availableFor($record, $hauling->waste_hauling_plan_id, $hauling->id));
 
         if ((float) $hauling->quantity > $availableQuantity) {
             return $this->error('Jumlah pengangkutan tidak lagi valid karena sisa limbah telah berubah.', 'CONFLICT', status: 409);
@@ -269,6 +280,7 @@ class WasteHaulingController extends ApiController
             'approved_hauled_quantity' => $record->getApprovedHauledQuantity(),
             'remaining_quantity' => $record->getRemainingQuantity(),
             'reserved_quantity' => $record->getReservedHaulingQuantity(),
+            ...app(\App\Services\HaulingPlans::class)->summary($record),
             'operational_status' => $record->getOperationalStatus(),
             'operational_status_label' => $record->getOperationalStatusLabel(),
             'allowed_actions' => $this->allowedRecordActions($user, $record),
@@ -279,6 +291,10 @@ class WasteHaulingController extends ApiController
     {
         return [
             'id' => $hauling->id,
+            ...app(\App\Services\HaulingMetadata::class)->serialize($hauling),
+            'waste_hauling_plan_id' => $hauling->waste_hauling_plan_id,
+            'can_view_plan' => app(\App\Services\HaulingPlans::class)->canViewPlan($hauling),
+            'record_kind' => $hauling->waste_hauling_plan_id ? 'planned_actual' : 'legacy_actual',
             'hauling_number' => $hauling->hauling_number,
             'hauling_date' => $hauling->hauling_date?->format('Y-m-d'),
             'quantity' => (float) $hauling->quantity,
@@ -355,7 +371,7 @@ class WasteHaulingController extends ApiController
     protected function findHaulingOrFail(string $id): WasteHauling
     {
         return WasteHauling::query()
-            ->with(['wasteRecord.wasteType.category', 'createdBy', 'submittedByUser', 'approvedByUser'])
+            ->with(['vendor', 'wasteRecord.wasteType.category', 'createdBy', 'submittedByUser', 'approvedByUser'])
             ->findOrFail($id);
     }
 

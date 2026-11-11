@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     ArrowRight,
@@ -9,6 +8,7 @@ import {
 } from 'lucide-vue-next';
 import type { LucideIcon } from 'lucide-vue-next';
 import { computed } from 'vue';
+import Link from '@/components/OrganizationLink.vue';
 import { Button } from '@/components/ui/button';
 import wasteManagementRoutes from '@/routes/waste-management';
 

@@ -10,7 +10,8 @@ import {
     Layers3,
     Sparkles,
 } from 'lucide-vue-next';
-import { computed, reactive } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
+import FabaBalanceReconciliation from '@/components/FabaBalanceReconciliation.vue';
 import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import { formatFabaMaterial, formatFabaMovementType } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
@@ -35,6 +37,7 @@ import type {
     FabaPurpose,
     FabaStockCardRow,
     FabaVendor,
+    FabaYearlyTotals,
 } from '@/types/faba';
 
 type OptionRef = {
@@ -43,8 +46,15 @@ type OptionRef = {
 };
 
 const ALL = '__all__';
+const { scopedUrl } = useOrganizationContext();
 
 const props = defineProps<{
+    archiveAvailable: boolean;
+    closingVersions: Array<{
+        id: string;
+        version: number;
+        approved_at: string | null;
+    }>;
     currentYear: number;
     filters: {
         year: number;
@@ -71,11 +81,7 @@ const props = defineProps<{
     monthlyRecap: FabaMonthlyRecap;
     yearlyRecap: {
         year: number;
-        totals: {
-            total_production: number;
-            total_utilization: number;
-            closing_balance: number;
-        };
+        totals: FabaYearlyTotals;
         latest_month?: {
             period_label: string;
             total_production: number;
@@ -120,6 +126,14 @@ const props = defineProps<{
     analysisMatrix: FabaAnalysisMatrix;
     tpsCapacitySummary: FabaCapacitySummary;
 }>();
+
+const exportVersion = ref('draft');
+watch(
+    () => [props.filters.year, props.filters.month],
+    () => {
+        exportVersion.value = 'draft';
+    },
+);
 
 const form = reactive({
     year: props.filters.year,
@@ -187,7 +201,7 @@ const filterSummary = computed(() => {
             : null,
     ].filter(Boolean);
 
-    return labels.length > 0 ? labels.join(' • ') : 'Semua segmen aktif';
+    return labels.length > 0 ? labels.join(' Ã¢â‚¬Â¢ ') : 'Semua segmen aktif';
 });
 
 const highlightedBalances = computed(() =>
@@ -197,11 +211,11 @@ const highlightedBalances = computed(() =>
             (item) =>
                 `${formatFabaMaterial(item.material_type)} ${item.balance} ton`,
         )
-        .join(' • '),
+        .join(' Ã¢â‚¬Â¢ '),
 );
 
 function download(url: string): void {
-    window.location.assign(url);
+    window.location.assign(scopedUrl(url));
 }
 
 function analysisMatrixUrl(format: 'xlsx' | 'pdf'): string {
@@ -214,7 +228,7 @@ function analysisMatrixUrl(format: 'xlsx' | 'pdf'): string {
 
 function applyFilters(): void {
     router.get(
-        wasteManagementRoutes.faba.reports.index(),
+        scopedUrl(wasteManagementRoutes.faba.reports.index()),
         normalizedFilters.value,
     );
 }
@@ -645,6 +659,12 @@ function applyFilters(): void {
                                 </div>
                             </div>
 
+                            <FabaBalanceReconciliation
+                                class="mt-4"
+                                :summary="monthlyRecap"
+                                :period-label="monthlyRecap.period_label"
+                            />
+
                             <div class="mt-4 flex flex-wrap gap-2">
                                 <Badge
                                     v-for="warning in monthlyRecap.warnings"
@@ -662,6 +682,51 @@ function applyFilters(): void {
                                 </span>
                             </div>
 
+                            <div class="mt-5 space-y-2">
+                                <p class="text-sm">
+                                    Ringkasan di atas: Draft / Data Langsung.
+                                    Pilih sumber ekspor:
+                                </p>
+                                <Select
+                                    v-if="archiveAvailable"
+                                    v-model="exportVersion"
+                                >
+                                    <SelectTrigger
+                                        aria-label="Sumber ekspor closing"
+                                        ><SelectValue
+                                    /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="draft"
+                                            >Draft / Data Langsung</SelectItem
+                                        >
+                                        <SelectItem
+                                            v-for="version in closingVersions"
+                                            :key="version.id"
+                                            :value="String(version.version)"
+                                        >
+                                            Arsip Disetujui / Versi
+                                            {{ version.version }} /
+                                            {{
+                                                version.approved_at ??
+                                                'Waktu tidak tercatat'
+                                            }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p v-else class="text-sm text-muted-foreground">
+                                    Arsip berversi belum diaktifkan. Ekspor
+                                    hanya Draft / Data Langsung.
+                                </p>
+                                <p
+                                    v-if="
+                                        archiveAvailable &&
+                                        closingVersions.length === 0
+                                    "
+                                    class="text-sm text-muted-foreground"
+                                >
+                                    Belum ada versi arsip untuk periode ini.
+                                </p>
+                            </div>
                             <div class="mt-5 flex flex-wrap gap-2">
                                 <Button
                                     @click="
@@ -669,8 +734,17 @@ function applyFilters(): void {
                                             wasteManagementRoutes.faba.reports.monthly.xlsx.url(
                                                 {
                                                     query: {
-                                                        year: normalizedFilters.year,
-                                                        month: normalizedFilters.month,
+                                                        year: props.filters
+                                                            .year,
+                                                        month: props.filters
+                                                            .month,
+                                                        version:
+                                                            exportVersion ===
+                                                            'draft'
+                                                                ? undefined
+                                                                : Number(
+                                                                      exportVersion,
+                                                                  ),
                                                     },
                                                 },
                                             ),
@@ -687,8 +761,17 @@ function applyFilters(): void {
                                             wasteManagementRoutes.faba.reports.monthly.pdf.url(
                                                 {
                                                     query: {
-                                                        year: normalizedFilters.year,
-                                                        month: normalizedFilters.month,
+                                                        year: props.filters
+                                                            .year,
+                                                        month: props.filters
+                                                            .month,
+                                                        version:
+                                                            exportVersion ===
+                                                            'draft'
+                                                                ? undefined
+                                                                : Number(
+                                                                      exportVersion,
+                                                                  ),
                                                     },
                                                 },
                                             ),
@@ -782,6 +865,13 @@ function applyFilters(): void {
                                     </p>
                                 </div>
                             </div>
+
+                            <FabaBalanceReconciliation
+                                class="mt-4"
+                                :summary="yearlyRecap.totals"
+                                :period-label="String(yearlyRecap.year)"
+                                yearly
+                            />
 
                             <p
                                 v-if="yearlyRecap.latest_month"

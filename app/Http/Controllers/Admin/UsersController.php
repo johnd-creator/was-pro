@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\SaveUserRequest;
 use App\Models\Organization;
 use App\Models\Role;
 use App\Models\User;
@@ -19,51 +20,40 @@ class UsersController extends Controller
      */
     public function index(): Response
     {
-        $organizationId = auth()->user()->organization_id;
+        $viewer = auth()->user();
 
-        $users = User::when($organizationId, function ($query) use ($organizationId) {
-            return $query->where('organization_id', $organizationId);
+        $users = User::when(! $viewer->isSuperAdmin(), function ($query) use ($viewer) {
+            return $query->where('organization_id', $viewer->organization_id);
         })
             ->with(['organization', 'role'])
             ->orderBy('name')
             ->get();
 
-        $organizations = Organization::active()->get();
+        $organizations = Organization::active()->when(! $viewer->isSuperAdmin(), fn ($query) => $query->where('id', $viewer->organization_id))->get();
         $roles = Role::active()->get();
 
         return Inertia::render('admin/Users', [
             'users' => $users,
             'organizations' => $organizations,
             'roles' => $roles,
+            'canManageSuperAdmins' => $viewer->isSuperAdmin(),
         ]);
     }
 
     /**
      * Store a newly created user.
      */
-    public function store(): RedirectResponse
+    public function store(SaveUserRequest $request): RedirectResponse
     {
-        $validated = request()->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-            'organization_id' => 'required|uuid|exists:organizations,id',
-            'role_id' => 'required|uuid|exists:roles,id',
-            'is_super_admin' => 'boolean',
-        ]);
-
-        // Check authorization
-        if (! auth()->user()->canManageUsers($validated['organization_id'])) {
-            abort(403, 'You do not have permission to create users in this organization.');
-        }
+        $validated = $request->validated();
 
         User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'organization_id' => $validated['organization_id'],
+            'organization_id' => $request->superAdminStatus() ? null : $validated['organization_id'],
             'role_id' => $validated['role_id'],
-            'is_super_admin' => $validated['is_super_admin'] ?? false,
+            'is_super_admin' => $request->superAdminStatus(),
             'created_by' => auth()->id(),
             'updated_by' => auth()->id(),
         ]);
@@ -75,27 +65,16 @@ class UsersController extends Controller
     /**
      * Update the specified user.
      */
-    public function update(User $user): RedirectResponse
+    public function update(SaveUserRequest $request, User $user): RedirectResponse
     {
-        // Check authorization
-        if (! auth()->user()->canManageUsers($user->organization_id)) {
-            abort(403, 'You do not have permission to edit users in this organization.');
-        }
-
-        $validated = request()->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,'.$user->id,
-            'organization_id' => 'required|uuid|exists:organizations,id',
-            'role_id' => 'required|uuid|exists:roles,id',
-            'is_super_admin' => 'boolean',
-        ]);
+        $validated = $request->validated();
 
         $user->update([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'organization_id' => $validated['organization_id'],
+            'organization_id' => $request->superAdminStatus() ? null : $validated['organization_id'],
             'role_id' => $validated['role_id'],
-            'is_super_admin' => $validated['is_super_admin'] ?? false,
+            'is_super_admin' => $request->superAdminStatus(),
             'updated_by' => auth()->id(),
         ]);
 
@@ -109,7 +88,7 @@ class UsersController extends Controller
     public function updatePassword(User $user): RedirectResponse
     {
         // Check authorization
-        if (! auth()->user()->canManageUsers($user->organization_id)) {
+        if (! $this->canManageTarget($user)) {
             abort(403, 'You do not have permission to edit users in this organization.');
         }
 
@@ -132,7 +111,7 @@ class UsersController extends Controller
     public function destroy(User $user): RedirectResponse
     {
         // Check authorization
-        if (! auth()->user()->canManageUsers($user->organization_id)) {
+        if (! $this->canManageTarget($user)) {
             abort(403, 'You do not have permission to delete users in this organization.');
         }
 
@@ -146,5 +125,15 @@ class UsersController extends Controller
 
         return Redirect::route('admin.users.index')
             ->with('success', 'User deleted successfully.');
+    }
+
+    private function canManageTarget(User $target): bool
+    {
+        $actor = auth()->user();
+
+        return $actor->isSuperAdmin() || (! $target->isSuperAdmin()
+            && $actor->organization_id !== null
+            && $actor->organization_id === $target->organization_id
+            && $actor->canManageUsers($target->organization_id));
     }
 }

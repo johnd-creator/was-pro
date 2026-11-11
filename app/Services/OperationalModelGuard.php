@@ -13,16 +13,17 @@ class OperationalModelGuard
 {
     public function before(Model $model, ?Model $current): ?array
     {
+        app(HaulingPlans::class)->before($model, $current);
         $approvalColumn = $model instanceof FabaMovement ? 'approval_status' : 'status';
         if ($current && auth()->user() && $model->isDirty($approvalColumn) && $model->{$approvalColumn} === 'approved'
-            && ($model instanceof WasteRecord || $model instanceof WasteHauling || $model instanceof FabaMovement || $model instanceof \App\Models\FabaMonthlyApproval)
+            && ($model instanceof \App\Models\WasteHaulingPlan || $model instanceof WasteRecord || $model instanceof WasteHauling || $model instanceof FabaMovement || $model instanceof \App\Models\FabaMonthlyApproval)
             && ! app(ApprovalSeparation::class)->canApprove(auth()->user(), $current)) {
             throw new OperationalConflict('Pengajuan sendiri harus disetujui supervisor lain.');
         }
         $restoringHauling = $model instanceof WasteHauling && $current && $current->deleted_at !== null && $model->deleted_at === null;
         if ($model instanceof WasteHauling && $current && (($model->isDirty('status') && $model->status === 'approved') || ($restoringHauling && in_array($model->status, ['pending_approval', 'approved'], true)))) {
             $record = WasteRecord::query()->findOrFail($model->waste_record_id);
-            if (! $record->isApproved() || round((float) $model->quantity, 2) > round((float) $record->quantity - $record->getReservedHaulingQuantity($model->id), 2)) {
+            if (! $record->isApproved() || round((float) $model->quantity, 2) > round((float) app(HaulingPlans::class)->availableFor($record, $model->waste_hauling_plan_id, $model->id), 2)) {
                 throw new OperationalConflict('Jumlah pengangkutan melebihi sisa limbah yang tersedia.');
             }
         }

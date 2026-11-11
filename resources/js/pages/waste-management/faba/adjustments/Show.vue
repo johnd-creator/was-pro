@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
     formatFabaDate,
@@ -28,6 +29,18 @@ const props = defineProps<{
         quantity: number;
         unit: string;
         note: string | null;
+        source_movement_id: string | null;
+        source_captured_at: string | null;
+        source_snapshot: {
+            id: string;
+            transaction_date: string;
+            material_type: string;
+            movement_type: string;
+            quantity: number;
+            unit: string;
+            document_number: string | null;
+        } | null;
+        source_current: { quantity: number; unit: string } | null;
         period_label: string;
         approval_status: string;
         effective_status?: string;
@@ -57,15 +70,20 @@ const rejectForm = useForm({ rejection_note: '' });
 
 function approve(): void {
     approveForm.post(
-        wasteManagementRoutes.faba.movements.approve(props.entry.id).url,
+        scopedUrl(
+            wasteManagementRoutes.faba.movements.approve(props.entry.id).url,
+        ),
     );
 }
 
 function reject(): void {
     rejectForm.post(
-        wasteManagementRoutes.faba.movements.reject(props.entry.id).url,
+        scopedUrl(
+            wasteManagementRoutes.faba.movements.reject(props.entry.id).url,
+        ),
     );
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>
@@ -144,6 +162,44 @@ function reject(): void {
                         </div>
                     </div>
                 </section>
+                <Card v-if="entry.source_movement_id">
+                    <CardHeader
+                        ><CardTitle>Bukti transaksi asal</CardTitle></CardHeader
+                    >
+                    <CardContent class="space-y-2">
+                        <p>ID: {{ entry.source_movement_id }}</p>
+                        <template v-if="entry.source_snapshot">
+                            <p>
+                                Bukti saat ditautkan ({{
+                                    entry.source_captured_at
+                                }}):
+                                {{ entry.source_snapshot.transaction_date }} ·
+                                {{
+                                    formatFabaMovementType(
+                                        entry.source_snapshot.movement_type,
+                                    )
+                                }}
+                                · {{ entry.source_snapshot.quantity }}
+                                {{ entry.source_snapshot.unit }}
+                            </p>
+                            <p v-if="entry.source_snapshot.document_number">
+                                Dokumen:
+                                {{ entry.source_snapshot.document_number }}
+                            </p>
+                        </template>
+                        <p v-else>Bukti historis tautan belum tersedia.</p>
+                        <p v-if="entry.source_current">
+                            Nilai sumber saat ini:
+                            {{ entry.source_current.quantity }}
+                            {{ entry.source_current.unit }}
+                        </p>
+                        <p v-else>Transaksi asal tidak tersedia.</p>
+                        <p>
+                            Tautan tidak mengubah perhitungan stok atau membalik
+                            transaksi asal secara otomatis.
+                        </p>
+                    </CardContent>
+                </Card>
 
                 <Card
                     v-if="entry.duplicate_warning"

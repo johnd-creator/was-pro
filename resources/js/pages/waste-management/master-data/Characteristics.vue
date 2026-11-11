@@ -27,6 +27,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import type { BreadcrumbItem } from '@/types';
 
@@ -96,7 +97,11 @@ function openEditDialog(characteristic: Characteristic) {
 function submit() {
     if (editingCharacteristic.value) {
         router.put(
-            CharacteristicsController.update(editingCharacteristic.value.id),
+            scopedUrl(
+                CharacteristicsController.update(
+                    editingCharacteristic.value.id,
+                ),
+            ),
             formData.value,
             {
                 onSuccess: () => {
@@ -105,17 +110,23 @@ function submit() {
             },
         );
     } else {
-        router.post(CharacteristicsController.store(), formData.value, {
-            onSuccess: () => {
-                dialogOpen.value = false;
+        router.post(
+            scopedUrl(CharacteristicsController.store()),
+            formData.value,
+            {
+                onSuccess: () => {
+                    dialogOpen.value = false;
+                },
             },
-        });
+        );
     }
 }
 
 function deleteCharacteristic(characteristic: Characteristic) {
     if (confirm(`Are you sure you want to delete ${characteristic.name}?`)) {
-        router.delete(CharacteristicsController.destroy(characteristic.id));
+        router.delete(
+            scopedUrl(CharacteristicsController.destroy(characteristic.id)),
+        );
     }
 }
 
@@ -124,6 +135,7 @@ function getHazardousBadgeClass(isHazardous: boolean) {
         ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
         : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>

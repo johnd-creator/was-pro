@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     Clock3,
@@ -12,6 +12,7 @@ import {
 } from 'lucide-vue-next';
 import { ref, computed } from 'vue';
 import Heading from '@/components/Heading.vue';
+import Link from '@/components/OrganizationLink.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -38,7 +39,9 @@ import {
 import CreateWasteRecordForm from '@/components/waste-management/CreateWasteRecordForm.vue';
 import ExpiryBadge from '@/components/waste-management/ExpiryBadge.vue';
 import StatusBadge from '@/components/waste-management/StatusBadge.vue';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import { getWasteStorageState } from '@/lib/waste-storage';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 
@@ -69,6 +72,7 @@ interface WasteRecord {
     status: 'draft' | 'pending_review' | 'approved' | 'rejected';
     approved_hauled_quantity: number;
     remaining_quantity: number;
+    has_simulated_hauling: boolean;
     reserved_quantity: number;
     operational_status: 'not_hauled' | 'partially_hauled' | 'completed';
     operational_status_label: string;
@@ -89,11 +93,15 @@ type Props = {
     wasteTypes?: WasteType[];
 };
 
+const { download } = useOrganizationContext();
+
 const props = defineProps<Props>();
 
 const isCreateDialogOpen = ref(false);
 
-const expiryFilter = ref<'all' | 'expired' | 'expiring_soon' | 'fresh'>('all');
+const expiryFilter = ref<
+    'all' | 'expired' | 'expiring_soon' | 'fresh' | 'completed'
+>('all');
 const searchQuery = ref('');
 const sortKey = ref<'latest' | 'oldest' | 'quantity_high' | 'quantity_low'>(
     'latest',
@@ -116,23 +124,16 @@ const totalPendingRecords = computed(
 );
 const totalExpiredRecords = computed(
     () =>
-        props.wasteRecords.filter((record) => {
-            if (!record.expiry_date) {
-                return false;
-            }
-
-            const expiryDate = new Date(record.expiry_date);
-            const today = new Date();
-            expiryDate.setHours(0, 0, 0, 0);
-            today.setHours(0, 0, 0, 0);
-
-            return expiryDate.getTime() < today.getTime();
-        }).length,
+        props.wasteRecords.filter(
+            (record) =>
+                getWasteStorageState(
+                    record.expiry_date,
+                    record.remaining_quantity,
+                ).status === 'expired',
+        ).length,
 );
 
 const filteredRecords = computed(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
     const query = searchQuery.value.trim().toLowerCase();
 
     return [...props.wasteRecords]
@@ -155,27 +156,12 @@ const filteredRecords = computed(() => {
                 return true;
             }
 
-            if (!record.expiry_date) {
-                return false;
-            }
-
-            const expiryDate = new Date(record.expiry_date);
-            expiryDate.setHours(0, 0, 0, 0);
-            const daysUntilExpiry = Math.ceil(
-                (expiryDate.getTime() - today.getTime()) /
-                    (1000 * 60 * 60 * 24),
+            return (
+                getWasteStorageState(
+                    record.expiry_date,
+                    record.remaining_quantity,
+                ).status === expiryFilter.value
             );
-
-            switch (expiryFilter.value) {
-                case 'expired':
-                    return daysUntilExpiry < 0;
-                case 'expiring_soon':
-                    return daysUntilExpiry >= 0 && daysUntilExpiry <= 7;
-                case 'fresh':
-                    return daysUntilExpiry > 7;
-                default:
-                    return true;
-            }
         })
         .sort((left, right) => {
             if (sortKey.value === 'oldest') {
@@ -251,6 +237,26 @@ function getOperationalStatusClass(status: WasteRecord['operational_status']) {
     }
 
     return 'bg-slate-100 text-slate-800 dark:bg-slate-900/40 dark:text-slate-200';
+}
+
+function exportCsv(): void {
+    const today = new Date();
+    const storageDate = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, '0'),
+        String(today.getDate()).padStart(2, '0'),
+    ].join('-');
+
+    download(
+        wasteManagementRoutes.records.export.csv.url({
+            query: {
+                search: searchQuery.value.trim(),
+                storage_status: expiryFilter.value,
+                storage_date: storageDate,
+                sort: sortKey.value,
+            },
+        }),
+    );
 }
 
 function resetPage(): void {
@@ -459,11 +465,7 @@ function handleCreateSuccess(): void {
                             <Button
                                 variant="outline"
                                 class="w-full justify-start border-white/90 bg-white/85 shadow-sm hover:bg-white dark:border-slate-800/80 dark:bg-slate-950/80 dark:hover:bg-slate-950"
-                                @click="
-                                    router.get(
-                                        wasteManagementRoutes.records.export.csv(),
-                                    )
-                                "
+                                @click="exportCsv"
                             >
                                 <DownloadIcon class="mr-2 h-4 w-4" />
                                 Ekspor CSV
@@ -546,6 +548,9 @@ function handleCreateSuccess(): void {
                                 >
                                 <SelectItem value="fresh"
                                     >Masih aman</SelectItem
+                                >
+                                <SelectItem value="completed"
+                                    >Selesai / stok nol</SelectItem
                                 >
                             </SelectContent>
                         </Select>
@@ -796,6 +801,12 @@ function handleCreateSuccess(): void {
                                     <TableCell>
                                         <ExpiryBadge
                                             :expiry-date="record.expiry_date"
+                                            :remaining-quantity="
+                                                record.remaining_quantity
+                                            "
+                                            :simulated="
+                                                record.has_simulated_hauling
+                                            "
                                             size="sm"
                                         />
                                     </TableCell>

@@ -58,7 +58,7 @@ class FabaUtilizationMovementsController extends Controller
 
         return Inertia::render('waste-management/faba/utilization/Index', [
             'entries' => $entries,
-            'vendors' => Vendor::query()->active()->orderBy('name')->get(['id', 'name']),
+            'vendors' => Vendor::query()->active()->orderBy('name')->get(['id', 'name', 'license_number', 'license_expiry_date'])->map(fn ($vendor) => [...$vendor->toArray(), 'license_expiry_date' => $vendor->license_expiry_date?->format('Y-m-d')]),
             'internalDestinations' => FabaInternalDestination::query()->active()->orderBy('name')->get(['id', 'name']),
             'purposes' => FabaPurpose::query()->active()->orderBy('name')->get(['id', 'name']),
             'initialMovementType' => $this->normalizeMovementType((string) request('movement_type', '')),
@@ -72,7 +72,7 @@ class FabaUtilizationMovementsController extends Controller
     public function create(): Response
     {
         return Inertia::render('waste-management/faba/utilization/Create', [
-            'vendors' => Vendor::query()->active()->orderBy('name')->get(['id', 'name']),
+            'vendors' => Vendor::query()->active()->orderBy('name')->get(['id', 'name', 'license_number', 'license_expiry_date'])->map(fn ($vendor) => [...$vendor->toArray(), 'license_expiry_date' => $vendor->license_expiry_date?->format('Y-m-d')]),
             'internalDestinations' => FabaInternalDestination::query()->active()->orderBy('name')->get(['id', 'name']),
             'purposes' => FabaPurpose::query()->active()->orderBy('name')->get(['id', 'name']),
             'materialOptions' => FabaMovement::materialOptions(),
@@ -203,9 +203,9 @@ class FabaUtilizationMovementsController extends Controller
 
         return Inertia::render('waste-management/faba/utilization/Edit', [
             'entry' => $this->transformMovement($movement),
-            'vendors' => Vendor::query()->active()->orderBy('name')->get(['id', 'name']),
-            'internalDestinations' => FabaInternalDestination::query()->active()->orderBy('name')->get(['id', 'name']),
-            'purposes' => FabaPurpose::query()->active()->orderBy('name')->get(['id', 'name']),
+            'vendors' => Vendor::query()->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $movement->vendor_id))->orderBy('name')->get(['id', 'name', 'license_number', 'license_expiry_date'])->map(fn ($vendor) => [...$vendor->toArray(), 'license_expiry_date' => $vendor->license_expiry_date?->format('Y-m-d')]),
+            'internalDestinations' => FabaInternalDestination::query()->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $movement->internal_destination_id))->orderBy('name')->get(['id', 'name']),
+            'purposes' => FabaPurpose::query()->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $movement->purpose_id))->orderBy('name')->get(['id', 'name']),
             'materialOptions' => FabaMovement::materialOptions(),
             'movementTypeOptions' => self::MOVEMENT_TYPES,
             'defaultUnit' => FabaMovement::DEFAULT_UNIT,

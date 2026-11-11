@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { Link, usePage } from '@inertiajs/vue3';
+import { usePage } from '@inertiajs/vue3';
 import { ChevronDown, ChevronRight } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import Link from '@/components/OrganizationLink.vue';
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -83,6 +84,10 @@ watch(
 );
 
 function canView(item: NavItem): boolean {
+    if (item.capability && page.props[item.capability] !== true) {
+        return false;
+    }
+
     if (user.value?.is_super_admin === true) {
         return true;
     }

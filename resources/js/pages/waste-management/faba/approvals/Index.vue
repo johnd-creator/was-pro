@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import {
     ArrowRight,
     CalendarClock,
@@ -9,9 +9,11 @@ import {
 } from 'lucide-vue-next';
 import { computed, reactive } from 'vue';
 import Heading from '@/components/Heading.vue';
+import Link from '@/components/OrganizationLink.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import { formatFabaStatus } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
@@ -69,15 +71,19 @@ const statusTone = (status: string): string => {
 };
 
 function applyFilters(): void {
-    router.get(wasteManagementRoutes.faba.approvals.index(), filterForm);
+    router.get(
+        scopedUrl(wasteManagementRoutes.faba.approvals.index()),
+        filterForm,
+    );
 }
 
 function submitPeriod(year: number, month: number): void {
-    router.post(wasteManagementRoutes.faba.approvals.submit.url(), {
+    router.post(scopedUrl(wasteManagementRoutes.faba.approvals.submit.url()), {
         year,
         month,
     });
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>

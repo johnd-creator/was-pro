@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\WasteManagement;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\WasteManagement\FabaReportRequest;
 use App\Models\FabaInternalDestination;
 use App\Models\FabaMovement;
 use App\Models\FabaPurpose;
 use App\Models\Vendor;
+use App\Services\FabaClosingArchiveService;
 use App\Services\FabaOfficialReportService;
 use App\Services\FabaRecapService;
 use Inertia\Inertia;
@@ -61,6 +63,8 @@ class FabaReportsController extends Controller
                 'purposes' => FabaPurpose::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             ],
             'monthlyRecap' => $monthlyRecap,
+            'archiveAvailable' => app(FabaClosingArchiveService::class)->available(),
+            'closingVersions' => app(FabaClosingArchiveService::class)->versions($year, $month),
             'yearlyRecap' => [
                 'year' => $yearlyRecap['year'],
                 'totals' => $yearlyRecap['totals'],
@@ -76,19 +80,21 @@ class FabaReportsController extends Controller
         ]);
     }
 
-    public function monthlyXlsx(): BinaryFileResponse
+    public function monthlyXlsx(FabaReportRequest $request): BinaryFileResponse
     {
         return $this->fabaOfficialReportService->downloadExcel('monthly', [
             'year' => request('year'),
             'month' => request('month'),
+            'version' => $request->validated('version'),
         ]);
     }
 
-    public function monthlyPdf(): HttpResponse
+    public function monthlyPdf(FabaReportRequest $request): HttpResponse
     {
         return $this->fabaOfficialReportService->downloadPdf('monthly', [
             'year' => request('year'),
             'month' => request('month'),
+            'version' => $request->validated('version'),
         ]);
     }
 

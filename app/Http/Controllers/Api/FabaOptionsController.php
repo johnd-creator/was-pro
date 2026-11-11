@@ -30,7 +30,7 @@ class FabaOptionsController extends ApiController
             'vendors' => Vendor::query()
                 ->active()
                 ->orderBy('name')
-                ->get(['id', 'name', 'code']),
+                ->get(['id', 'name', 'code', 'license_number', 'license_expiry_date'])->map(fn ($vendor) => [...$vendor->toArray(), 'license_expiry_date' => $vendor->license_expiry_date?->format('Y-m-d')]),
             'internal_destinations' => FabaInternalDestination::query()
                 ->active()
                 ->orderBy('name')

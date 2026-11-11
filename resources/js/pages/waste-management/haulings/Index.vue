@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     Clock3,
@@ -11,7 +11,9 @@ import {
     Truck,
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import { index as plansIndex } from '@/actions/App/Http/Controllers/WasteManagement/WasteHaulingPlansController';
 import Heading from '@/components/Heading.vue';
+import Link from '@/components/OrganizationLink.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -38,8 +40,13 @@ import {
 import CreateWasteHaulingForm from '@/components/waste-management/CreateWasteHaulingForm.vue';
 import ExpiryBadge from '@/components/waste-management/ExpiryBadge.vue';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import {
+    compareWasteQuantities,
+    summarizeWasteQuantities,
+} from '@/lib/waste-quantity';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
+import type { HaulingPlan } from '@/types/hauling-plan';
 
 interface HaulingItem {
     id: string;
@@ -62,6 +69,9 @@ interface RecordItem {
     approved_hauled_quantity: number;
     remaining_quantity: number;
     reserved_quantity: number;
+    pending_actual_quantity?: number;
+    plan_reserved_quantity?: number;
+    available_quantity?: number;
     operational_status: 'not_hauled' | 'partially_hauled' | 'completed';
     operational_status_label: string;
     waste_type: {
@@ -74,9 +84,15 @@ interface RecordItem {
 
 const props = defineProps<{
     records: RecordItem[];
+    metadataAvailable?: boolean;
+    plansEnabled?: boolean;
+    actualDateLimit?: string;
+    actualDateTimezone?: string;
+    approvedPlans?: HaulingPlan[];
+    vendors?: { id: string; name: string }[];
     stats: {
         total_records: number;
-        total_remaining_quantity: number;
+        remaining_quantities: { unit: string; quantity: number }[];
         pending_requests: number;
     };
 }>();
@@ -105,7 +121,9 @@ function openCreateDialog(record: RecordItem): void {
 function handleCreateSuccess(): void {
     isCreateDialogOpen.value = false;
     selectedRecord.value = null;
-    router.reload({ only: ['records', 'stats'] });
+    router.reload({
+        only: ['records', 'stats', 'approvedPlans', 'plansEnabled'],
+    });
 }
 
 const filteredRecords = computed(() => {
@@ -142,7 +160,7 @@ const filteredRecords = computed(() => {
             }
 
             if (sortKey.value === 'remaining_high') {
-                return right.remaining_quantity - left.remaining_quantity;
+                return compareWasteQuantities(left, right);
             }
 
             const rankDifference =
@@ -177,18 +195,15 @@ const freshRecords = computed(() =>
     ),
 );
 
-const attentionQuantity = computed(
+const attentionQuantityLabel = computed(
     () =>
-        expiredRecords.value.reduce(
-            (sum, record) => sum + record.remaining_quantity,
-            0,
-        ) +
-        expiringSoonRecords.value.reduce(
-            (sum, record) => sum + record.remaining_quantity,
-            0,
-        ),
+        summarizeWasteQuantities([
+            ...expiredRecords.value,
+            ...expiringSoonRecords.value,
+        ])
+            .map(({ unit, quantity }) => `${formatNumber(quantity)} ${unit}`)
+            .join(', ') || 'Tidak ada sisa material',
 );
-
 const highestPriorityRecord = computed(() => {
     const prioritized = [...props.records].sort((left, right) => {
         const leftRank = expiryRank(left.expiry_date);
@@ -489,10 +504,7 @@ function changePage(page: number): void {
                                     <p
                                         class="mt-2 text-[12px] leading-5 text-slate-600 dark:text-slate-300"
                                     >
-                                        {{ formatNumber(attentionQuantity) }}
-                                        {{
-                                            highestPriorityRecord?.unit ?? 'kg'
-                                        }}
+                                        {{ attentionQuantityLabel }}
                                         berada di zona expired atau mendekati
                                         expired.
                                     </p>
@@ -551,7 +563,7 @@ function changePage(page: number): void {
                                         highestPriorityRecord.waste_type.name ||
                                         '-'
                                     }}
-                                    • Sisa
+                                    Ã¢â‚¬Â¢ Sisa
                                     {{
                                         formatNumber(
                                             highestPriorityRecord.remaining_quantity,
@@ -564,6 +576,19 @@ function changePage(page: number): void {
                                         :expiry-date="
                                             highestPriorityRecord.expiry_date
                                         "
+                                        :remaining-quantity="
+                                            highestPriorityRecord.remaining_quantity
+                                        "
+                                        :simulated="
+                                            highestPriorityRecord.hauling_history.some(
+                                                (entry) =>
+                                                    entry.status ===
+                                                        'approved' &&
+                                                    entry.hauling_number.startsWith(
+                                                        'SIMULASI-',
+                                                    ),
+                                            )
+                                        "
                                     />
                                 </div>
                                 <Button
@@ -574,7 +599,11 @@ function changePage(page: number): void {
                                     "
                                 >
                                     <Truck class="mr-2 h-3.5 w-3.5" />
-                                    Ajukan angkut prioritas
+                                    {{
+                                        plansEnabled
+                                            ? 'Rencana / realisasi prioritas'
+                                            : 'Catat realisasi prioritas'
+                                    }}
                                 </Button>
                             </div>
 
@@ -668,7 +697,7 @@ function changePage(page: number): void {
                                     >Tanggal catatan terbaru</SelectItem
                                 >
                                 <SelectItem value="remaining_high"
-                                    >Sisa terbesar ke terkecil</SelectItem
+                                    >Sisa terbesar per satuan</SelectItem
                                 >
                             </SelectContent>
                         </Select>
@@ -709,8 +738,8 @@ function changePage(page: number): void {
                                     <TableHead>Jenis limbah</TableHead>
                                     <TableHead>Masa simpan</TableHead>
                                     <TableHead>Total</TableHead>
-                                    <TableHead>Sudah diangkut</TableHead>
-                                    <TableHead>Sisa</TableHead>
+                                    <TableHead>Realisasi disetujui</TableHead>
+                                    <TableHead>Saldo tercatat</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Aksi</TableHead>
                                 </TableRow>
@@ -778,7 +807,7 @@ function changePage(page: number): void {
                                         >
                                             {{ formatDate(record.date) }}
                                             <span v-if="record.source">
-                                                • {{ record.source }}
+                                                Ã¢â‚¬Â¢ {{ record.source }}
                                             </span>
                                         </div>
                                     </TableCell>
@@ -803,6 +832,19 @@ function changePage(page: number): void {
                                     <TableCell>
                                         <ExpiryBadge
                                             :expiry-date="record.expiry_date"
+                                            :remaining-quantity="
+                                                record.remaining_quantity
+                                            "
+                                            :simulated="
+                                                record.hauling_history.some(
+                                                    (entry) =>
+                                                        entry.status ===
+                                                            'approved' &&
+                                                        entry.hauling_number.startsWith(
+                                                            'SIMULASI-',
+                                                        ),
+                                                )
+                                            "
                                             size="sm"
                                         />
                                     </TableCell>
@@ -830,16 +872,31 @@ function changePage(page: number): void {
                                             </div>
                                             <div
                                                 v-if="
-                                                    record.reserved_quantity >
-                                                    record.approved_hauled_quantity
+                                                    record.pending_actual_quantity !==
+                                                    undefined
                                                 "
                                                 class="text-xs text-muted-foreground"
                                             >
-                                                Pending:
+                                                Realisasi menunggu:
                                                 {{
                                                     formatNumber(
-                                                        record.reserved_quantity -
-                                                            record.approved_hauled_quantity,
+                                                        record.pending_actual_quantity,
+                                                    )
+                                                }}
+                                                {{ record.unit }}
+                                            </div>
+                                            <div
+                                                v-if="
+                                                    plansEnabled &&
+                                                    record.plan_reserved_quantity !==
+                                                        undefined
+                                                "
+                                                class="text-xs text-muted-foreground"
+                                            >
+                                                Alokasi rencana:
+                                                {{
+                                                    formatNumber(
+                                                        record.plan_reserved_quantity,
                                                     )
                                                 }}
                                                 {{ record.unit }}
@@ -871,7 +928,11 @@ function changePage(page: number): void {
                                                 <Plus
                                                     class="mr-1.5 h-3.5 w-3.5"
                                                 />
-                                                Ajukan Angkut
+                                                {{
+                                                    plansEnabled
+                                                        ? 'Rencana / Realisasi'
+                                                        : 'Catat realisasi'
+                                                }}
                                             </Button>
                                             <Button
                                                 as-child
@@ -926,6 +987,13 @@ function changePage(page: number): void {
             </div>
         </div>
 
+        <div v-if="plansEnabled" class="px-6 pb-6">
+            <Button as-child variant="outline"
+                ><Link :href="plansIndex.url()"
+                    >Lihat semua rencana angkut</Link
+                ></Button
+            >
+        </div>
         <!-- Create Dialog -->
         <Dialog v-model:open="isCreateDialogOpen">
             <DialogContent
@@ -933,12 +1001,23 @@ function changePage(page: number): void {
                 :show-close-button="true"
             >
                 <DialogHeader class="border-b px-6 pt-6 pb-4 sm:px-8">
-                    <DialogTitle>Ajukan Pengangkutan Limbah</DialogTitle>
+                    <DialogTitle>{{
+                        plansEnabled
+                            ? 'Rencana dan realisasi pengangkutan'
+                            : 'Catat realisasi pengangkutan'
+                    }}</DialogTitle>
                 </DialogHeader>
                 <div class="px-6 py-5 sm:px-8 sm:py-6">
                     <CreateWasteHaulingForm
                         v-if="selectedRecord"
+                        :key="selectedRecord.id"
                         :record="selectedRecord"
+                        :plans-enabled="plansEnabled"
+                        :actual-date-limit="actualDateLimit"
+                        :actual-date-timezone="actualDateTimezone"
+                        :approved-plans="approvedPlans"
+                        :metadata-available="metadataAvailable"
+                        :vendors="vendors"
                         @success="handleCreateSuccess"
                     />
                 </div>

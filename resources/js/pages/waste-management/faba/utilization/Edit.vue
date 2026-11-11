@@ -22,6 +22,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import VendorLicenseNotice from '@/components/VendorLicenseNotice.vue';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import { formatFabaMovementType } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
@@ -95,7 +97,11 @@ function submit(): void {
                 ? null
                 : data.internal_destination_id,
         purpose_id: data.purpose_id === NO_PURPOSE ? null : data.purpose_id,
-    })).put(wasteManagementRoutes.faba.utilization.update(props.entry.id).url);
+    })).put(
+        scopedUrl(
+            wasteManagementRoutes.faba.utilization.update(props.entry.id).url,
+        ),
+    );
 }
 
 function updateAttachment(event: Event): void {
@@ -115,6 +121,7 @@ watch(
         }
     },
 );
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>
@@ -405,6 +412,22 @@ watch(
                                                             >
                                                         </SelectContent>
                                                     </Select>
+                                                    <VendorLicenseNotice
+                                                        v-if="
+                                                            form.movement_type !==
+                                                            'utilization_internal'
+                                                        "
+                                                        :vendor="
+                                                            vendors.find(
+                                                                (item) =>
+                                                                    item.id ===
+                                                                    form.vendor_id,
+                                                            )
+                                                        "
+                                                        :reference-date="
+                                                            form.transaction_date
+                                                        "
+                                                    />
                                                     <InputError
                                                         :message="
                                                             form.movement_type ===

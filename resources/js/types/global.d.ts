@@ -46,6 +46,7 @@ declare module '@inertiajs/core' {
             name: string;
             auth: Auth;
             sidebarOpen: boolean;
+            operational_inbox_available?: boolean;
             [key: string]: unknown;
         };
     }

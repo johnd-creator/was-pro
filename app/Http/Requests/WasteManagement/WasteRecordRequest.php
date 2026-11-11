@@ -3,7 +3,9 @@
 namespace App\Http\Requests\WasteManagement;
 
 use App\Concerns\WasteValidationRules;
+use App\Models\WasteRecord;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class WasteRecordRequest extends FormRequest
 {
@@ -24,9 +26,23 @@ class WasteRecordRequest extends FormRequest
      */
     public function rules(): array
     {
+        $record = null;
+        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+            $routeRecord = $this->route('wasteRecord');
+            $recordId = $routeRecord instanceof WasteRecord ? $routeRecord->getKey() : $routeRecord;
+            if (is_string($recordId) && $recordId !== '') {
+                $record = WasteRecord::query()->findOrFail($recordId);
+            }
+        }
+
+        $wasteTypeRule = Rule::exists('waste_types', 'id')->whereNull('deleted_at');
+        if (! $record || (string) $record->waste_type_id !== (string) $this->input('waste_type_id')) {
+            $wasteTypeRule->where('is_active', true);
+        }
+
         $rules = [
             'date' => ['required', 'date', 'before_or_equal:today'],
-            'waste_type_id' => ['required', 'uuid', 'exists:waste_types,id'],
+            'waste_type_id' => ['required', 'uuid', $wasteTypeRule],
             'quantity' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
             'unit' => ['required', 'string', 'max:50'],
             'source' => ['nullable', 'string', 'max:255'],
@@ -36,11 +52,6 @@ class WasteRecordRequest extends FormRequest
 
         // For updates, allow changing certain fields only in draft/rejected status
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
-            $record = $this->route('wasteRecord');
-            if (is_string($record)) {
-                $record = \App\Models\WasteRecord::query()->findOrFail($record);
-            }
-
             if ($record && ! $record->canBeEdited()) {
                 // If record is not editable, only allow notes
                 $rules = [

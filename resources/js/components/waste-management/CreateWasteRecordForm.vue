@@ -19,6 +19,8 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
+import { formatLocalDate } from '@/lib/date';
 
 interface WasteType {
     id: string;
@@ -45,7 +47,7 @@ const emit = defineEmits<{
 }>();
 
 const form = useForm({
-    date: new Date().toISOString().split('T')[0],
+    date: formatLocalDate(),
     waste_type_id: '',
     quantity: '',
     unit: 'kg',
@@ -140,7 +142,7 @@ const expiryInfo = computed(() => {
 });
 
 function submit(): void {
-    form.post(WasteRecordsController.store().url, {
+    form.post(scopedUrl(WasteRecordsController.store().url), {
         preserveScroll: true,
         onSuccess: () => {
             emit('success');
@@ -153,6 +155,7 @@ function getHazardousClass(isHazardous: boolean): string {
         ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
         : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>

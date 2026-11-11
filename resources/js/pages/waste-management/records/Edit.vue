@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, useForm } from '@inertiajs/vue3';
 import { format } from 'date-fns';
 import {
     AlertCircle,
@@ -10,6 +10,7 @@ import {
 import { computed, ref } from 'vue';
 import WasteRecordsController from '@/actions/App/Http/Controllers/WasteManagement/WasteRecordsController';
 import Heading from '@/components/Heading.vue';
+import Link from '@/components/OrganizationLink.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import type { BreadcrumbItem } from '@/types';
 
@@ -167,17 +169,21 @@ function resetMessages(): void {
 
 function submit(): void {
     resetMessages();
-    form.put(WasteRecordsController.update(props.wasteRecord.id).url, {
-        preserveScroll: true,
-        onSuccess: () => {
-            statusMessage.value = 'Catatan limbah berhasil diperbarui.';
+    form.put(
+        scopedUrl(WasteRecordsController.update(props.wasteRecord.id).url),
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                statusMessage.value = 'Catatan limbah berhasil diperbarui.';
+            },
+            onError: () => {
+                errorMessage.value =
+                    'Periksa kembali field yang ditandai lalu coba lagi.';
+            },
         },
-        onError: () => {
-            errorMessage.value =
-                'Periksa kembali field yang ditandai lalu coba lagi.';
-        },
-    });
+    );
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>
