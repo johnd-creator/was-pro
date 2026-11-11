@@ -1212,3 +1212,102 @@ test('expired action preserves snapshot partial hauling unit and authorized tena
     $this->actingAs($operator)->get(route('waste-management.records.index', $parameters))->assertForbidden();
     $this->actingAs($admin)->get(route('waste-management.records.index', ['expiry' => 'expired']))->assertSessionHasErrors('as_of');
 });
+
+test('dashboard navigation capabilities follow the selected tenant without leaking between requests', function () {
+    config(['hauling-plans.enabled' => true, 'operational-inbox.enabled' => true]);
+    $ready = Organization::factory()->create(['schema_name' => 'tenant_navigation_ready']);
+    $legacy = Organization::factory()->create(['schema_name' => 'tenant_navigation_legacy']);
+    migrateTenantSchema($ready);
+    migrateTenantSchema($legacy);
+    \Illuminate\Support\Facades\Schema::drop($legacy->schema_name.'.operational_notifications');
+    \Illuminate\Support\Facades\Schema::table($legacy->schema_name.'.waste_haulings', fn ($table) => $table->dropColumn('waste_hauling_plan_id'));
+    $user = User::factory()->create(['is_super_admin' => true, 'organization_id' => $legacy->id]);
+    $this->actingAs($user);
+    $path = \Illuminate\Support\Facades\DB::connection()->selectOne('SHOW search_path', [], false)->search_path;
+
+    foreach ([[$ready, true], [$legacy, false], [$ready, true]] as [$organization, $available]) {
+        $this->get(route('dashboard', ['organization_id' => $organization->id]))->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('Dashboard')
+                ->where('filters.organization_id', $organization->id)
+                ->where('hauling_plans_available', $available)
+                ->where('hauling_plans_enabled', $available)
+                ->where('operational_inbox_available', $available));
+        expect(\Illuminate\Support\Facades\DB::connection()->selectOne('SHOW search_path', [], false)->search_path)->toBe($path);
+    }
+
+    config(['hauling-plans.enabled' => false, 'operational-inbox.enabled' => false]);
+    $this->get(route('dashboard', ['organization_id' => $ready->id]))->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('hauling_plans_available', false)
+            ->where('hauling_plans_enabled', false)
+            ->where('operational_inbox_available', false));
+
+    $operator = User::factory()->create(['organization_id' => $legacy->id, 'is_super_admin' => false]);
+    $this->actingAs($operator)->get(route('dashboard', ['organization_id' => $ready->id]))->assertForbidden();
+});
+
+test('schema existence checks preserve actual connection context across separate service instances', function () {
+    $tenant = new TenantService;
+    $tenant->createSchema('tenant_navigation_source');
+    $tenant->switchToSchema('tenant_navigation_source');
+    $connection = \Illuminate\Support\Facades\DB::connection();
+    $path = $connection->selectOne('SHOW search_path', [], false)->search_path;
+    $other = new TenantService;
+    expect($other->getCurrentSchema())->toBeNull();
+    expect($other->schemaExists('tenant_navigation_source'))->toBeTrue();
+    expect($connection->selectOne('SHOW search_path', [], false)->search_path)->toBe($path);
+    expect($other->schemaExists('tenant_navigation_missing'))->toBeFalse();
+    expect($connection->selectOne('SHOW search_path', [], false)->search_path)->toBe($path);
+});
+
+test('dashboard schema scopes restore exact caller context for nested and exceptional paths', function (string $outcome) {
+    $tenant = new TenantService;
+    foreach (['source', 'outer', 'inner'] as $suffix) {
+        $tenant->createSchema('tenant_navigation_'.$suffix);
+    }
+    $tenant->switchToSchema('tenant_navigation_source');
+    $connection = \Illuminate\Support\Facades\DB::connection();
+    $connection->statement('SET search_path TO "tenant_navigation_source", "$user", public');
+    $path = $connection->selectOne('SHOW search_path', [], false)->search_path;
+    $configuration = config('database.connections.pgsql');
+    $service = app(\App\Services\UnifiedDashboardService::class);
+    $scope = new ReflectionMethod($service, 'withinOrganizationSchema');
+    $outer = new Organization(['schema_name' => 'tenant_navigation_outer']);
+    $inner = new Organization(['schema_name' => $outcome === 'missing' ? 'tenant_navigation_missing' : 'tenant_navigation_inner']);
+
+    try {
+        $result = $scope->invoke($service, $outer, function () use ($scope, $service, $inner, $connection, $outcome) {
+            $outerPath = $connection->selectOne('SHOW search_path', [], false)->search_path;
+            expect($connection->selectOne('SELECT current_schema() AS schema', [], false)->schema)->toBe('tenant_navigation_outer');
+            try {
+                return $scope->invoke($service, $inner, function () use ($connection, $outcome) {
+                    expect($connection->selectOne('SELECT current_schema() AS schema', [], false)->schema)->toBe('tenant_navigation_inner');
+                    if ($outcome === 'exception') {
+                        throw new RuntimeException('navigation scope failure');
+                    }
+                    if ($outcome === 'sql exception') {
+                        $connection->transaction(fn () => $connection->statement('SELECT * FROM navigation_missing_table'));
+                    }
+
+                    return ['nested' => true];
+                });
+            } finally {
+                expect($connection->selectOne('SHOW search_path', [], false)->search_path)->toBe($outerPath);
+            }
+        });
+        expect($outcome)->toBe('success');
+        expect($result)->toBe(['nested' => true]);
+    } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+        expect($outcome)->toBe('missing');
+        expect($exception->getStatusCode())->toBe(403);
+    } catch (\Illuminate\Database\QueryException $exception) {
+        expect($outcome)->toBe('sql exception');
+    } catch (RuntimeException $exception) {
+        expect($outcome)->toBe('exception');
+        expect($exception->getMessage())->toBe('navigation scope failure');
+    } finally {
+        expect($connection->selectOne('SHOW search_path', [], false)->search_path)->toBe($path);
+        expect(config('database.connections.pgsql'))->toBe($configuration);
+    }
+})->with(['success', 'exception', 'sql exception', 'missing']);

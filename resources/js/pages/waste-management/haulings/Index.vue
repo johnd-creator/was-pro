@@ -563,7 +563,7 @@ function changePage(page: number): void {
                                         highestPriorityRecord.waste_type.name ||
                                         '-'
                                     }}
-                                    Ã¢â‚¬Â¢ Sisa
+                                    • Sisa
                                     {{
                                         formatNumber(
                                             highestPriorityRecord.remaining_quantity,
@@ -807,7 +807,7 @@ function changePage(page: number): void {
                                         >
                                             {{ formatDate(record.date) }}
                                             <span v-if="record.source">
-                                                Ã¢â‚¬Â¢ {{ record.source }}
+                                                • {{ record.source }}
                                             </span>
                                         </div>
                                     </TableCell>

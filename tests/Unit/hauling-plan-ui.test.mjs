@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
     actualQuantityLimit,
@@ -76,4 +77,17 @@ test('unlinked legacy defaults preserve the browser day with or without a server
 test('linked defaults stay blank when the server business day is unavailable', () => {
     assert.equal(initialActualDate('2026-11-10', 'plan-id'), '');
     assert.equal(initialActualDate('2026-11-10', 'plan-id', ''), '');
+});
+
+test('hauling list uses readable bullet separators in priority and source labels', () => {
+    const source = readFileSync(
+        new URL(
+            '../../resources/js/pages/waste-management/haulings/Index.vue',
+            import.meta.url,
+        ),
+        'utf8',
+    );
+    assert.match(source, /\u2022 Sisa/);
+    assert.match(source, /\u2022 \{\{ record\.source \}\}/);
+    assert.doesNotMatch(source, /[\u00c2\u00c3\ufffd]/);
 });

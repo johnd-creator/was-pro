@@ -135,26 +135,14 @@ class TenantService
      */
     public function schemaExists(string $schemaName): bool
     {
-        $originalSchema = $this->currentSchema;
-
         try {
-            // Reset to public schema first to avoid transaction issues
-            DB::statement('SET search_path TO public');
-
-            $result = DB::select('SELECT schema_name FROM information_schema.schemata WHERE schema_name = ?', [$schemaName]);
+            $result = DB::connection()->select('SELECT schema_name FROM information_schema.schemata WHERE schema_name = ?', [$schemaName], false);
 
             return count($result) > 0;
         } catch (\Exception $e) {
-            // If we're in a failed transaction, assume schema doesn't exist
             \Log::warning("Failed to check schema existence: {$schemaName}", ['error' => $e->getMessage()]);
 
             return false;
-        } finally {
-            if ($originalSchema && $originalSchema !== 'public') {
-                DB::statement("SET search_path TO \"{$originalSchema}\", public");
-            } else {
-                DB::statement('SET search_path TO public');
-            }
         }
     }
 
@@ -195,7 +183,7 @@ class TenantService
         });
     }
 
-    protected function withRestoredSchema(callable $callback): mixed
+    public function withRestoredSchema(callable $callback): mixed
     {
         $originalSchema = $this->getCurrentSchema();
         $connectionName = config('database.default');

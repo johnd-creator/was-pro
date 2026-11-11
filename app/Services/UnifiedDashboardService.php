@@ -1330,22 +1330,14 @@ class UnifiedDashboardService
 
     private function withinOrganizationSchema(Organization $organization, callable $callback): array
     {
-        $originalSchema = $this->tenantService->getCurrentSchema();
+        return $this->tenantService->withRestoredSchema(function () use ($organization, $callback): array {
+            if (! $this->tenantService->schemaExists($organization->schema_name)) {
+                abort(403);
+            }
 
-        if (! $this->tenantService->schemaExists($organization->schema_name)) {
-            abort(403);
-        }
-
-        try {
             $this->tenantService->switchToSchema($organization->schema_name);
 
             return $callback();
-        } finally {
-            if ($originalSchema && $originalSchema !== 'public') {
-                $this->tenantService->switchToSchema($originalSchema);
-            } else {
-                $this->tenantService->switchToPublic();
-            }
-        }
+        });
     }
 }
