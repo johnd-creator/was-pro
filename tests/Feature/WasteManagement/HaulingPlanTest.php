@@ -429,3 +429,66 @@ test('plan rollback takes the normal writer transaction lock before checking emp
     }
     expect(\Illuminate\Support\Facades\DB::transactionLevel())->toBe(0)->and(app(HaulingPlans::class)->installed())->toBeFalse();
 });
+
+test('scoped Jakarta day changes at WIB midnight without changing global or legacy dates', function (string $utc, string $day) {
+    config(['hauling-plans.timezone' => 'Asia/Jakarta']);
+    $this->record->update(['date' => '2026-11-01']);
+    $this->travelTo(\Carbon\Carbon::parse($utc, 'UTC'));
+    try {
+        expect(config('app.timezone'))->toBe('UTC')->and(app(HaulingPlans::class)->actualDateLimit())->toBe($day);
+        $plan = haulingPlan($this);
+        $this->actingAs($this->supervisor);
+        $plan->approve($this->supervisor->id);
+        $this->actingAs($this->creator);
+        $this->get(route('waste-management.haulings.create', ['waste_record' => $this->record->id, 'organization_id' => $this->organization->id]))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->where('actualDateLimit', $day)->where('actualDateTimezone', 'Asia/Jakarta'));
+        $url = route('waste-management.haulings.store', ['organization_id' => $this->organization->id]);
+        $payload = ['waste_record_id' => $this->record->id, 'waste_hauling_plan_id' => $plan->id, 'hauling_date' => $day, 'quantity' => '1.00'];
+        $this->post($url, $payload)->assertSessionHas('success');
+        $tomorrow = \Carbon\Carbon::parse($day)->addDay()->toDateString();
+        $this->post($url, [...$payload, 'hauling_date' => $tomorrow])->assertSessionHas('error', 'Tanggal realisasi tidak boleh setelah '.$day.' (Asia/Jakarta).');
+        $this->tenants->switchToSchema($this->organization->schema_name);
+        $token = \Illuminate\Support\Str::random(40);
+        \App\Models\ApiToken::create(['user_id' => $this->creator->id, 'name' => 'Timezone test', 'token' => hash('sha256', $token)]);
+        $this->withToken($token)->postJson(route('api.v1.waste-haulings.store', ['organization_id' => $this->organization->id]), $payload)->assertCreated()->assertJsonPath('data.actual_date_limit', $day)->assertJsonPath('data.actual_date_timezone', 'Asia/Jakarta');
+        $this->tenants->switchToSchema($this->organization->schema_name);
+        $legacy = WasteHauling::create(['waste_record_id' => $this->record->id, 'hauling_date' => $tomorrow, 'quantity' => 1, 'unit' => 'kg', 'status' => 'pending_approval', 'created_by' => $this->creator->id]);
+        expect($legacy->waste_hauling_plan_id)->toBeNull()->and($legacy->hauling_date->toDateString())->toBe($tomorrow);
+        config(['hauling-plans.timezone' => null]);
+        expect(app(HaulingPlans::class)->timezone())->toBe('UTC')->and(app(HaulingPlans::class)->actualDateLimit())->toBe(substr($utc, 0, 10));
+    } finally {
+        $this->travelBack();
+    }
+})->with([
+    ['2026-11-11 16:59:59', '2026-11-11'],
+    ['2026-11-11 17:00:00', '2026-11-12'],
+    ['2026-11-11 23:59:59', '2026-11-12'],
+    ['2026-11-12 00:00:00', '2026-11-12'],
+]);
+
+test('enabled lifecycle records incoming plan partial actual closure and scoped inbox audit over HTTP', function () {
+    config(['hauling-plans.timezone' => 'Asia/Jakarta', 'operational-inbox.enabled' => true]);
+    $params = ['organization_id' => $this->organization->id];
+    $this->post(route('waste-management.records.store', $params), ['date' => today()->toDateString(), 'waste_type_id' => $this->record->waste_type_id, 'quantity' => 100, 'unit' => 'kg'])->assertSessionHas('success');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    $record = WasteRecord::where('id', '!=', $this->record->id)->firstOrFail();
+    $this->post(route('waste-management.records.submit', [$record->id, ...$params]))->assertSessionHas('success');
+    $this->actingAs($this->supervisor)->post(route('waste-management.records.approve', [$record->id, ...$params]))->assertSessionHas('success');
+    $this->actingAs($this->creator)->post(planRoute($this, 'store'), ['waste_record_id' => $record->id, 'planned_date' => today()->addDays(2)->toDateString(), 'quantity' => 80])->assertSessionHas('success');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    $plan = WasteHaulingPlan::firstOrFail();
+    $this->actingAs($this->supervisor)->post(planRoute($this, 'approve', $plan))->assertSessionHas('success');
+    $this->actingAs($this->creator)->post(route('waste-management.haulings.store', $params), ['waste_record_id' => $record->id, 'waste_hauling_plan_id' => $plan->id, 'hauling_date' => app(HaulingPlans::class)->actualDateLimit(), 'quantity' => 30])->assertSessionHas('success');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    $actual = WasteHauling::firstOrFail();
+    expect($actual->document_number)->toBeNull()->and($actual->attachment_path)->toBeNull();
+    $this->actingAs($this->supervisor)->post(planRoute($this, 'close', $plan), ['closure_reason' => 'Sisa tidak diperlukan'])->assertSessionHas('error');
+    $this->post(route('waste-management.haulings.approve', [$actual->id, ...$params]))->assertSessionHas('success');
+    $this->post(planRoute($this, 'close', $plan), [])->assertSessionHasErrors('closure_reason');
+    $this->post(planRoute($this, 'close', $plan), ['closure_reason' => 'Sisa tidak diperlukan'])->assertSessionHas('success');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect($plan->fresh()->status)->toBe('closed')->and($record->getRemainingQuantity())->toBe(70.0)->and(app(HaulingPlans::class)->availableFor($record))->toBe(70.0);
+    expect(\App\Models\OperationalNotification::count())->toBe(6);
+    expect(OperationalAuditLog::where('module', 'waste_hauling_plans')->count())->toBe(3);
+    $this->actingAs($this->creator)->get(route('waste-management.notifications.index', $params))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->where('available', true)->has('notifications', 3));
+    $this->actingAs($this->supervisor)->get(route('waste-management.audit.index', [...$params, 'module' => 'waste_hauling_plans']))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->has('entries', 3));
+});

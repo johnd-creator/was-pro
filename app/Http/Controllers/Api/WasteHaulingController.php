@@ -260,6 +260,8 @@ class WasteHaulingController extends ApiController
     protected function serializeBacklogRecord(WasteRecord $record, User $user): array
     {
         return [
+            'actual_date_limit' => app(\App\Services\HaulingPlans::class)->actualDateLimit(),
+            'actual_date_timezone' => app(\App\Services\HaulingPlans::class)->timezone(),
             'id' => $record->id,
             'record_number' => $record->record_number,
             'date' => $record->date?->format('Y-m-d'),
@@ -290,6 +292,8 @@ class WasteHaulingController extends ApiController
     protected function serializeHauling(WasteHauling $hauling, User $user): array
     {
         return [
+            'actual_date_limit' => app(\App\Services\HaulingPlans::class)->actualDateLimit(),
+            'actual_date_timezone' => app(\App\Services\HaulingPlans::class)->timezone(),
             'id' => $hauling->id,
             ...app(\App\Services\HaulingMetadata::class)->serialize($hauling),
             'waste_hauling_plan_id' => $hauling->waste_hauling_plan_id,

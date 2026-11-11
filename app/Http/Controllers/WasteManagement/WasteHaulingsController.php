@@ -67,8 +67,8 @@ class WasteHaulingsController extends Controller
 
         return Inertia::render('waste-management/haulings/Index', [
             'approvedPlans' => $plans->map(fn ($plan) => app(WasteHaulingPlansController::class)->serialize($plan)),
-            'actualDateLimit' => today()->toDateString(),
-            'actualDateTimezone' => config('app.timezone'),
+            'actualDateLimit' => app(\App\Services\HaulingPlans::class)->actualDateLimit(),
+            'actualDateTimezone' => app(\App\Services\HaulingPlans::class)->timezone(),
             'plansEnabled' => app(\App\Services\HaulingPlans::class)->enabled(),
             'metadataAvailable' => $metadataAvailable,
             'vendors' => $metadataAvailable ? \App\Models\Vendor::query()->active()->orderBy('name')->get(['id', 'name', 'license_number', 'license_expiry_date'])->map(fn ($vendor) => [...$vendor->toArray(), 'license_expiry_date' => $vendor->license_expiry_date?->format('Y-m-d')]) : [],
@@ -105,8 +105,8 @@ class WasteHaulingsController extends Controller
         return Inertia::render('waste-management/haulings/Create', [
             'selectedPlanId' => $plans->contains('id', request()->query('waste_hauling_plan_id')) ? request()->query('waste_hauling_plan_id') : null,
             'approvedPlans' => $plans->map(fn ($plan) => app(WasteHaulingPlansController::class)->serialize($plan)),
-            'actualDateLimit' => today()->toDateString(),
-            'actualDateTimezone' => config('app.timezone'),
+            'actualDateLimit' => app(\App\Services\HaulingPlans::class)->actualDateLimit(),
+            'actualDateTimezone' => app(\App\Services\HaulingPlans::class)->timezone(),
             'plansEnabled' => app(\App\Services\HaulingPlans::class)->enabled(),
             'metadataAvailable' => $metadataAvailable,
             'vendors' => $metadataAvailable ? \App\Models\Vendor::query()->active()->orderBy('name')->get(['id', 'name', 'license_number', 'license_expiry_date'])->map(fn ($vendor) => [...$vendor->toArray(), 'license_expiry_date' => $vendor->license_expiry_date?->format('Y-m-d')]) : [],
@@ -179,8 +179,8 @@ class WasteHaulingsController extends Controller
         }
 
         return Inertia::render('waste-management/haulings/Show', [
-            'actualDateLimit' => today()->toDateString(),
-            'actualDateTimezone' => config('app.timezone'),
+            'actualDateLimit' => app(\App\Services\HaulingPlans::class)->actualDateLimit(),
+            'actualDateTimezone' => app(\App\Services\HaulingPlans::class)->timezone(),
             'plansEnabled' => app(\App\Services\HaulingPlans::class)->enabled(),
             'hauling' => $this->serializeHauling($hauling),
             'record' => $this->serializeBacklogRecord($hauling->wasteRecord),

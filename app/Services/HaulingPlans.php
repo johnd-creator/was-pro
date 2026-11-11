@@ -21,6 +21,16 @@ class HaulingPlans
         return config('hauling-plans.enabled', false) && $this->installed();
     }
 
+    public function timezone(): string
+    {
+        return config('hauling-plans.timezone') ?: config('app.timezone');
+    }
+
+    public function actualDateLimit(): string
+    {
+        return today($this->timezone())->toDateString();
+    }
+
     public function cents(mixed $quantity): int
     {
         $value = (string) $quantity;
@@ -144,8 +154,8 @@ class HaulingPlans
             if ($current && $model->isDirty('status') && ! ($current->status === 'pending_approval' && in_array($model->status, ['approved', 'rejected', 'cancelled'], true))) {
                 throw new OperationalConflict('Transisi realisasi tidak valid.');
             }
-            if ($model->hauling_date->toDateString() > today()->toDateString()) {
-                throw new OperationalConflict('Tanggal realisasi tidak boleh setelah '.today()->toDateString().' ('.config('app.timezone').').');
+            if ($model->hauling_date->toDateString() > $this->actualDateLimit()) {
+                throw new OperationalConflict('Tanggal realisasi tidak boleh setelah '.$this->actualDateLimit().' ('.$this->timezone().').');
             }
             if ($current && $model->isDirty('status') && $model->status === 'rejected' && auth()->user() && ! app(ApprovalSeparation::class)->canApprove(auth()->user(), $current)) {
                 throw new OperationalConflict('Pengajuan sendiri harus ditinjau supervisor lain; gunakan pembatalan untuk menarik pengajuan.');

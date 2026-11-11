@@ -40,9 +40,5 @@ export function initialActualDate(
     serverDateLimit?: string,
 ): string {
     if (!planId) return localDate;
-    return serverDateLimit
-        ? localDate <= serverDateLimit
-            ? localDate
-            : serverDateLimit
-        : '';
+    return serverDateLimit ?? '';
 }
