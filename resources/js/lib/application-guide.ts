@@ -142,6 +142,8 @@ export const guideCases: GuideCase[] = [
             'Kenali konteks organisasi dan bedakan panduan role dari hak akun Anda.',
         prerequisites: [
             'Sudah masuk ke aplikasi. Akun operasional perlu terhubung ke organisasi yang datanya siap.',
+            'Jika autentikasi dua faktor (MFA) sudah aktif dan dikonfirmasi, akses mobile/API belum tersedia, termasuk melalui token lama. Gunakan login web dan selesaikan verifikasi dua faktor; jangan menonaktifkan MFA untuk mengakses API.',
+            'Perubahan atau reset kata sandi melalui web, administrator, pemulihan akun, atau API mencabut seluruh token API akun tersebut. Login ulang pada mobile/API setelahnya jika akun memenuhi syarat akses.',
         ],
         steps: [
             'Periksa nama organisasi pada bagian atas aplikasi sebelum membuka data atau membuat transaksi.',

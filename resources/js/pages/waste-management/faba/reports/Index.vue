@@ -201,7 +201,7 @@ const filterSummary = computed(() => {
             : null,
     ].filter(Boolean);
 
-    return labels.length > 0 ? labels.join(' Ã¢â‚¬Â¢ ') : 'Semua segmen aktif';
+    return labels.length > 0 ? labels.join(' · ') : 'Semua segmen aktif';
 });
 
 const highlightedBalances = computed(() =>
@@ -211,7 +211,7 @@ const highlightedBalances = computed(() =>
             (item) =>
                 `${formatFabaMaterial(item.material_type)} ${item.balance} ton`,
         )
-        .join(' Ã¢â‚¬Â¢ '),
+        .join(' · '),
 );
 
 function download(url: string): void {

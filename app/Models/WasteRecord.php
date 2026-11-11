@@ -42,8 +42,10 @@ class WasteRecord extends Model
         }
 
         $wasteType = WasteType::find($this->waste_type_id);
-        if ($wasteType && $wasteType->storage_period_days > 0) {
-            $this->expiry_date = $this->date->addDays($wasteType->storage_period_days);
+        if ($wasteType) {
+            $this->expiry_date = $wasteType->storage_period_days > 0
+                ? $this->date->addDays($wasteType->storage_period_days)
+                : null;
         }
     }
 

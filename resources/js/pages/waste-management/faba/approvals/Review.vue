@@ -192,8 +192,10 @@ const { scopedUrl } = useOrganizationContext();
                                 >
                                     Status operasional:
                                     {{
-                                        approval.operational_status ||
-                                        approval.status
+                                        formatFabaStatus(
+                                            approval.operational_status ||
+                                                approval.status,
+                                        )
                                     }}
                                 </div>
                                 <div
@@ -468,8 +470,10 @@ const { scopedUrl } = useOrganizationContext();
                                         class="mt-2 text-base font-semibold text-slate-950 dark:text-slate-100"
                                     >
                                         {{
-                                            approval.operational_status ||
-                                            approval.status
+                                            formatFabaStatus(
+                                                approval.operational_status ||
+                                                    approval.status,
+                                            )
                                         }}
                                     </p>
                                 </div>
@@ -485,7 +489,7 @@ const { scopedUrl } = useOrganizationContext();
                                     <p
                                         class="mt-2 text-base font-semibold text-slate-950 dark:text-slate-100"
                                     >
-                                        {{ snapshot.status }}
+                                        {{ formatFabaStatus(snapshot.status) }}
                                     </p>
                                     <p
                                         class="mt-1 text-sm text-slate-500 dark:text-slate-400"
@@ -611,7 +615,7 @@ const { scopedUrl } = useOrganizationContext();
                                                         item.material_type,
                                                     )
                                                 }}
-                                                â€¢
+                                                ·
                                                 {{
                                                     formatFabaMovementType(
                                                         item.movement_type,

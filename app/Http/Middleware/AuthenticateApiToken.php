@@ -51,6 +51,15 @@ class AuthenticateApiToken
             ], 401);
         }
 
+        if ($token->user->hasEnabledTwoFactorAuthentication()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun dengan autentikasi dua faktor harus masuk melalui web dan menyelesaikan verifikasi. Akses mobile/API belum tersedia untuk akun ini.',
+                'error_code' => 'MFA_WEB_LOGIN_REQUIRED',
+                'errors' => [],
+            ], 401);
+        }
+
         $token->forceFill([
             'last_used_at' => now(),
         ])->save();

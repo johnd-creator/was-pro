@@ -13,6 +13,7 @@ use App\Models\Organization;
 use App\Models\User;
 use App\Models\WasteRecord;
 use App\Models\WasteType;
+use App\Services\CsvExportService;
 use App\Services\TenantService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -492,7 +493,7 @@ class WasteRecordsController extends Controller
             $file = fopen('php://output', 'w');
 
             // CSV Header
-            fputcsv($file, [
+            CsvExportService::writeRow($file, [
                 'Record Number',
                 'Date',
                 'Expiry Date',
@@ -512,7 +513,7 @@ class WasteRecordsController extends Controller
             ]);
 
             $write = function (array $values) use ($file): void {
-                fputcsv($file, array_map(fn ($value) => is_string($value) && preg_match('/^(?:\s*[=+@\-]|[\t\r\n])/u', $value) ? "'".$value : $value, $values), ',', '"', '');
+                CsvExportService::writeRow($file, $values);
             };
 
             // CSV Data

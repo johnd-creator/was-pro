@@ -7,6 +7,7 @@ use App\Http\Requests\WasteManagement\FabaProductionMovementRequest;
 use App\Models\FabaAuditLog;
 use App\Models\FabaMovement;
 use App\Services\ApprovalSeparation;
+use App\Services\CsvExportService;
 use App\Services\FabaAuditService;
 use App\Services\FabaMovementLedgerService;
 use App\Services\FabaRecapService;
@@ -254,7 +255,7 @@ class FabaProductionMovementsController extends Controller
                 abort(500, 'Gagal menyiapkan file export produksi FABA.');
             }
 
-            fputcsv($file, [
+            CsvExportService::writeRow($file, [
                 'Movement Number',
                 'Transaction Date',
                 'Material Type',
@@ -269,7 +270,7 @@ class FabaProductionMovementsController extends Controller
             ]);
 
             foreach ($entries as $entry) {
-                fputcsv($file, [
+                CsvExportService::writeRow($file, [
                     $this->formatMovementNumber($entry),
                     $entry->transaction_date->format('Y-m-d'),
                     $entry->material_type,

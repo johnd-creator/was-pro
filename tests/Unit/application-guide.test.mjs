@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
     canOpenGuideAction,
@@ -180,4 +181,43 @@ test('optional FABA master links require both installation and actual view permi
         }),
         true,
     );
+});
+
+test('guide accurately describes confirmed MFA API restriction and future password token revocation', () => {
+    const start = guideCases.find((item) => item.id === 'mulai');
+    const text = start.prerequisites.join(' ');
+    assert.match(text, /MFA.*aktif dan dikonfirmasi/);
+    assert.match(
+        text,
+        /mobile\/API belum tersedia, termasuk melalui token lama/,
+    );
+    assert.match(text, /login web.*verifikasi dua faktor/);
+    assert.match(text, /jangan menonaktifkan MFA/);
+    assert.match(text, /reset kata sandi.*mencabut seluruh token API/);
+});
+
+test('FABA report and review display clean separators and translated secondary statuses', () => {
+    const read = (file) =>
+        readFileSync(
+            new URL(
+                '../../resources/js/pages/waste-management/faba/' + file,
+                import.meta.url,
+            ),
+            'utf8',
+        );
+    const report = read('reports/Index.vue');
+    const review = read('approvals/Review.vue');
+    assert.match(report, /\.join\(' · '\)/);
+    assert.doesNotMatch(report + review, /[\u00c2\u00c3\ufffd]|â€/);
+    assert.match(review, /formatFabaStatus\(snapshot.status\)/);
+    assert.equal(
+        (
+            review.match(
+                /formatFabaStatus\(\s*approval.operational_status \|\|\s*approval.status,?\s*\)/g,
+            ) ?? []
+        ).length,
+        2,
+    );
+    assert.equal(formatFabaStatus('approved'), 'Disetujui');
+    assert.equal(formatFabaStatus('ready_to_submit'), 'Siap diajukan');
 });

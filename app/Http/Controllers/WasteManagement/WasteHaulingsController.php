@@ -185,8 +185,10 @@ class WasteHaulingsController extends Controller
             'hauling' => $this->serializeHauling($hauling),
             'record' => $this->serializeBacklogRecord($hauling->wasteRecord),
             'abilities' => [
-                'can_approve' => $this->canApproveHaulings() && $hauling->canBeApproved(),
-                'can_reject' => $this->canRejectHaulings() && $hauling->canBeRejected(),
+                'can_approve' => $this->canApproveHaulings() && $hauling->canBeApproved()
+                    && app(\App\Services\ApprovalSeparation::class)->canApprove(Auth::user(), $hauling),
+                'can_reject' => $this->canRejectHaulings() && $hauling->canBeRejected()
+                    && (! $hauling->waste_hauling_plan_id || app(\App\Services\ApprovalSeparation::class)->canApprove(Auth::user(), $hauling)),
                 'can_cancel' => (Auth::user()?->hasPermission('waste_hauling.cancel') ?? false)
                     && $hauling->created_by === Auth::id()
                     && $hauling->canBeCancelled(),

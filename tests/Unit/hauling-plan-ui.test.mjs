@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
     actualQuantityLimit,
+    availablePlanRecords,
     initialActualDate,
     haulingActualStatus,
     haulingPlanStatus,
@@ -90,4 +91,41 @@ test('hauling list uses readable bullet separators in priority and source labels
     assert.match(source, /\u2022 Sisa/);
     assert.match(source, /\u2022 \{\{ record\.source \}\}/);
     assert.doesNotMatch(source, /[\u00c2\u00c3\ufffd]/);
+});
+
+test('plan selector excludes exhausted allocations and keeps eligible records unchanged', () => {
+    const records = [
+        { id: 'exhausted', available_quantity: 0 },
+        { id: 'reserved', available_quantity: -1 },
+        { id: 'eligible', available_quantity: 0.01 },
+        { id: 'available', available_quantity: 10 },
+    ];
+    assert.deepEqual(availablePlanRecords(records), records.slice(2));
+    assert.equal(records.length, 4);
+    assert.deepEqual(availablePlanRecords(records.slice(0, 2)), []);
+    assert.deepEqual(availablePlanRecords([]), []);
+    assert.equal(
+        availablePlanRecords(records).find(
+            (record) => record.id === 'exhausted',
+        ),
+        undefined,
+    );
+});
+
+test('plan options, preselection, selected record and empty state share eligible collection', () => {
+    const source = readFileSync(
+        new URL(
+            '../../resources/js/pages/waste-management/hauling-plans/Index.vue',
+            import.meta.url,
+        ),
+        'utf8',
+    );
+    assert.match(source, /availablePlanRecords\(props.records\)/);
+    assert.equal(
+        (source.match(/selectableRecords.value.find/g) ?? []).length,
+        2,
+    );
+    assert.match(source, /v-for="record in selectableRecords"/);
+    assert.match(source, /v-if="!selectableRecords.length"/);
+    assert.match(source, /tersedia untuk alokasi baru/);
 });

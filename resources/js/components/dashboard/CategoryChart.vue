@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import EmptyState from '@/components/dashboard/EmptyState.vue';
+import { encodeCsvRow } from '@/lib/csv';
 import wasteManagementRoutes from '@/routes/waste-management';
 
 interface CategoryData {
@@ -81,7 +82,7 @@ const csvData = computed(() => {
         `${item.percentage.toFixed(1)}%`,
     ]);
 
-    return [headers, ...rows].map((row) => row.join(',')).join('\n');
+    return [headers, ...rows].map(encodeCsvRow).join('\n');
 });
 
 // Download CSV function

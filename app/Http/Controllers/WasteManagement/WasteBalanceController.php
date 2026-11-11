@@ -4,6 +4,7 @@ namespace App\Http\Controllers\WasteManagement;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\WasteManagement\WasteBalanceRequest;
+use App\Services\CsvExportService;
 use App\Services\WasteBalanceService;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -26,7 +27,7 @@ class WasteBalanceController extends Controller
             $file = fopen('php://output', 'w');
             fwrite($file, "\xEF\xBB\xBF");
             $write = function (array $values) use ($file): void {
-                fputcsv($file, array_map(fn ($value) => is_string($value) && preg_match('/^(?:\s*[=+@\-]|[\t\r\n])/u', $value) ? "'".$value : $value, $values), ',', '"', '');
+                CsvExportService::writeRow($file, $values);
             };
             $write(['Neraca Operasional Limbah', $report['start_date'], $report['end_date']]);
             $write(['Dasar perhitungan', $report['basis']]);

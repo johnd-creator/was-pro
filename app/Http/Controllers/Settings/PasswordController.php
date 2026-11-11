@@ -23,9 +23,12 @@ class PasswordController extends Controller
      */
     public function update(PasswordUpdateRequest $request): RedirectResponse
     {
-        $request->user()->update([
-            'password' => $request->password,
-        ]);
+        $request->user()->getConnection()->transaction(function () use ($request): void {
+            $request->user()->update([
+                'password' => $request->validated('password'),
+            ]);
+            $request->user()->apiTokens()->delete();
+        });
 
         return back();
     }

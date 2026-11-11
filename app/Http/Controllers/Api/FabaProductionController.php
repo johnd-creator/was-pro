@@ -368,7 +368,7 @@ class FabaProductionController extends ApiController
             return false;
         }
 
-        if ($user->hasRole('operator')) {
+        if (! $user->isSuperAdmin() && $user->hasRole('operator')) {
             return (string) $movement->created_by === (string) $user->id;
         }
 

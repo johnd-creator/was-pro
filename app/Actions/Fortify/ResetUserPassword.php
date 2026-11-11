@@ -22,8 +22,11 @@ class ResetUserPassword implements ResetsUserPasswords
             'password' => $this->passwordRules(),
         ])->validate();
 
-        $user->forceFill([
-            'password' => $input['password'],
-        ])->save();
+        $user->getConnection()->transaction(function () use ($user, $input): void {
+            $user->forceFill([
+                'password' => $input['password'],
+            ])->save();
+            $user->apiTokens()->delete();
+        });
     }
 }

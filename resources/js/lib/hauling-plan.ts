@@ -42,3 +42,9 @@ export function initialActualDate(
     if (!planId) return localDate;
     return serverDateLimit ?? '';
 }
+
+export function availablePlanRecords<T extends { available_quantity: number }>(
+    records: T[],
+): T[] {
+    return records.filter((record) => record.available_quantity > 0);
+}

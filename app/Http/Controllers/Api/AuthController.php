@@ -15,31 +15,38 @@ class AuthController extends ApiController
 {
     public function login(LoginRequest $request): JsonResponse
     {
-        /** @var User|null $user */
-        $user = User::query()
-            ->with(['organization', 'role.permissions'])
-            ->where('email', $request->validated('email'))
-            ->first();
+        return (new User)->getConnection()->transaction(function () use ($request): JsonResponse {
+            /** @var User|null $user */
+            $user = User::query()
+                ->lockForUpdate()
+                ->with(['organization', 'role.permissions'])
+                ->where('email', $request->validated('email'))
+                ->first();
 
-        if (! $user || ! Hash::check($request->validated('password'), $user->password)) {
-            return $this->error('Email atau password tidak valid.', 'INVALID_CREDENTIALS', status: 422);
-        }
+            if (! $user || ! Hash::check($request->validated('password'), $user->password)) {
+                return $this->error('Email atau password tidak valid.', 'INVALID_CREDENTIALS', status: 422);
+            }
 
-        $plainTextToken = Str::random(80);
-        $token = ApiToken::query()->create([
-            'user_id' => $user->id,
-            'name' => $request->validated('device_name') ?: 'flutter-mobile',
-            'token' => hash('sha256', $plainTextToken),
-            'last_used_at' => now(),
-            'expires_at' => now()->addDays(30),
-        ]);
+            if ($user->hasEnabledTwoFactorAuthentication()) {
+                return $this->error('Akun dengan autentikasi dua faktor harus masuk melalui web dan menyelesaikan verifikasi. Akses mobile/API belum tersedia untuk akun ini.', 'MFA_WEB_LOGIN_REQUIRED', status: 403);
+            }
 
-        return $this->success([
-            'token' => $plainTextToken,
-            'token_type' => 'Bearer',
-            'expires_at' => $token->expires_at?->toIso8601String(),
-            'context' => $this->serializeUserContext($user),
-        ], 'Login berhasil.');
+            $plainTextToken = Str::random(80);
+            $token = ApiToken::query()->create([
+                'user_id' => $user->id,
+                'name' => $request->validated('device_name') ?: 'flutter-mobile',
+                'token' => hash('sha256', $plainTextToken),
+                'last_used_at' => now(),
+                'expires_at' => now()->addDays(30),
+            ]);
+
+            return $this->success([
+                'token' => $plainTextToken,
+                'token_type' => 'Bearer',
+                'expires_at' => $token->expires_at?->toIso8601String(),
+                'context' => $this->serializeUserContext($user),
+            ], 'Login berhasil.');
+        });
     }
 
     public function logout(Request $request): JsonResponse

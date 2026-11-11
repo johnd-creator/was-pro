@@ -25,7 +25,7 @@ import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import { usePermissions } from '@/composables/usePermissions';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import { formatLocalDate } from '@/lib/date';
-import { haulingPlanStatus } from '@/lib/hauling-plan';
+import { availablePlanRecords, haulingPlanStatus } from '@/lib/hauling-plan';
 import type { HaulingPlan, HaulingPlanRecord } from '@/types/hauling-plan';
 
 const props = defineProps<{
@@ -36,20 +36,24 @@ const props = defineProps<{
 const page = usePage();
 const { scopedUrl } = useOrganizationContext();
 const { hasPermission } = usePermissions();
+const selectableRecords = computed(() => availablePlanRecords(props.records));
 const preselectedRecord = new URL(
     page.url,
     'https://local.invalid',
 ).searchParams.get('waste_record');
 const form = useForm({
     waste_record_id:
-        props.records.find((record) => record.id === preselectedRecord)?.id ??
-        '',
+        selectableRecords.value.find(
+            (record) => record.id === preselectedRecord,
+        )?.id ?? '',
     planned_date: formatLocalDate(),
     quantity: '' as string | number,
     notes: '',
 });
 const selectedRecord = computed(() =>
-    props.records.find((record) => record.id === form.waste_record_id),
+    selectableRecords.value.find(
+        (record) => record.id === form.waste_record_id,
+    ),
 );
 const flash = computed(
     () => page.props.flash as { success?: string; error?: string } | undefined,
@@ -137,7 +141,7 @@ function submit(): void {
                                     Pilih catatan limbah
                                 </option>
                                 <option
-                                    v-for="record in records"
+                                    v-for="record in selectableRecords"
                                     :key="record.id"
                                     :value="record.id"
                                 >
@@ -217,11 +221,11 @@ function submit(): void {
                                 }}</Button
                             >
                             <p
-                                v-if="!records.length"
+                                v-if="!selectableRecords.length"
                                 class="mt-2 text-sm text-muted-foreground"
                             >
-                                Belum ada catatan limbah disetujui yang dapat
-                                direncanakan.
+                                Belum ada catatan limbah disetujui dengan saldo
+                                tersedia untuk alokasi baru.
                             </p>
                         </div>
                     </form>

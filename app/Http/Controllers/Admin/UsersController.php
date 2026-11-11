@@ -96,10 +96,13 @@ class UsersController extends Controller
             'password' => 'required|string|min:8|confirmed',
         ]);
 
-        $user->update([
-            'password' => Hash::make($validated['password']),
-            'updated_by' => auth()->id(),
-        ]);
+        $user->getConnection()->transaction(function () use ($user, $validated): void {
+            $user->update([
+                'password' => Hash::make($validated['password']),
+                'updated_by' => auth()->id(),
+            ]);
+            $user->apiTokens()->delete();
+        });
 
         return Redirect::route('admin.users.index')
             ->with('success', 'Password updated successfully.');
