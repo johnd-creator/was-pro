@@ -43,6 +43,8 @@ class FabaMonthlyApprovalsController extends Controller
             'approval' => $this->fabaRecapService->getPeriodMeta($year, $month),
             'recap' => $detail['recap'],
             'snapshot' => $detail['snapshot'],
+            'archive_available' => $detail['archive_available'],
+            'closing_versions' => $detail['closing_versions'],
             'vendorBreakdown' => $detail['vendor_breakdown'],
             'internalDestinationBreakdown' => $detail['internal_destination_breakdown'],
             'purposeBreakdown' => $detail['purpose_breakdown'],

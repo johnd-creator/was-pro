@@ -21,6 +21,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
     formatFabaDate,
@@ -95,13 +96,14 @@ const activeMaterialLabel = computed(() =>
 );
 
 function applyFilters(): void {
-    router.get(wasteManagementRoutes.faba.recaps.stockCard(), {
+    router.get(scopedUrl(wasteManagementRoutes.faba.recaps.stockCard()), {
         year: form.year,
         month: form.month === ALL_MONTHS ? null : form.month,
         material_type:
             form.material_type === ALL_MATERIALS ? null : form.material_type,
     });
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>

@@ -18,7 +18,7 @@ class AtomicOperationalMutation
         'FabaProductionMovementsController', 'FabaUtilizationController', 'FabaUtilizationMovementsController',
         'FabaMovementApprovalController', 'FabaMovementApprovalsController', 'FabaApprovalController',
         'FabaMonthlyApprovalsController', 'FabaRecapController', 'FabaRecapsController',
-        'WasteRecordController', 'WasteRecordsController', 'WasteHaulingController', 'WasteHaulingsController',
+        'WasteHaulingPlansController', 'WasteRecordController', 'WasteRecordsController', 'WasteHaulingController', 'WasteHaulingsController',
     ];
 
     public function __construct(private OperationalTransactionService $transactions) {}
@@ -62,7 +62,12 @@ class AtomicOperationalMutation
                 $integrity = $faba ? app(\App\Services\FabaIntegrityService::class) : null;
                 $before = $integrity?->capture();
 
-                $response = $next($request);
+                $request->attributes->set(\App\Services\OperationalInbox::CAPTURE, true);
+                try {
+                    $response = $next($request);
+                } finally {
+                    $request->attributes->remove(\App\Services\OperationalInbox::CAPTURE);
+                }
                 $failed = $response->getStatusCode() >= 400
                     || ($response->isRedirection() && $request->hasSession() && in_array('error', $request->session()->get('_flash.new', []), true));
                 if ($failed) {

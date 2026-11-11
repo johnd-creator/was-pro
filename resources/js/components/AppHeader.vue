@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { Link, usePage } from '@inertiajs/vue3';
+import { usePage } from '@inertiajs/vue3';
 import { ChevronDown, ChevronRight, Menu } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
+import Link from '@/components/OrganizationLink.vue';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -92,6 +93,10 @@ function filterNavItem(item: NavItem): NavItem | null {
 }
 
 function canView(item: NavItem): boolean {
+    if (item.capability && page.props[item.capability] !== true) {
+        return false;
+    }
+
     if (user.value?.is_super_admin === true) {
         return true;
     }

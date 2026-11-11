@@ -28,7 +28,9 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import { vendorExpiryStatus } from '@/lib/vendor-license';
 import type { BreadcrumbItem } from '@/types';
 
 interface Vendor {
@@ -42,14 +44,16 @@ interface Vendor {
     address: string | null;
     license_number: string | null;
     license_expiry_date: string | null;
+    license_expiry_day: string | null;
     is_active: boolean;
-    transportations_count: number;
+    faba_movements_count: number;
     created_at: string;
     updated_at: string;
 }
 
 type Props = {
     vendors: Vendor[];
+    licenseReferenceDate: string;
 };
 
 const props = defineProps<Props>();
@@ -108,7 +112,7 @@ function openEditDialog(vendor: Vendor) {
         email: vendor.email || '',
         address: vendor.address || '',
         license_number: vendor.license_number || '',
-        license_expiry_date: vendor.license_expiry_date || '',
+        license_expiry_date: vendor.license_expiry_day || '',
         is_active: vendor.is_active,
     };
     dialogOpen.value = true;
@@ -117,7 +121,7 @@ function openEditDialog(vendor: Vendor) {
 function submit() {
     if (editingVendor.value) {
         router.put(
-            VendorsController.update(editingVendor.value.id),
+            scopedUrl(VendorsController.update(editingVendor.value.id)),
             formData.value,
             {
                 onSuccess: () => {
@@ -126,7 +130,7 @@ function submit() {
             },
         );
     } else {
-        router.post(VendorsController.store(), formData.value, {
+        router.post(scopedUrl(VendorsController.store()), formData.value, {
             onSuccess: () => {
                 dialogOpen.value = false;
             },
@@ -136,7 +140,7 @@ function submit() {
 
 function deleteVendor(vendor: Vendor) {
     if (confirm(`Are you sure you want to delete ${vendor.name}?`)) {
-        router.delete(VendorsController.destroy(vendor.id));
+        router.delete(scopedUrl(VendorsController.destroy(vendor.id)));
     }
 }
 
@@ -150,36 +154,9 @@ function formatDate(dateString: string | null) {
 }
 
 function getLicenseStatusBadge(licenseExpiryDate: string | null) {
-    if (!licenseExpiryDate) {
-        return {
-            class: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
-            text: 'Tidak ada lisensi',
-        };
-    }
-
-    const expiryDate = new Date(licenseExpiryDate);
-    const today = new Date();
-    const daysUntilExpiry = Math.ceil(
-        (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-    );
-
-    if (daysUntilExpiry < 0) {
-        return {
-            class: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-            text: 'Kedaluwarsa',
-        };
-    } else if (daysUntilExpiry <= 30) {
-        return {
-            class: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-            text: `Segera berakhir (${daysUntilExpiry}h)`,
-        };
-    } else {
-        return {
-            class: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-            text: 'Valid',
-        };
-    }
+    return vendorExpiryStatus(licenseExpiryDate, props.licenseReferenceDate);
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>
@@ -264,7 +241,7 @@ function getLicenseStatusBadge(licenseExpiryDate: string | null) {
                                             props.vendors.reduce(
                                                 (total, vendor) =>
                                                     total +
-                                                    vendor.transportations_count,
+                                                    vendor.faba_movements_count,
                                                 0,
                                             )
                                         }}
@@ -526,13 +503,13 @@ function getLicenseStatusBadge(licenseExpiryDate: string | null) {
                                     <Badge
                                         :class="
                                             getLicenseStatusBadge(
-                                                vendor.license_expiry_date,
+                                                vendor.license_expiry_day,
                                             ).class
                                         "
                                     >
                                         {{
                                             getLicenseStatusBadge(
-                                                vendor.license_expiry_date,
+                                                vendor.license_expiry_day,
                                             ).text
                                         }}
                                     </Badge>

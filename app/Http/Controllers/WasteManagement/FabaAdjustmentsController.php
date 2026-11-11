@@ -48,12 +48,15 @@ class FabaAdjustmentsController extends Controller
             'materialOptions' => FabaMovement::materialOptions(),
             'movementTypeOptions' => [FabaMovement::TYPE_ADJUSTMENT_IN, FabaMovement::TYPE_ADJUSTMENT_OUT],
             'defaultUnit' => FabaMovement::DEFAULT_UNIT,
+            'sourceOptions' => app(\App\Services\FabaCorrectionSource::class)->options(),
         ]);
     }
 
     public function store(FabaAdjustmentRequest $request): RedirectResponse
     {
         $validated = $request->validated();
+        $previousSourceId = isset($movement) && $movement->reference_type === FabaMovement::class ? $movement->reference_id : null;
+        $sourceAttributes = app(\App\Services\FabaCorrectionSource::class)->attributes($validated, $movement ?? null);
         $year = (int) date('Y', strtotime($validated['transaction_date']));
         $month = (int) date('n', strtotime($validated['transaction_date']));
 
@@ -82,6 +85,7 @@ class FabaAdjustmentsController extends Controller
         ]);
 
         $movement = FabaMovement::query()->create([
+            ...$sourceAttributes,
             'transaction_date' => $validated['transaction_date'],
             'material_type' => $validated['material_type'],
             'movement_type' => $validated['movement_type'],
@@ -99,6 +103,8 @@ class FabaAdjustmentsController extends Controller
             'created_by' => Auth::id(),
             'updated_by' => Auth::id(),
         ]);
+
+        app(\App\Services\FabaCorrectionSource::class)->capture($movement, $previousSourceId);
 
         $this->fabaAuditService->log(
             Auth::id(),
@@ -134,6 +140,7 @@ class FabaAdjustmentsController extends Controller
             'materialOptions' => FabaMovement::materialOptions(),
             'movementTypeOptions' => [FabaMovement::TYPE_ADJUSTMENT_IN, FabaMovement::TYPE_ADJUSTMENT_OUT],
             'defaultUnit' => FabaMovement::DEFAULT_UNIT,
+            'sourceOptions' => app(\App\Services\FabaCorrectionSource::class)->options(),
         ]);
     }
 
@@ -143,6 +150,8 @@ class FabaAdjustmentsController extends Controller
         $this->abortIfCannotModify($movement, 'faba_adjustments.edit', 'mengubah');
 
         $validated = $request->validated();
+        $previousSourceId = isset($movement) && $movement->reference_type === FabaMovement::class ? $movement->reference_id : null;
+        $sourceAttributes = app(\App\Services\FabaCorrectionSource::class)->attributes($validated, $movement ?? null);
         $year = (int) date('Y', strtotime($validated['transaction_date']));
         $month = (int) date('n', strtotime($validated['transaction_date']));
 
@@ -172,6 +181,7 @@ class FabaAdjustmentsController extends Controller
         ], $movement->id);
 
         $movement->update([
+            ...$sourceAttributes,
             'transaction_date' => $validated['transaction_date'],
             'material_type' => $validated['material_type'],
             'movement_type' => $validated['movement_type'],
@@ -193,6 +203,8 @@ class FabaAdjustmentsController extends Controller
             'note' => $validated['note'],
             'updated_by' => Auth::id(),
         ]);
+
+        app(\App\Services\FabaCorrectionSource::class)->capture($movement, $previousSourceId);
 
         $this->fabaAuditService->log(
             Auth::id(),
@@ -264,6 +276,7 @@ class FabaAdjustmentsController extends Controller
 
         return [
             'id' => $movement->id,
+            ...app(\App\Services\FabaCorrectionSource::class)->serialize($movement),
             'display_number' => sprintf('FAD-%s-%s', $movement->transaction_date->format('Ym'), strtoupper(substr(str_replace('-', '', $movement->id), -4))),
             'transaction_date' => $movement->transaction_date->format('Y-m-d'),
             'material_type' => $movement->material_type,

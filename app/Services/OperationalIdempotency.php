@@ -35,25 +35,34 @@ class OperationalIdempotency
             throw new OperationalConflict('Idempotency-Key sudah digunakan untuk data yang berbeda.');
         }
 
-        return response()->json(json_decode($record->response, true, flags: JSON_THROW_ON_ERROR), $record->status)
+        $saved = json_decode($record->response, true, flags: JSON_THROW_ON_ERROR);
+        if (isset($saved['__operational_redirect'])) {
+            return redirect()->to($saved['__operational_redirect'], $record->status)->with($saved['flash'] ?? [])->header('Idempotency-Replayed', 'true');
+        }
+
+        return response()->json($saved, $record->status)
             ->header('Idempotency-Replayed', 'true');
     }
 
     public function remember(Request $request, Response $response): void
     {
-        if (! $this->enabled($request) || ! $response instanceof JsonResponse || ! $response->isSuccessful()) {
+        $redirect = $response instanceof \Illuminate\Http\RedirectResponse && $response->isRedirection();
+        if (! $this->enabled($request) || (! $redirect && (! $response instanceof JsonResponse || ! $response->isSuccessful()))) {
             return;
         }
         DB::table('operational_requests')->insert([
             'id' => $this->id($request), 'fingerprint' => $this->fingerprint($request),
             'authorization' => $this->authorization($request), 'status' => $response->getStatusCode(),
-            'response' => $response->getContent(), 'created_at' => now(),
+            'response' => $redirect ? json_encode(['__operational_redirect' => $response->getTargetUrl(), 'flash' => $request->session()->only(['success', 'warning'])], JSON_THROW_ON_ERROR) : $response->getContent(), 'created_at' => now(),
         ]);
     }
 
     private function enabled(Request $request): bool
     {
-        return $request->is('api/*') && $request->hasHeader('Idempotency-Key');
+        $planCommand = str_starts_with((string) $request->route()?->getName(), 'waste-management.hauling-plans.')
+            || ($request->route()?->getName() === 'waste-management.haulings.store' && $request->filled('waste_hauling_plan_id'));
+
+        return ($request->is('api/*') || $planCommand) && $request->hasHeader('Idempotency-Key');
     }
 
     private function id(Request $request): string
@@ -90,6 +99,7 @@ class OperationalIdempotency
         $owners = [];
         $models = [
             'wasteRecord' => \App\Models\WasteRecord::class,
+            'wasteHaulingPlan' => \App\Models\WasteHaulingPlan::class,
             'wasteHauling' => \App\Models\WasteHauling::class,
             'production' => \App\Models\FabaMovement::class, 'utilization' => \App\Models\FabaMovement::class,
             'adjustment' => \App\Models\FabaMovement::class, 'movement' => \App\Models\FabaMovement::class,
@@ -104,10 +114,13 @@ class OperationalIdempotency
                 }
                 $resource = $query->find($id);
                 $owners[$parameter] = $resource?->only(['id', 'created_by', 'submitted_by', 'waste_record_id']);
-                if ($resource instanceof \App\Models\WasteHauling) {
+                if ($resource instanceof \App\Models\WasteHauling || $resource instanceof \App\Models\WasteHaulingPlan) {
                     $owners['parent'] = $resource->wasteRecord?->only(['id', 'created_by']);
                 }
             }
+        }
+        if ($request->filled('waste_hauling_plan_id') && app(HaulingPlans::class)->installed()) {
+            $owners['body_plan'] = \App\Models\WasteHaulingPlan::query()->find($request->input('waste_hauling_plan_id'))?->only(['id', 'created_by', 'submitted_by', 'waste_record_id']);
         }
         if ($request->filled('waste_record_id')) {
             $owners['body_parent'] = \App\Models\WasteRecord::query()->find($request->input('waste_record_id'))?->only(['id', 'created_by']);

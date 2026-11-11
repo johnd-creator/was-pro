@@ -9,6 +9,7 @@ import {
 } from 'lucide-vue-next';
 import type { LucideIcon } from 'lucide-vue-next';
 import { computed, reactive } from 'vue';
+import FabaBalanceReconciliation from '@/components/FabaBalanceReconciliation.vue';
 import Heading from '@/components/Heading.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +23,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
     formatFabaDate,
@@ -169,7 +171,10 @@ const ledgerSummary = computed(() => [
 function applyFilters(): void {
     const [year, month] = form.selectedPeriod.split('-').map(Number);
 
-    router.get(wasteManagementRoutes.faba.recaps.monthly(), { year, month });
+    router.get(scopedUrl(wasteManagementRoutes.faba.recaps.monthly()), {
+        year,
+        month,
+    });
 }
 
 function formatNumber(value: number): string {
@@ -198,6 +203,7 @@ function iconWrapClasses(tone: SummaryCard['tone']): string {
 
     return map[tone];
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>
@@ -433,6 +439,11 @@ function iconWrapClasses(tone: SummaryCard['tone']): string {
                         </ul>
                     </AlertDescription>
                 </Alert>
+
+                <FabaBalanceReconciliation
+                    :summary="detail.recap"
+                    :period-label="detail.recap.period_label"
+                />
 
                 <section class="space-y-4">
                     <div class="flex items-end justify-between gap-4">

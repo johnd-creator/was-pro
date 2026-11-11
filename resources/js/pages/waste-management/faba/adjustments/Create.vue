@@ -15,7 +15,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import { formatLocalDate } from '@/lib/date';
 import { formatFabaMaterial, formatFabaMovementType } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
@@ -24,6 +26,14 @@ const props = defineProps<{
     materialOptions: string[];
     movementTypeOptions: string[];
     defaultUnit: string;
+    sourceOptions: {
+        id: string;
+        transaction_date: string;
+        material_type: string;
+        movement_type: string;
+        quantity: number;
+        unit: string;
+    }[];
 }>();
 
 const breadcrumbItems: BreadcrumbItem[] = [
@@ -38,17 +48,19 @@ const breadcrumbItems: BreadcrumbItem[] = [
 ];
 
 const form = useForm({
-    transaction_date: new Date().toISOString().split('T')[0],
+    transaction_date: formatLocalDate(),
     material_type: '',
     movement_type: '',
     quantity: '',
     unit: props.defaultUnit,
     note: '',
+    source_movement_id: '',
 });
 
 function submit(): void {
-    form.post(wasteManagementRoutes.faba.adjustments.store.url());
+    form.post(scopedUrl(wasteManagementRoutes.faba.adjustments.store.url()));
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>
@@ -293,6 +305,63 @@ function submit(): void {
                                                         class="bg-white dark:bg-slate-950"
                                                     />
                                                 </div>
+                                            </div>
+                                            <div class="grid gap-2">
+                                                <Label for="source_movement_id"
+                                                    >Transaksi asal
+                                                    (opsional)</Label
+                                                >
+                                                <select
+                                                    id="source_movement_id"
+                                                    v-model="
+                                                        form.source_movement_id
+                                                    "
+                                                    class="h-11 rounded-md border bg-background px-3"
+                                                >
+                                                    <option value="">
+                                                        Tanpa tautan transaksi
+                                                        asal
+                                                    </option>
+                                                    <option
+                                                        v-for="source in sourceOptions.filter(
+                                                            (item) =>
+                                                                item.material_type ===
+                                                                form.material_type,
+                                                        )"
+                                                        :key="source.id"
+                                                        :value="source.id"
+                                                    >
+                                                        {{
+                                                            source.transaction_date.slice(
+                                                                0,
+                                                                10,
+                                                            )
+                                                        }}
+                                                        Â·
+                                                        {{
+                                                            formatFabaMovementType(
+                                                                source.movement_type,
+                                                            )
+                                                        }}
+                                                        Â· {{ source.quantity }}
+                                                        {{ source.unit }} Â·
+                                                        {{ source.id }}
+                                                    </option>
+                                                </select>
+                                                <p
+                                                    class="text-sm text-muted-foreground"
+                                                >
+                                                    Tautan ini menyimpan bukti
+                                                    transaksi asal, bukan
+                                                    menghitung pembalikan
+                                                    otomatis.
+                                                </p>
+                                                <InputError
+                                                    :message="
+                                                        form.errors
+                                                            .source_movement_id
+                                                    "
+                                                />
                                             </div>
                                             <div class="grid gap-2">
                                                 <Label for="note"

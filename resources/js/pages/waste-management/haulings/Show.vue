@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import { AlertCircle, CircleCheck } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import { show as showPlan } from '@/actions/App/Http/Controllers/WasteManagement/WasteHaulingPlansController';
 import WasteHaulingsController from '@/actions/App/Http/Controllers/WasteManagement/WasteHaulingsController';
 import Heading from '@/components/Heading.vue';
+import Link from '@/components/OrganizationLink.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,10 +18,22 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import ExpiryBadge from '@/components/waste-management/ExpiryBadge.vue';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import type { BreadcrumbItem } from '@/types';
 
 interface HaulingItem {
+    metadata_available?: boolean;
+    record_kind?: string;
+    waste_hauling_plan_id?: string | null;
+    can_view_plan?: boolean;
+    vendor_name?: string | null;
+    vehicle_number?: string | null;
+    driver_name?: string | null;
+    document_number?: string | null;
+    destination?: string | null;
+    receiver?: string | null;
+    has_attachment?: boolean;
     id: string;
     hauling_number: string;
     hauling_date: string;
@@ -55,6 +69,7 @@ interface RecordItem {
 
 const props = defineProps<{
     hauling: HaulingItem;
+    plansEnabled?: boolean;
     record: RecordItem;
     abilities: {
         can_approve: boolean;
@@ -108,66 +123,76 @@ function formatDate(value: string | null): string {
 
 function approve(): void {
     resetMessages();
-    approveForm.post(WasteHaulingsController.approve(props.hauling.id).url, {
-        preserveScroll: true,
-        onSuccess: () => {
-            if (flash.value?.success) {
-                statusMessage.value = flash.value.success;
-            } else if (flash.value?.error) {
-                errorMessage.value = flash.value.error;
-            } else {
-                statusMessage.value =
-                    'Pengajuan pengangkutan berhasil diproses.';
-            }
+    approveForm.post(
+        scopedUrl(WasteHaulingsController.approve(props.hauling.id).url),
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                if (flash.value?.success) {
+                    statusMessage.value = flash.value.success;
+                } else if (flash.value?.error) {
+                    errorMessage.value = flash.value.error;
+                } else {
+                    statusMessage.value =
+                        'Pengajuan pengangkutan berhasil diproses.';
+                }
+            },
+            onError: () => {
+                errorMessage.value =
+                    'Pengajuan pengangkutan tidak dapat disetujui saat ini.';
+            },
         },
-        onError: () => {
-            errorMessage.value =
-                'Pengajuan pengangkutan tidak dapat disetujui saat ini.';
-        },
-    });
+    );
 }
 
 function reject(): void {
     resetMessages();
-    rejectForm.post(WasteHaulingsController.reject(props.hauling.id).url, {
-        preserveScroll: true,
-        onSuccess: () => {
-            if (flash.value?.success) {
-                statusMessage.value = flash.value.success;
-            } else if (flash.value?.error) {
-                errorMessage.value = flash.value.error;
-            } else {
-                statusMessage.value =
-                    'Pengajuan pengangkutan berhasil ditolak.';
-            }
+    rejectForm.post(
+        scopedUrl(WasteHaulingsController.reject(props.hauling.id).url),
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                if (flash.value?.success) {
+                    statusMessage.value = flash.value.success;
+                } else if (flash.value?.error) {
+                    errorMessage.value = flash.value.error;
+                } else {
+                    statusMessage.value =
+                        'Pengajuan pengangkutan berhasil ditolak.';
+                }
+            },
+            onError: () => {
+                errorMessage.value =
+                    'Pengajuan pengangkutan tidak dapat ditolak saat ini.';
+            },
         },
-        onError: () => {
-            errorMessage.value =
-                'Pengajuan pengangkutan tidak dapat ditolak saat ini.';
-        },
-    });
+    );
 }
 
 function cancel(): void {
     resetMessages();
-    useForm({}).post(WasteHaulingsController.cancel(props.hauling.id).url, {
-        preserveScroll: true,
-        onSuccess: () => {
-            if (flash.value?.success) {
-                statusMessage.value = flash.value.success;
-            } else if (flash.value?.error) {
-                errorMessage.value = flash.value.error;
-            } else {
-                statusMessage.value =
-                    'Pengajuan pengangkutan berhasil dibatalkan.';
-            }
+    useForm({}).post(
+        scopedUrl(WasteHaulingsController.cancel(props.hauling.id).url),
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                if (flash.value?.success) {
+                    statusMessage.value = flash.value.success;
+                } else if (flash.value?.error) {
+                    errorMessage.value = flash.value.error;
+                } else {
+                    statusMessage.value =
+                        'Pengajuan pengangkutan berhasil dibatalkan.';
+                }
+            },
+            onError: () => {
+                errorMessage.value =
+                    'Pengajuan pengangkutan tidak dapat dibatalkan saat ini.';
+            },
         },
-        onError: () => {
-            errorMessage.value =
-                'Pengajuan pengangkutan tidak dapat dibatalkan saat ini.';
-        },
-    });
+    );
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>
@@ -175,9 +200,72 @@ function cancel(): void {
         :breadcrumbs="breadcrumbItems"
         title="Detail Pengangkutan"
     >
+        <div
+            v-if="hauling.metadata_available"
+            class="space-y-2 px-6 py-4 text-sm"
+        >
+            <p>Vendor: {{ hauling.vendor_name || '-' }}</p>
+            <p>Kendaraan: {{ hauling.vehicle_number || '-' }}</p>
+            <p>Pengemudi: {{ hauling.driver_name || '-' }}</p>
+            <p>Manifest / dokumen: {{ hauling.document_number || '-' }}</p>
+            <p>Tujuan: {{ hauling.destination || '-' }}</p>
+            <p>Penerima: {{ hauling.receiver || '-' }}</p>
+            <a
+                v-if="hauling.has_attachment"
+                :href="
+                    scopedUrl(
+                        WasteHaulingsController.attachment(hauling.id).url,
+                    )
+                "
+                class="underline"
+                >Unduh bukti pengangkutan</a
+            >
+        </div>
         <Head :title="`${hauling.hauling_number} - Pengangkutan Limbah`" />
 
         <div class="space-y-6 px-4 py-5 sm:px-6 lg:px-8">
+            <div class="space-y-2 rounded-lg border bg-muted/40 p-4 text-sm">
+                <p v-if="hauling.record_kind === 'legacy_actual'">
+                    Catatan tanpa tautan rencana (alur lama). Persetujuan
+                    historis dipertahankan untuk saldo tercatat; status ini
+                    sendiri bukan bukti verifikasi fisik.
+                </p>
+                <p v-else>
+                    Persetujuan realisasi terpisah dari persetujuan rencana dan
+                    mengurangi saldo tercatat.
+                </p>
+                <Link
+                    v-if="
+                        plansEnabled &&
+                        hauling.can_view_plan &&
+                        hauling.waste_hauling_plan_id
+                    "
+                    :href="showPlan.url(hauling.waste_hauling_plan_id)"
+                    class="underline underline-offset-4"
+                    >Buka rencana angkut terkait</Link
+                >
+            </div>
+            <div
+                v-if="hauling.metadata_available"
+                class="space-y-2 px-6 py-4 text-sm"
+            >
+                <p>Vendor: {{ hauling.vendor_name || '-' }}</p>
+                <p>Kendaraan: {{ hauling.vehicle_number || '-' }}</p>
+                <p>Pengemudi: {{ hauling.driver_name || '-' }}</p>
+                <p>Manifest / dokumen: {{ hauling.document_number || '-' }}</p>
+                <p>Tujuan: {{ hauling.destination || '-' }}</p>
+                <p>Penerima: {{ hauling.receiver || '-' }}</p>
+                <a
+                    v-if="hauling.has_attachment"
+                    :href="
+                        scopedUrl(
+                            WasteHaulingsController.attachment(hauling.id).url,
+                        )
+                    "
+                    class="underline"
+                    >Unduh bukti pengangkutan</a
+                >
+            </div>
             <Heading
                 title="Detail Pengangkutan"
                 description="Tinjau pengajuan, status approval, dan dampaknya terhadap sisa limbah."
@@ -213,7 +301,7 @@ function cancel(): void {
                     <CardContent class="space-y-3 text-sm">
                         <div>
                             <span class="text-muted-foreground"
-                                >Tanggal angkut:</span
+                                >Tanggal aktual angkut:</span
                             >
                             {{ hauling.hauling_date }}
                         </div>
@@ -276,6 +364,16 @@ function cancel(): void {
                             >
                             <ExpiryBadge
                                 :expiry-date="record.expiry_date"
+                                :remaining-quantity="record.remaining_quantity"
+                                :simulated="
+                                    record.hauling_history.some(
+                                        (entry) =>
+                                            entry.status === 'approved' &&
+                                            entry.hauling_number.startsWith(
+                                                'SIMULASI-',
+                                            ),
+                                    )
+                                "
                                 size="sm"
                             />
                         </div>
@@ -285,13 +383,15 @@ function cancel(): void {
                         </div>
                         <div>
                             <span class="text-muted-foreground"
-                                >Sudah diangkut:</span
+                                >Realisasi disetujui:</span
                             >
                             {{ record.approved_hauled_quantity }}
                             {{ record.unit }}
                         </div>
                         <div>
-                            <span class="text-muted-foreground">Sisa:</span>
+                            <span class="text-muted-foreground"
+                                >Saldo tercatat:</span
+                            >
                             {{ record.remaining_quantity }} {{ record.unit }}
                         </div>
                         <div>
@@ -318,10 +418,11 @@ function cancel(): void {
             >
                 <Card v-if="abilities.can_approve">
                     <CardHeader>
-                        <CardTitle>Setujui pengajuan</CardTitle>
+                        <CardTitle>Setujui realisasi</CardTitle>
                         <CardDescription
-                            >Approval langsung mengurangi backlog
-                            limbah.</CardDescription
+                            >Persetujuan realisasi mengurangi saldo tercatat.
+                            Tinjau jumlah aktual dan bukti yang
+                            tersedia.</CardDescription
                         >
                     </CardHeader>
                     <CardContent class="space-y-4">
@@ -425,7 +526,9 @@ function cancel(): void {
                             </div>
                         </div>
                         <div class="mt-1 text-muted-foreground">
-                            {{ history.hauling_date }} • {{ history.quantity }}
+                            {{ history.hauling_date }}
+                            ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢
+                            {{ history.quantity }}
                             {{ history.unit }}
                         </div>
                     </div>

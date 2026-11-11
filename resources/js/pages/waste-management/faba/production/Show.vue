@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
     formatFabaDate,
@@ -39,15 +40,20 @@ const rejectForm = useForm({
 
 function approve(): void {
     approveForm.post(
-        wasteManagementRoutes.faba.movements.approve(props.entry.id).url,
+        scopedUrl(
+            wasteManagementRoutes.faba.movements.approve(props.entry.id).url,
+        ),
     );
 }
 
 function reject(): void {
     rejectForm.post(
-        wasteManagementRoutes.faba.movements.reject(props.entry.id).url,
+        scopedUrl(
+            wasteManagementRoutes.faba.movements.reject(props.entry.id).url,
+        ),
     );
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>

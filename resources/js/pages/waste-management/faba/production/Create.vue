@@ -22,7 +22,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import { formatLocalDate } from '@/lib/date';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 
@@ -51,7 +53,7 @@ const form = useForm<{
     unit: string;
     note: string;
 }>({
-    transaction_date: new Date().toISOString().split('T')[0],
+    transaction_date: formatLocalDate(),
     material_type: '',
     movement_type: '',
     quantity: '',
@@ -60,7 +62,7 @@ const form = useForm<{
 });
 
 function submit(): void {
-    form.post(wasteManagementRoutes.faba.production.store.url());
+    form.post(scopedUrl(wasteManagementRoutes.faba.production.store.url()));
 }
 
 const movementTypeOptions = computed(
@@ -75,6 +77,7 @@ watch(
         }
     },
 );
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>

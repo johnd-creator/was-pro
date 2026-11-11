@@ -317,6 +317,7 @@ class WasteRecordController extends ApiController
             'approved_hauled_quantity' => $record->getApprovedHauledQuantity(),
             'remaining_quantity' => $record->getRemainingQuantity(),
             'reserved_quantity' => $record->getReservedHaulingQuantity(),
+            ...app(\App\Services\HaulingPlans::class)->summary($record),
             'operational_status' => $record->getOperationalStatus(),
             'operational_status_label' => $record->getOperationalStatusLabel(),
             'waste_type' => $record->wasteType ? [

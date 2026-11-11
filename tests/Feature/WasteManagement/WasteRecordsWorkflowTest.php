@@ -380,7 +380,7 @@ test('super admin can approve valid hauling request', function () {
     $tenantService->switchToPublic();
 
     $response = $this->actingAs($this->superAdmin)
-        ->post(route('waste-management.haulings.approve', $hauling), [
+        ->post(route('waste-management.haulings.approve', [$hauling, 'organization_id' => $this->org->id]), [
             'approval_notes' => 'Siap diangkut.',
         ]);
 
@@ -438,7 +438,7 @@ test('super admin can approve hauling when remaining quantity matches at two dec
     $tenantService->switchToPublic();
 
     $response = $this->actingAs($this->superAdmin)
-        ->post(route('waste-management.haulings.approve', $hauling), [
+        ->post(route('waste-management.haulings.approve', [$hauling, 'organization_id' => $this->org->id]), [
             'approval_notes' => 'Sisa dua desimal valid.',
         ]);
 
@@ -495,12 +495,12 @@ test('approve hauling returns error when quantity is no longer available', funct
     $tenantService->switchToPublic();
 
     $response = $this->actingAs($this->superAdmin)
-        ->from(route('waste-management.haulings.show', $hauling))
-        ->post(route('waste-management.haulings.approve', $hauling), [
+        ->from(route('waste-management.haulings.show', [$hauling, 'organization_id' => $this->org->id]))
+        ->post(route('waste-management.haulings.approve', [$hauling, 'organization_id' => $this->org->id]), [
             'approval_notes' => 'Coba approve.',
         ]);
 
-    $response->assertRedirect(route('waste-management.haulings.show', $hauling));
+    $response->assertRedirect(route('waste-management.haulings.show', [$hauling, 'organization_id' => $this->org->id]));
     $response->assertSessionHas('error', 'Jumlah pengangkutan tidak lagi valid karena sisa limbah telah berubah.');
 
     $tenantService->switchToSchema($this->org->schema_name);
@@ -542,7 +542,7 @@ test('hauling detail page receives flash messages from inertia shared props', fu
             'success' => 'Pengajuan pengangkutan berhasil disetujui.',
             'error' => 'Jumlah pengangkutan tidak lagi valid karena sisa limbah telah berubah.',
         ])
-        ->get(route('waste-management.haulings.show', $hauling));
+        ->get(route('waste-management.haulings.show', [$hauling, 'organization_id' => $this->org->id]));
 
     $response->assertSuccessful();
     $response->assertInertia(fn (AssertableInertia $page) => $page

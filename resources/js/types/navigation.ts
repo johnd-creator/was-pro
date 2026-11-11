@@ -11,6 +11,7 @@ export type NavItem = {
     href?: string;
     icon?: LucideIcon;
     isActive?: boolean;
+    capability?: 'operational_inbox_available' | 'hauling_plans_available';
     permission?: string;
     permissions?: string[];
     items?: NavItem[];

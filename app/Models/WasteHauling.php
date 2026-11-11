@@ -19,7 +19,7 @@ class WasteHauling extends Model
     {
         static::creating(function (self $hauling): void {
             if (! $hauling->hauling_number) {
-                $organization = auth()->user()?->organization;
+                $organization = app(\App\Services\OperationalInbox::class)->organization() ?? auth()->user()?->organization;
 
                 if (! $organization && $hauling->waste_record_id) {
                     $wasteRecord = WasteRecord::query()->with('createdBy.organization')->find($hauling->waste_record_id);
@@ -33,6 +33,14 @@ class WasteHauling extends Model
     }
 
     protected $fillable = [
+        'waste_hauling_plan_id',
+        'vendor_id',
+        'vehicle_number',
+        'driver_name',
+        'document_number',
+        'destination',
+        'receiver',
+        'attachment_path',
         'hauling_number',
         'waste_record_id',
         'hauling_date',
@@ -58,6 +66,16 @@ class WasteHauling extends Model
             'submitted_at' => 'datetime',
             'approved_at' => 'datetime',
         ];
+    }
+
+    public function haulingPlan(): BelongsTo
+    {
+        return $this->belongsTo(WasteHaulingPlan::class, 'waste_hauling_plan_id');
+    }
+
+    public function vendor(): BelongsTo
+    {
+        return $this->belongsTo(Vendor::class)->withTrashed();
     }
 
     public function wasteRecord(): BelongsTo

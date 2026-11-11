@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
 import {
     ArrowRight,
     CheckCircle2,
@@ -11,7 +10,7 @@ import {
 } from 'lucide-vue-next';
 import type { LucideIcon } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
-import { Badge } from '@/components/ui/badge';
+import Link from '@/components/OrganizationLink.vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface DashboardTaskItem {
@@ -51,8 +50,8 @@ const activeTab = ref<TabType>(
 
 const panelTitle = computed(() =>
     props.taskContext === 'operator'
-        ? 'Task Perlu Tindak Lanjut'
-        : 'Task Perlu Keputusan',
+        ? 'Prioritas tindak lanjut'
+        : 'Antrean keputusan',
 );
 
 const activeTasks = computed(() => {
@@ -129,257 +128,161 @@ function leadingIcon(task: DashboardTaskItem): LucideIcon {
 
     return ShieldAlert;
 }
+const tabs = computed<Array<{ value: TabType; label: string; count: number }>>(
+    () => [
+        { value: 'waste', label: 'Limbah', count: props.wastePendingCount },
+        { value: 'faba', label: 'FABA', count: props.fabaPendingCount },
+        {
+            value: 'hauling_attention',
+            label: 'Atensi',
+            count: props.haulingAttentionCount,
+        },
+    ],
+);
 </script>
 
 <template>
     <Card
-        class="wm-panel-work wm-card-overlay-blue relative flex h-full min-h-[520px] flex-col overflow-hidden border shadow-sm xl:min-h-0 dark:border-slate-700/50 dark:bg-slate-900/40"
+        class="min-w-0 gap-0 overflow-hidden rounded-2xl border-slate-200 bg-white py-0 shadow-none dark:border-slate-800 dark:bg-slate-900"
     >
-        <CardHeader
-            class="wm-border-strong shrink-0 border-b bg-sky-50/40 px-3 py-2 dark:border-slate-700/50 dark:bg-sky-950/25"
-        >
-            <div class="space-y-0.5">
-                <p
-                    class="wm-text-muted text-[10px] font-semibold tracking-[0.12em] uppercase"
-                >
-                    Task List
-                </p>
-                <CardTitle class="wm-text-primary text-sm">
-                    {{ panelTitle }}
-                </CardTitle>
-            </div>
-
-            <!-- Tab Navigation -->
-            <div class="mt-3">
-                <div
-                    class="grid grid-cols-3 gap-0 border-b border-sky-200/60 dark:border-sky-900/40"
-                >
-                    <button
-                        :class="[
-                            'relative px-3 py-2 text-left transition-all duration-200',
-                            activeTab === 'waste'
-                                ? ''
-                                : 'hover:bg-sky-50/45 dark:hover:bg-sky-950/30',
-                        ]"
-                        @click="activeTab = 'waste'"
+        <CardHeader class="gap-4 px-5 pt-5 pb-4">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <p
+                        class="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400"
                     >
-                        <div class="flex items-center justify-between gap-2">
-                            <span
-                                :class="[
-                                    'text-xs font-medium',
-                                    activeTab === 'waste'
-                                        ? 'text-sky-700 dark:text-sky-300'
-                                        : 'wm-text-muted',
-                                ]"
-                            >
-                                Limbah
-                            </span>
-                            <span
-                                :class="[
-                                    'rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
-                                    activeTab === 'waste'
-                                        ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-200'
-                                        : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
-                                ]"
-                            >
-                                {{ wastePendingCount }}
-                            </span>
-                        </div>
-                        <div
-                            v-if="activeTab === 'waste'"
-                            class="absolute right-0 bottom-0 left-0 h-0.5 bg-sky-500 dark:bg-sky-400"
-                        />
-                    </button>
-
-                    <button
-                        :class="[
-                            'relative px-3 py-2 text-left transition-all duration-200',
-                            activeTab === 'faba'
-                                ? ''
-                                : 'hover:bg-sky-50/45 dark:hover:bg-sky-950/30',
-                        ]"
-                        @click="activeTab = 'faba'"
-                    >
-                        <div class="flex items-center justify-between gap-2">
-                            <span
-                                :class="[
-                                    'text-xs font-medium',
-                                    activeTab === 'faba'
-                                        ? 'text-sky-700 dark:text-sky-300'
-                                        : 'wm-text-muted',
-                                ]"
-                            >
-                                FABA
-                            </span>
-                            <span
-                                :class="[
-                                    'rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
-                                    activeTab === 'faba'
-                                        ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-200'
-                                        : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
-                                ]"
-                            >
-                                {{ fabaPendingCount }}
-                            </span>
-                        </div>
-                        <div
-                            v-if="activeTab === 'faba'"
-                            class="absolute right-0 bottom-0 left-0 h-0.5 bg-sky-500 dark:bg-sky-400"
-                        />
-                    </button>
-
-                    <button
-                        :class="[
-                            'relative px-3 py-2 text-left transition-all duration-200',
-                            activeTab === 'hauling_attention'
-                                ? ''
-                                : 'hover:bg-sky-50/45 dark:hover:bg-sky-950/30',
-                        ]"
-                        @click="activeTab = 'hauling_attention'"
-                    >
-                        <div class="flex items-center justify-between gap-2">
-                            <span
-                                :class="[
-                                    'text-xs font-medium',
-                                    activeTab === 'hauling_attention'
-                                        ? 'text-sky-700 dark:text-sky-300'
-                                        : 'wm-text-muted',
-                                ]"
-                            >
-                                Atensi
-                            </span>
-                            <span
-                                :class="[
-                                    'rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
-                                    activeTab === 'hauling_attention'
-                                        ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-200'
-                                        : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
-                                ]"
-                            >
-                                {{ haulingAttentionCount }}
-                            </span>
-                        </div>
-                        <div
-                            v-if="activeTab === 'hauling_attention'"
-                            class="absolute right-0 bottom-0 left-0 h-0.5 bg-sky-500 dark:bg-sky-400"
-                        />
-                    </button>
+                        Ruang kerja
+                    </p>
+                    <CardTitle class="text-base font-semibold">{{
+                        panelTitle
+                    }}</CardTitle>
                 </div>
+                <ClipboardList
+                    class="size-5 text-slate-400"
+                    aria-hidden="true"
+                />
+            </div>
+            <div
+                class="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-950"
+                role="group"
+                aria-label="Jenis tindak lanjut"
+            >
+                <button
+                    v-for="tab in tabs"
+                    :key="tab.value"
+                    type="button"
+                    :aria-pressed="activeTab === tab.value"
+                    class="flex min-h-11 items-center justify-center gap-2 rounded-lg px-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                    :class="
+                        activeTab === tab.value
+                            ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-800 dark:text-blue-300'
+                            : 'text-slate-600 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'
+                    "
+                    @click="activeTab = tab.value"
+                >
+                    {{ tab.label
+                    }}<span
+                        class="rounded-md bg-slate-100 px-1.5 py-0.5 tabular-nums dark:bg-slate-900"
+                        >{{ tab.count }}</span
+                    >
+                </button>
             </div>
         </CardHeader>
-
-        <CardContent class="flex min-h-0 flex-1 flex-col overflow-hidden p-2.5">
+        <CardContent class="px-5 pb-5">
+            <div
+                class="mb-3 flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400"
+                aria-live="polite"
+            >
+                <span>{{ activePendingCount }} item perlu ditangani</span
+                ><span v-if="activeTasks.length > 0"
+                    >{{ activeTasks.length }} ditampilkan</span
+                >
+            </div>
             <div
                 v-if="activeTasks.length === 0"
-                class="wm-panel-elevated flex flex-1 items-center justify-center rounded-lg border border-dashed p-4 text-center"
+                class="flex min-h-52 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 px-5 py-8 text-center dark:border-slate-700"
             >
-                <div class="space-y-1.5">
-                    <CheckCircle2
-                        class="mx-auto size-4 text-sky-500 dark:text-sky-300"
-                    />
-                    <p class="wm-text-primary text-xs font-medium">
-                        Tidak ada task aktif
-                    </p>
-                </div>
+                <CheckCircle2
+                    class="size-7 text-emerald-600 dark:text-emerald-400"
+                    aria-hidden="true"
+                />
+                <p
+                    class="text-sm font-semibold text-slate-800 dark:text-slate-100"
+                >
+                    {{
+                        activePendingCount > 0
+                            ? 'Rincian tugas belum tersedia'
+                            : 'Tidak ada tugas pada kategori ini'
+                    }}
+                </p>
+                <p
+                    class="max-w-56 text-xs leading-5 text-slate-500 dark:text-slate-400"
+                >
+                    {{
+                        activePendingCount > 0
+                            ? 'Buka daftar lengkap untuk memeriksa item yang perlu ditangani.'
+                            : 'Pilih kategori lain untuk melihat tindak lanjut operasional.'
+                    }}
+                </p>
             </div>
-
-            <div v-else class="flex min-h-0 flex-1 flex-col space-y-3">
-                <!-- Pending Count Badge -->
-                <div class="flex shrink-0 items-center justify-between px-1">
-                    <p class="wm-text-secondary text-[10px] font-medium">
-                        {{
-                            activeTab === 'waste'
-                                ? 'Limbah'
-                                : activeTab === 'faba'
-                                  ? 'FABA'
-                                  : 'Limbah atensi'
-                        }}
-                        yang perlu ditangani
-                    </p>
-                    <span
-                        class="rounded-full bg-sky-100/80 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950/50 dark:text-sky-200"
-                    >
-                        {{ activePendingCount }} items
-                    </span>
-                </div>
-
-                <!-- Scrollable List -->
-                <div class="flex h-0 min-h-0 flex-1 overflow-y-auto pr-1">
-                    <div class="flex w-full flex-col space-y-2">
-                        <Link
-                            v-for="task in activeTasks"
-                            :key="task.id"
-                            :href="task.href"
-                            class="wm-panel-elevated block rounded-lg border px-2.5 py-2 transition-colors duration-200 hover:border-sky-300/70 hover:bg-sky-50/40 dark:hover:border-sky-800/70 dark:hover:bg-sky-950/30"
-                        >
-                            <div class="flex items-start gap-2">
-                                <div
-                                    class="wm-surface-subtle flex size-7 shrink-0 items-center justify-center rounded-md border"
+            <ul
+                v-else
+                class="max-h-[440px] space-y-2 overflow-y-auto pr-1"
+                aria-label="Daftar tindak lanjut"
+            >
+                <li v-for="task in activeTasks" :key="task.id">
+                    <Link
+                        :href="task.href"
+                        class="group block rounded-xl border border-slate-200 p-3 transition-colors hover:border-blue-300 hover:bg-blue-50/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-slate-800 dark:hover:border-blue-700 dark:hover:bg-blue-950/30"
+                        ><div class="flex items-start gap-3">
+                            <span
+                                class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"
+                                ><component
+                                    :is="leadingIcon(task)"
+                                    class="size-4"
+                                    aria-hidden="true"
+                            /></span>
+                            <div class="min-w-0 flex-1">
+                                <p
+                                    class="text-sm leading-5 font-semibold break-words text-slate-900 dark:text-slate-100"
                                 >
-                                    <component
-                                        :is="leadingIcon(task)"
-                                        class="size-3 text-slate-700 dark:text-slate-200"
-                                    />
-                                </div>
-
-                                <div class="min-w-0 flex-1 space-y-1">
-                                    <div
-                                        class="flex items-start justify-between gap-2"
+                                    {{ task.title }}
+                                </p>
+                                <p
+                                    class="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 dark:text-slate-400"
+                                >
+                                    {{ task.subtitle }}
+                                </p>
+                                <div
+                                    class="mt-3 flex flex-wrap items-center gap-2"
+                                >
+                                    <span
+                                        class="rounded-md border px-2 py-0.5 text-[11px] font-medium"
+                                        :class="statusBadgeClass(task.priority)"
+                                        >{{ task.status }}</span
+                                    ><span
+                                        class="inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400"
+                                        ><Clock3
+                                            class="size-3"
+                                            aria-hidden="true"
+                                        />{{ task.age_label }}</span
                                     >
-                                        <div class="min-w-0 flex-1">
-                                            <p
-                                                class="wm-text-primary truncate text-xs font-semibold"
-                                            >
-                                                {{ task.title }}
-                                            </p>
-                                            <p
-                                                class="wm-text-secondary mt-0.5 line-clamp-2 text-[10px] leading-4"
-                                            >
-                                                {{ task.subtitle }}
-                                            </p>
-                                        </div>
-
-                                        <ArrowRight
-                                            class="mt-0.5 size-3 shrink-0 text-slate-400 dark:text-slate-500"
-                                        />
-                                    </div>
-
-                                    <div
-                                        class="flex flex-wrap items-center gap-1.5"
-                                    >
-                                        <Badge
-                                            variant="secondary"
-                                            :class="[
-                                                'rounded-md border px-1 py-0.5 text-[9px] font-medium',
-                                                statusBadgeClass(task.priority),
-                                            ]"
-                                        >
-                                            {{ task.status }}
-                                        </Badge>
-                                        <span
-                                            class="wm-text-muted inline-flex items-center gap-0.5 text-[9px] font-medium"
-                                        >
-                                            <Clock3 class="size-2.5" />
-                                            {{ task.age_label }}
-                                        </span>
-                                    </div>
                                 </div>
                             </div>
-                        </Link>
-                    </div>
-                </div>
-
-                <!-- View All Link -->
-                <div class="shrink-0 pt-1">
-                    <Link
-                        :href="viewAllHref"
-                        class="flex items-center justify-center gap-1.5 rounded-md border border-sky-200/80 bg-sky-50 px-2.5 py-1.5 text-[10px] font-medium text-sky-700 transition-colors hover:bg-sky-100 hover:text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/45 dark:text-sky-200 dark:hover:bg-sky-900/45 dark:hover:text-sky-100"
-                    >
-                        Lihat Semua
-                        <ArrowRight class="size-3" />
-                    </Link>
-                </div>
-            </div>
+                            <ArrowRight
+                                class="mt-1 size-4 shrink-0 text-slate-400 group-hover:text-blue-600"
+                                aria-hidden="true"
+                            /></div
+                    ></Link>
+                </li>
+            </ul>
+            <Link
+                :href="viewAllHref"
+                class="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                >Buka daftar lengkap<ArrowRight
+                    class="size-4"
+                    aria-hidden="true"
+            /></Link>
         </CardContent>
     </Card>
 </template>

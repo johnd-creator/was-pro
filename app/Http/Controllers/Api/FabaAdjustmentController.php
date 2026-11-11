@@ -85,6 +85,8 @@ class FabaAdjustmentController extends ApiController
         }
 
         $validated = $request->validated();
+        $previousSourceId = isset($movement) && $movement->reference_type === FabaMovement::class ? $movement->reference_id : null;
+        $sourceAttributes = app(\App\Services\FabaCorrectionSource::class)->attributes($validated, $movement ?? null);
         $year = (int) date('Y', strtotime($validated['transaction_date']));
         $month = (int) date('n', strtotime($validated['transaction_date']));
 
@@ -116,6 +118,7 @@ class FabaAdjustmentController extends ApiController
         ]);
 
         $movement = FabaMovement::query()->create([
+            ...$sourceAttributes,
             'transaction_date' => $validated['transaction_date'],
             'material_type' => $validated['material_type'],
             'movement_type' => $validated['movement_type'],
@@ -135,6 +138,8 @@ class FabaAdjustmentController extends ApiController
         ]);
 
         $movement->load(['createdByUser:id,name', 'updatedByUser:id,name', 'submittedByUser:id,name', 'approvedByUser:id,name', 'rejectedByUser:id,name']);
+
+        app(\App\Services\FabaCorrectionSource::class)->capture($movement, $previousSourceId);
 
         $this->fabaAuditService->log(
             $user->id,
@@ -180,6 +185,8 @@ class FabaAdjustmentController extends ApiController
         }
 
         $validated = $request->validated();
+        $previousSourceId = isset($movement) && $movement->reference_type === FabaMovement::class ? $movement->reference_id : null;
+        $sourceAttributes = app(\App\Services\FabaCorrectionSource::class)->attributes($validated, $movement ?? null);
         $year = (int) date('Y', strtotime($validated['transaction_date']));
         $month = (int) date('n', strtotime($validated['transaction_date']));
 
@@ -212,6 +219,7 @@ class FabaAdjustmentController extends ApiController
         ], $movement->id);
 
         $movement->update([
+            ...$sourceAttributes,
             'transaction_date' => $validated['transaction_date'],
             'material_type' => $validated['material_type'],
             'movement_type' => $validated['movement_type'],
@@ -235,6 +243,8 @@ class FabaAdjustmentController extends ApiController
         ]);
 
         $movement->load(['createdByUser:id,name', 'updatedByUser:id,name', 'submittedByUser:id,name', 'approvedByUser:id,name', 'rejectedByUser:id,name']);
+
+        app(\App\Services\FabaCorrectionSource::class)->capture($movement, $previousSourceId);
 
         $this->fabaAuditService->log(
             $user->id,
@@ -313,6 +323,7 @@ class FabaAdjustmentController extends ApiController
         return [
             'id' => $movement->id,
             'resource_version' => \App\Services\ResourceVersion::of($movement),
+            ...app(\App\Services\FabaCorrectionSource::class)->serialize($movement),
             'display_number' => sprintf('FAD-%s-%s', $movement->transaction_date->format('Ym'), strtoupper(substr(str_replace('-', '', $movement->id), -4))),
             'transaction_date' => $movement->transaction_date->format('Y-m-d'),
             'material_type' => $movement->material_type,

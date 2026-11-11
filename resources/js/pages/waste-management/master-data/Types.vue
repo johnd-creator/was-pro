@@ -34,6 +34,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import type { BreadcrumbItem } from '@/types';
 
@@ -131,7 +132,7 @@ function openEditDialog(wasteType: WasteType) {
 function submit() {
     if (editingWasteType.value) {
         router.put(
-            TypesController.update(editingWasteType.value.id),
+            scopedUrl(TypesController.update(editingWasteType.value.id)),
             formData.value,
             {
                 onSuccess: () => {
@@ -140,7 +141,7 @@ function submit() {
             },
         );
     } else {
-        router.post(TypesController.store(), formData.value, {
+        router.post(scopedUrl(TypesController.store()), formData.value, {
             onSuccess: () => {
                 dialogOpen.value = false;
             },
@@ -150,7 +151,7 @@ function submit() {
 
 function deleteWasteType(wasteType: WasteType) {
     if (confirm(`Are you sure you want to delete ${wasteType.name}?`)) {
-        router.delete(TypesController.destroy(wasteType.id));
+        router.delete(scopedUrl(TypesController.destroy(wasteType.id)));
     }
 }
 
@@ -159,6 +160,7 @@ function getHazardousBadgeClass(isHazardous: boolean) {
         ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
         : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>

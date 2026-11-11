@@ -61,6 +61,9 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'hauling_plans_available' => fn (): bool => app(\App\Services\HaulingPlans::class)->enabled(),
+            'hauling_plans_enabled' => fn (): bool => app(\App\Services\HaulingPlans::class)->enabled(),
+            'operational_inbox_available' => fn (): bool => app(\App\Services\OperationalInbox::class)->available(),
             'auth' => [
                 'user' => $userData,
             ],
@@ -69,6 +72,16 @@ class HandleInertiaRequests extends Middleware
                 'error' => fn () => $request->session()->get('error'),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'organizationContext' => fn (): array => [
+                'organization' => ($organization = $request->attributes->get(UseOrganizationContext::ATTRIBUTE))
+                    ? ['id' => $organization->id, 'name' => $organization->name, 'code' => $organization->code]
+                    : null,
+                'can_select' => $user?->isSuperAdmin() ?? false,
+                'is_global' => ($user?->isSuperAdmin() ?? false) && $request->routeIs('admin.*'),
+                'choices' => $user?->isSuperAdmin()
+                    ? \App\Models\Organization::active()->orderBy('name')->get(['id', 'name', 'code'])->toArray()
+                    : [],
+            ],
         ];
     }
 }

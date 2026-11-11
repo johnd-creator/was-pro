@@ -98,6 +98,25 @@
         </div>
     @endif
 
+    @if (isset($reconciliation_rows))
+        <div class="table-wrap">
+            <h2>Rekonsiliasi Saldo (ton)</h2>
+            <p class="muted">Saldo akhir = saldo awal + stok masuk - stok keluar + reset saldo awal antarbulan (jika ada). Reset adalah selisih saldo awal bulan berikutnya dengan saldo akhir bulan sebelumnya, bukan produksi.</p>
+            <table>
+                <thead><tr><th>Komponen</th><th>Fly Ash</th><th>Bottom Ash</th><th>Total</th></tr></thead>
+                <tbody>
+                    @foreach ($reconciliation_rows as $row)
+                        <tr>
+                            @foreach ($row as $value)
+                                <td>{{ $value }}</td>
+                            @endforeach
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
+
     <div class="table-wrap">
         <table>
             <thead>

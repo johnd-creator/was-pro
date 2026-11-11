@@ -29,7 +29,11 @@ class FabaProductionMovementRequest extends FormRequest
                     }
                 },
             ],
-            'quantity' => ['required', 'numeric', 'gt:0'],
+            'quantity' => ['required', 'numeric', 'gt:0', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (is_numeric($value) && round((float) $value, 2) <= 0) {
+                    $fail('Jumlah setelah pembulatan dua desimal harus lebih besar dari 0.');
+                }
+            }],
             'unit' => ['nullable', Rule::in([FabaMovement::DEFAULT_UNIT])],
             'note' => ['nullable', 'string'],
         ];

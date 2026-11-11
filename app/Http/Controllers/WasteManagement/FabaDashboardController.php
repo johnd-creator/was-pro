@@ -101,7 +101,8 @@ class FabaDashboardController extends Controller
             'stats' => [
                 'total_production' => $yearlyRecap['totals']['total_production'],
                 'total_utilization' => $yearlyRecap['totals']['total_utilization'],
-                'current_balance' => $this->fabaRecapService->getCurrentBalance(),
+                'current_balance' => $yearlyRecap['totals']['closing_balance'],
+                'balance_as_of_date' => sprintf('%04d-12-31', $year),
                 'negative_periods' => collect($yearlyRecap['months'])
                     ->filter(fn (array $month): bool => (bool) $month['warning_negative_balance'])
                     ->count(),

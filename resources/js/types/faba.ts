@@ -43,6 +43,8 @@ export interface FabaDuplicateWarning {
 export interface FabaVendor {
     id: string;
     name: string;
+    license_number?: string | null;
+    license_expiry_date?: string | null;
 }
 
 export interface FabaProductionMovement {
@@ -122,7 +124,33 @@ export interface FabaUtilizationMovement {
     can_edit?: boolean;
 }
 
-export interface FabaMonthlyRecap {
+export interface FabaBalanceComponent {
+    movement_type: string;
+    stock_effect: string;
+    fly_ash: number;
+    bottom_ash: number;
+    total: number;
+}
+
+export interface FabaBalanceReconciliation {
+    balance_components?: FabaBalanceComponent[];
+    opening_fly_ash?: number;
+    opening_bottom_ash?: number;
+    opening_balance?: number;
+    closing_fly_ash?: number;
+    closing_bottom_ash?: number;
+    closing_balance: number;
+    opening_reset_fly_ash?: number;
+    opening_reset_bottom_ash?: number;
+    opening_reset_total?: number;
+}
+
+export interface FabaYearlyTotals extends FabaBalanceReconciliation {
+    total_production: number;
+    total_utilization: number;
+}
+
+export interface FabaMonthlyRecap extends FabaBalanceReconciliation {
     year: number;
     month: number;
     period_label: string;

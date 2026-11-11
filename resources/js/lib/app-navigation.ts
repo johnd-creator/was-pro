@@ -1,4 +1,5 @@
 import {
+    Bell,
     Building2,
     Database,
     FileText,
@@ -11,12 +12,28 @@ import {
     Truck,
     Users,
 } from 'lucide-vue-next';
+import { index as fabaMastersIndex } from '@/actions/App/Http/Controllers/WasteManagement/MasterData/FabaMastersController';
+import { index as auditIndex } from '@/actions/App/Http/Controllers/WasteManagement/OperationalAuditController';
+import { index as inboxIndex } from '@/actions/App/Http/Controllers/WasteManagement/OperationalInboxController';
+import { index as haulingPlansIndex } from '@/actions/App/Http/Controllers/WasteManagement/WasteHaulingPlansController';
 import { dashboard as dashboardRoute } from '@/routes';
 import adminRoutes from '@/routes/admin';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { NavItem } from '@/types';
 
 export const appNavigationItems: NavItem[] = [
+    {
+        title: 'Riwayat Audit B3',
+        href: auditIndex.url(),
+        icon: FileText,
+        permission: 'operational_audit.view',
+    },
+    {
+        title: 'Notifikasi Operasional',
+        href: inboxIndex.url(),
+        icon: Bell,
+        capability: 'operational_inbox_available',
+    },
     {
         title: 'Dashboard',
         href: dashboardRoute.url(),
@@ -27,6 +44,24 @@ export const appNavigationItems: NavItem[] = [
         href: wasteManagementRoutes.records.index.url(),
         icon: FileText,
         permissions: ['waste_records.view_all', 'waste_records.view_own'],
+    },
+    {
+        title: 'Neraca Operasional Limbah',
+        href: wasteManagementRoutes.balance.index.url(),
+        icon: Database,
+        permissions: ['waste_records.view_all', 'waste_records.view_own'],
+    },
+    {
+        title: 'Rencana Angkut',
+        href: haulingPlansIndex.url(),
+        icon: Truck,
+        capability: 'hauling_plans_available',
+        permissions: [
+            'waste_hauling.view_all',
+            'waste_hauling.view_own',
+            'waste_hauling.approve',
+            'waste_hauling.reject',
+        ],
     },
     {
         title: 'Pengangkutan Limbah',
@@ -105,6 +140,18 @@ export const appNavigationItems: NavItem[] = [
                 href: wasteManagementRoutes.masterData.characteristics.index.url(),
                 icon: Sparkles,
                 permission: 'waste_characteristics.view',
+            },
+            {
+                title: 'Tujuan Internal FABA',
+                href: fabaMastersIndex.url('destinations'),
+                icon: Database,
+                permission: 'faba_master.view',
+            },
+            {
+                title: 'Peruntukan FABA',
+                href: fabaMastersIndex.url('purposes'),
+                icon: Database,
+                permission: 'faba_master.view',
             },
             {
                 title: 'Vendors',

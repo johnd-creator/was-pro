@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     ArrowRight,
@@ -9,9 +9,11 @@ import {
     ShieldX,
 } from 'lucide-vue-next';
 import Heading from '@/components/Heading.vue';
+import Link from '@/components/OrganizationLink.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
     formatFabaDate,
@@ -31,6 +33,12 @@ import type {
 } from '@/types/faba';
 
 const props = defineProps<{
+    archive_available: boolean;
+    closing_versions: Array<{
+        id: string;
+        version: number;
+        approved_at: string | null;
+    }>;
     approval: FabaMonthlyApproval;
     recap: FabaMonthlyRecap;
     snapshot?: FabaClosingSnapshot | null;
@@ -75,33 +83,39 @@ const reopenForm = useForm({ reopen_note: '' });
 
 function approve(): void {
     approveForm.post(
-        wasteManagementRoutes.faba.approvals.approve([
-            props.approval.year,
-            props.approval.month,
-        ]).url,
+        scopedUrl(
+            wasteManagementRoutes.faba.approvals.approve([
+                props.approval.year,
+                props.approval.month,
+            ]).url,
+        ),
     );
 }
 
 function reject(): void {
     rejectForm.post(
-        wasteManagementRoutes.faba.approvals.reject([
-            props.approval.year,
-            props.approval.month,
-        ]).url,
+        scopedUrl(
+            wasteManagementRoutes.faba.approvals.reject([
+                props.approval.year,
+                props.approval.month,
+            ]).url,
+        ),
     );
 }
 
 function reopen(): void {
     reopenForm.post(
-        wasteManagementRoutes.faba.approvals.reopen([
-            props.approval.year,
-            props.approval.month,
-        ]).url,
+        scopedUrl(
+            wasteManagementRoutes.faba.approvals.reopen([
+                props.approval.year,
+                props.approval.month,
+            ]).url,
+        ),
     );
 }
 
 function submitPeriod(): void {
-    router.post(wasteManagementRoutes.faba.approvals.submit.url(), {
+    router.post(scopedUrl(wasteManagementRoutes.faba.approvals.submit.url()), {
         year: props.approval.year,
         month: props.approval.month,
     });
@@ -122,6 +136,7 @@ function statusTone(status: string): string {
 
     return 'border-slate-200/80 bg-white/90 text-slate-600 dark:text-slate-300';
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>
@@ -346,6 +361,80 @@ function statusTone(status: string): string {
                     class="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]"
                 >
                     <section class="space-y-6">
+                        <Card>
+                            <CardHeader
+                                ><CardTitle
+                                    >Arsip Closing Berversi</CardTitle
+                                ></CardHeader
+                            >
+                            <CardContent class="space-y-3">
+                                <p v-if="!archive_available">
+                                    Arsip berversi belum diaktifkan untuk
+                                    organisasi ini.
+                                </p>
+                                <template v-else>
+                                    <p>
+                                        Arsip persetujuan tetap tersimpan
+                                        setelah periode dibuka kembali.
+                                        Ringkasan operasional adalah data
+                                        langsung.
+                                    </p>
+                                    <p v-if="closing_versions.length === 0">
+                                        Belum ada versi arsip.
+                                    </p>
+                                    <div
+                                        v-for="version in closing_versions"
+                                        :key="version.id"
+                                        class="flex flex-wrap items-center gap-3"
+                                    >
+                                        <span
+                                            >Arsip Disetujui / Versi
+                                            {{ version.version }} /
+                                            {{
+                                                version.approved_at ??
+                                                'Waktu tidak tercatat'
+                                            }}</span
+                                        >
+                                        <a
+                                            :href="
+                                                scopedUrl(
+                                                    wasteManagementRoutes.faba.reports.monthly.pdf.url(
+                                                        {
+                                                            query: {
+                                                                year: approval.year,
+                                                                month: approval.month,
+                                                                version:
+                                                                    version.version,
+                                                            },
+                                                        },
+                                                    ),
+                                                )
+                                            "
+                                            class="underline"
+                                            >PDF</a
+                                        >
+                                        <a
+                                            :href="
+                                                scopedUrl(
+                                                    wasteManagementRoutes.faba.reports.monthly.xlsx.url(
+                                                        {
+                                                            query: {
+                                                                year: approval.year,
+                                                                month: approval.month,
+                                                                version:
+                                                                    version.version,
+                                                            },
+                                                        },
+                                                    ),
+                                                )
+                                            "
+                                            class="underline"
+                                            >Excel</a
+                                        >
+                                    </div>
+                                </template>
+                            </CardContent>
+                        </Card>
                         <Card
                             class="rounded-[28px] border-slate-200/80 bg-white/90 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.28)] dark:bg-slate-950/85"
                         >
@@ -522,7 +611,7 @@ function statusTone(status: string): string {
                                                         item.material_type,
                                                     )
                                                 }}
-                                                •
+                                                â€¢
                                                 {{
                                                     formatFabaMovementType(
                                                         item.movement_type,

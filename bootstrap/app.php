@@ -24,15 +24,20 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->trustProxies(at: '*');
+
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
         $middleware->prependToPriorityList(\Illuminate\Routing\Middleware\SubstituteBindings::class, SetTenantSchema::class);
         $middleware->prependToPriorityList(\Illuminate\Routing\Middleware\SubstituteBindings::class, \App\Http\Middleware\AtomicOperationalMutation::class);
         $middleware->prependToPriorityList(SetTenantSchema::class, \App\Http\Middleware\AuthenticateApiToken::class);
+        $middleware->prependToPriorityList(\App\Http\Middleware\AtomicOperationalMutation::class, \App\Http\Middleware\UseOrganizationContext::class);
+        $middleware->prependToPriorityList(SetTenantSchema::class, HandleInertiaRequests::class);
 
         $middleware->web(append: [
             HandleAppearance::class,
             HandleInertiaRequests::class,
             SetTenantSchema::class,
+            \App\Http\Middleware\UseOrganizationContext::class,
             \App\Http\Middleware\AtomicOperationalMutation::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);

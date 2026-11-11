@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import {
     AlertCircle,
     CircleCheck,
@@ -8,6 +8,7 @@ import {
     LoaderCircle,
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import Link from '@/components/OrganizationLink.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,6 +37,7 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import StatusBadge from '@/components/waste-management/StatusBadge.vue';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
@@ -121,7 +123,7 @@ function approveRecord(record: WasteRecord): void {
     processing.value[record.id] = true;
 
     router.post(
-        wasteManagementRoutes.records.approve(record.id).url,
+        scopedUrl(wasteManagementRoutes.records.approve(record.id).url),
         {
             approval_notes: approvalNotesById.value[record.id] || null,
         },
@@ -163,7 +165,9 @@ function rejectRecord(): void {
     processing.value[selectedRecord.value.id] = true;
 
     router.post(
-        wasteManagementRoutes.records.reject(selectedRecord.value.id).url,
+        scopedUrl(
+            wasteManagementRoutes.records.reject(selectedRecord.value.id).url,
+        ),
         {
             rejection_reason: rejectionReason.value,
         },
@@ -189,6 +193,7 @@ function rejectRecord(): void {
         },
     );
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>

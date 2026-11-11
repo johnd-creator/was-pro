@@ -90,5 +90,8 @@ jobs:
       - name: Check TypeScript
         run: npm run types:check
 
+      - name: Frontend regression tests
+        run: npm run test:frontend
+
       - name: Tests
         run: ./vendor/bin/pest

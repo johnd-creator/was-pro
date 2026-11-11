@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Link, router } from '@inertiajs/vue3';
+import { router } from '@inertiajs/vue3';
 import {
     AlertCircle,
     CircleCheck,
@@ -8,6 +8,7 @@ import {
     LoaderCircle,
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import Link from '@/components/OrganizationLink.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -21,6 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import wasteManagementRoutes from '@/routes/waste-management';
 
 interface PendingApproval {
@@ -105,7 +107,7 @@ function approve(approval: PendingApproval): void {
     processing.value[approval.id] = true;
 
     router.post(
-        wasteManagementRoutes.records.approve(approval.id).url,
+        scopedUrl(wasteManagementRoutes.records.approve(approval.id).url),
         {},
         {
             preserveScroll: true,
@@ -132,7 +134,9 @@ function reject(): void {
     processing.value[selectedApproval.value.id] = true;
 
     router.post(
-        wasteManagementRoutes.records.reject(selectedApproval.value.id).url,
+        scopedUrl(
+            wasteManagementRoutes.records.reject(selectedApproval.value.id).url,
+        ),
         {
             rejection_reason: rejectionReason.value,
         },
@@ -158,6 +162,7 @@ function reject(): void {
         },
     );
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>

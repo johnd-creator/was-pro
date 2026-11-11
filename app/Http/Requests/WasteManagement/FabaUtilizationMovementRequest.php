@@ -5,6 +5,7 @@ namespace App\Http\Requests\WasteManagement;
 use App\Models\FabaMovement;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Exists;
 
 class FabaUtilizationMovementRequest extends FormRequest
 {
@@ -29,20 +30,24 @@ class FabaUtilizationMovementRequest extends FormRequest
                 Rule::requiredIf($isExternal),
                 'nullable',
                 'uuid',
-                'exists:vendors,id',
+                $this->masterRule('vendors', 'vendor_id', true),
             ],
             'internal_destination_id' => [
                 Rule::requiredIf(! $isExternal),
                 'nullable',
                 'uuid',
-                'exists:faba_internal_destinations,id',
+                $this->masterRule('faba_internal_destinations', 'internal_destination_id'),
             ],
             'purpose_id' => [
                 'nullable',
                 'uuid',
-                'exists:faba_purposes,id',
+                $this->masterRule('faba_purposes', 'purpose_id'),
             ],
-            'quantity' => ['required', 'numeric', 'gt:0'],
+            'quantity' => ['required', 'numeric', 'gt:0', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (is_numeric($value) && round((float) $value, 2) <= 0) {
+                    $fail('Jumlah setelah pembulatan dua desimal harus lebih besar dari 0.');
+                }
+            }],
             'unit' => ['nullable', Rule::in([FabaMovement::DEFAULT_UNIT])],
             'document_number' => [Rule::requiredIf($isExternal), 'nullable', 'string', 'max:255'],
             'document_date' => [Rule::requiredIf($isExternal), 'nullable', 'date', 'before_or_equal:today'],
@@ -69,6 +74,31 @@ class FabaUtilizationMovementRequest extends FormRequest
             'attachment.mimetypes' => 'Lampiran harus berupa foto JPG/PNG/WEBP atau PDF.',
             'unit.in' => 'Satuan transaksi harus ton.',
         ];
+    }
+
+    protected function masterRule(string $table, string $field, bool $softDeletes = false): Exists
+    {
+        $rule = Rule::exists($table, 'id');
+        if ($softDeletes) {
+            $rule->whereNull('deleted_at');
+        }
+
+        $current = null;
+        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+            $utilization = $this->route('utilization');
+            $id = $utilization instanceof FabaMovement ? $utilization->getKey() : $utilization;
+            if (is_string($id) && $id !== '') {
+                $current = FabaMovement::query()
+                    ->whereIn('movement_type', FabaMovement::utilizationTypeOptions())
+                    ->find($id);
+            }
+        }
+
+        if (! $current || (string) $current->{$field} !== (string) $this->input($field)) {
+            $rule->where('is_active', true);
+        }
+
+        return $rule;
     }
 
     protected function hasExistingAttachment(): bool

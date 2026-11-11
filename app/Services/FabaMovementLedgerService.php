@@ -47,10 +47,15 @@ class FabaMovementLedgerService
 
     public function deleteReferenceMovements(string $referenceType, string $referenceId): void
     {
-        FabaMovement::query()
+        $movements = FabaMovement::query()
             ->where('reference_type', $referenceType)
-            ->where('reference_id', $referenceId)
-            ->delete();
+            ->where('reference_id', $referenceId)->get();
+        foreach ($movements as $movement) {
+            app(FabaCorrectionSource::class)->assertDeletable($movement);
+        }
+        foreach ($movements as $movement) {
+            $movement->delete();
+        }
     }
 
     public function calculateAvailableStock(string $materialType, CarbonInterface $transactionDate, ?string $excludeMovementId = null): float

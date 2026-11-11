@@ -22,6 +22,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
@@ -62,7 +63,11 @@ const form = useForm<{
 });
 
 function submit(): void {
-    form.put(wasteManagementRoutes.faba.production.update(props.entry.id).url);
+    form.put(
+        scopedUrl(
+            wasteManagementRoutes.faba.production.update(props.entry.id).url,
+        ),
+    );
 }
 
 const movementTypeOptions = computed(
@@ -77,6 +82,7 @@ watch(
         }
     },
 );
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>

@@ -51,12 +51,50 @@ class FabaOfficialReportService
         };
     }
 
+    protected function buildReconciliationRows(array $recap): array
+    {
+        $rows = [[
+            'Saldo Awal', $this->formatNumber($recap['opening_fly_ash']),
+            $this->formatNumber($recap['opening_bottom_ash']), $this->formatNumber($recap['opening_balance']),
+        ]];
+        $labels = [
+            'production' => 'Produksi', 'workshop' => 'Workshop',
+            'adjustment_in' => 'Penyesuaian Masuk', 'adjustment_out' => 'Penyesuaian Keluar',
+            'reject' => 'Reject', 'disposal_pok' => 'Disposal POK',
+            'utilization_external' => 'Pemanfaatan Eksternal', 'utilization_internal' => 'Pemanfaatan Internal',
+        ];
+        foreach ($recap['balance_components'] as $component) {
+            $direction = $component['stock_effect'] === 'in' ? 'Masuk (+)' : 'Keluar (-)';
+            $rows[] = [
+                ($labels[$component['movement_type']] ?? $component['movement_type']).' / '.$direction,
+                $this->formatNumber($component['fly_ash']), $this->formatNumber($component['bottom_ash']),
+                $this->formatNumber($component['total']),
+            ];
+        }
+        if (array_key_exists('opening_reset_total', $recap)) {
+            $rows[] = [
+                'Reset Saldo Awal Antarbulan (+/-)', $this->formatNumber($recap['opening_reset_fly_ash']),
+                $this->formatNumber($recap['opening_reset_bottom_ash']), $this->formatNumber($recap['opening_reset_total']),
+            ];
+        }
+        $rows[] = [
+            'Saldo Akhir', $this->formatNumber($recap['closing_fly_ash']),
+            $this->formatNumber($recap['closing_bottom_ash']), $this->formatNumber($recap['closing_balance']),
+        ];
+
+        return $rows;
+    }
+
     /**
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
     protected function buildMonthlyContext(array $filters): array
     {
+        if (isset($filters['version'])) {
+            abort_unless(isset($filters['year'], $filters['month']) && filter_var($filters['version'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) !== false, 422, 'Tahun, bulan, dan versi arsip wajib valid.');
+        }
+
         $resolvedPeriod = $this->fabaRecapService->resolveRequestedOrLatestPeriod(
             isset($filters['year']) ? (int) $filters['year'] : null,
             isset($filters['month']) ? (int) $filters['month'] : null,
@@ -64,37 +102,52 @@ class FabaOfficialReportService
 
         $year = $resolvedPeriod['year'];
         $month = $resolvedPeriod['month'];
-        $recap = $this->fabaRecapService->getMonthlyRecap($year, $month);
+        $version = isset($filters['version']) ? (int) $filters['version'] : null;
+        $archive = $version !== null ? app(FabaClosingArchiveService::class)->find($year, $month, $version) : null;
+        $recap = $archive ? ($archive->snapshot_payload['recap'] ?? []) : $this->fabaRecapService->getMonthlyRecap($year, $month);
+        $provenance = $archive?->provenance ?? [];
+        $label = $archive ? 'Arsip Disetujui / Versi '.$archive->version : 'Draft / Data Langsung';
+        $number = fn (string $key): string => isset($recap[$key]) ? $this->formatNumber($recap[$key]) : 'Tidak tercatat';
+        $completeReconciliation = isset($recap['balance_components'], $recap['opening_fly_ash'], $recap['opening_bottom_ash'], $recap['opening_balance'], $recap['closing_fly_ash'], $recap['closing_bottom_ash'], $recap['closing_balance']);
 
         return [
-            'title' => 'Laporan Rekap Closing Bulanan FABA',
+            'title' => 'Laporan Rekap Closing Bulanan FABA - '.$label,
             'sheet_title' => 'Monthly Recap',
-            'file_name' => sprintf('faba-monthly-recap-%d-%02d', $year, $month),
-            'period_label' => $recap['period_label'],
+            'file_name' => sprintf('faba-monthly-recap-%d-%02d', $year, $month).($archive ? '-v'.$archive->version : '-draft'),
+            'period_label' => $recap['period_label'] ?? sprintf('%d-%02d', $year, $month),
+            'reconciliation_rows' => $completeReconciliation ? $this->buildReconciliationRows($recap) : [],
             'filters' => [
                 'Tahun' => (string) $year,
                 'Bulan' => (string) $month,
+                'Sumber Laporan' => $label,
+                ...($archive ? [
+                    'Organisasi saat persetujuan' => $provenance['organization_name'] ?? 'Tidak tercatat pada snapshot lama',
+                    'Skema Organisasi' => $provenance['schema'] ?? 'Tidak tercatat',
+                    'Disetujui oleh' => $provenance['approver_name'] ?? 'Nama tidak tercatat (ID: '.($archive->approved_by ?? '-').')',
+                    'Waktu persetujuan' => $archive->approved_at?->format('Y-m-d H:i:s') ?? 'Tidak tercatat',
+                    'Asal Arsip' => ($provenance['source'] ?? '') === 'legacy_snapshot' ? 'Snapshot lama, tanpa rekonstruksi' : 'Persetujuan berversi',
+                ] : []),
             ],
             'summary_rows' => [
-                ['label' => 'Total Produksi', 'value' => $this->formatNumber($recap['total_production'])],
-                ['label' => 'Total Pemanfaatan', 'value' => $this->formatNumber($recap['total_utilization'])],
-                ['label' => 'Saldo Awal', 'value' => $this->formatNumber($recap['opening_balance'])],
-                ['label' => 'Saldo Akhir', 'value' => $this->formatNumber($recap['closing_balance'])],
+                ['label' => 'Total Produksi', 'value' => $number('total_production')],
+                ['label' => 'Total Pemanfaatan', 'value' => $number('total_utilization')],
+                ['label' => 'Saldo Awal', 'value' => $number('opening_balance')],
+                ['label' => 'Saldo Akhir', 'value' => $number('closing_balance')],
             ],
             'table_columns' => ['Metrik', 'Nilai'],
             'table_rows' => [
-                ['Produksi Fly Ash', $this->formatNumber($recap['production_fly_ash'])],
-                ['Produksi Bottom Ash', $this->formatNumber($recap['production_bottom_ash'])],
-                ['Pemanfaatan Fly Ash', $this->formatNumber($recap['utilization_fly_ash'])],
-                ['Pemanfaatan Bottom Ash', $this->formatNumber($recap['utilization_bottom_ash'])],
-                ['Opening Fly Ash', $this->formatNumber($recap['opening_fly_ash'])],
-                ['Opening Bottom Ash', $this->formatNumber($recap['opening_bottom_ash'])],
-                ['Closing Fly Ash', $this->formatNumber($recap['closing_fly_ash'])],
-                ['Closing Bottom Ash', $this->formatNumber($recap['closing_bottom_ash'])],
-                ['Jumlah Movement Produksi', (string) $recap['production_movements_count']],
-                ['Jumlah Movement Pemanfaatan', (string) $recap['utilization_movements_count']],
+                ['Produksi Fly Ash', $number('production_fly_ash')],
+                ['Produksi Bottom Ash', $number('production_bottom_ash')],
+                ['Pemanfaatan Fly Ash', $number('utilization_fly_ash')],
+                ['Pemanfaatan Bottom Ash', $number('utilization_bottom_ash')],
+                ['Opening Fly Ash', $number('opening_fly_ash')],
+                ['Opening Bottom Ash', $number('opening_bottom_ash')],
+                ['Closing Fly Ash', $number('closing_fly_ash')],
+                ['Closing Bottom Ash', $number('closing_bottom_ash')],
+                ['Jumlah Movement Produksi', (string) ($recap['production_movements_count'] ?? 'Tidak tercatat')],
+                ['Jumlah Movement Pemanfaatan', (string) ($recap['utilization_movements_count'] ?? 'Tidak tercatat')],
             ],
-            'warnings' => collect($recap['warnings'])->pluck('message')->all(),
+            'warnings' => [...collect($recap['warnings'] ?? [])->pluck('message')->all(), ...($completeReconciliation ? [] : ['Rincian rekonsiliasi tidak tercatat pada snapshot ini; tidak dihitung ulang.'])],
         ];
     }
 
@@ -112,6 +165,7 @@ class FabaOfficialReportService
             'sheet_title' => 'Yearly Recap',
             'file_name' => sprintf('faba-yearly-recap-%d', $year),
             'period_label' => (string) $year,
+            'reconciliation_rows' => $this->buildReconciliationRows($recap['totals']),
             'filters' => [
                 'Tahun' => (string) $year,
             ],

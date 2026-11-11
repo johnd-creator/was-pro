@@ -21,6 +21,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import { formatFabaDate, formatFabaMaterial } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
@@ -71,11 +72,12 @@ const selectedVendor = computed(() =>
 );
 
 function applyFilters(): void {
-    router.get(wasteManagementRoutes.faba.recaps.vendors(), {
+    router.get(scopedUrl(wasteManagementRoutes.faba.recaps.vendors()), {
         year: form.year,
         vendor_id: form.vendor_id === ALL_VENDORS ? null : form.vendor_id,
     });
 }
+const { scopedUrl } = useOrganizationContext();
 </script>
 
 <template>

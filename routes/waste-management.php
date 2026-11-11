@@ -13,12 +13,24 @@ use App\Http\Controllers\WasteManagement\MasterData\CategoriesController;
 use App\Http\Controllers\WasteManagement\MasterData\CharacteristicsController;
 use App\Http\Controllers\WasteManagement\MasterData\TypesController;
 use App\Http\Controllers\WasteManagement\MasterData\VendorsController;
+use App\Http\Controllers\WasteManagement\WasteBalanceController;
 use App\Http\Controllers\WasteManagement\WasteHaulingsController;
 use App\Http\Controllers\WasteManagement\WasteRecordsController;
 use Illuminate\Support\Facades\Route;
 
 // Waste Management Routes
 Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste-management.')->group(function () {
+
+    Route::get('/notifications', [\App\Http\Controllers\WasteManagement\OperationalInboxController::class, 'index'])->name('notifications.index');
+    Route::patch('/notifications/{notification}', [\App\Http\Controllers\WasteManagement\OperationalInboxController::class, 'update'])->name('notifications.update');
+
+    Route::prefix('master-data/faba/{kind}')->whereIn('kind', ['destinations', 'purposes'])->name('master-data.faba.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\WasteManagement\MasterData\FabaMastersController::class, 'index'])->middleware('permission:faba_master.view')->name('index');
+        Route::post('/', [\App\Http\Controllers\WasteManagement\MasterData\FabaMastersController::class, 'store'])->middleware('permission:faba_master.create')->name('store');
+        Route::put('/{record}', [\App\Http\Controllers\WasteManagement\MasterData\FabaMastersController::class, 'update'])->middleware('permission:faba_master.edit')->name('update');
+    });
+
+    Route::get('/audit', [\App\Http\Controllers\WasteManagement\OperationalAuditController::class, 'index'])->middleware('permission:operational_audit.view')->name('audit.index');
 
     // Dashboard
     Route::middleware(['permission:dashboard.view'])
@@ -291,6 +303,11 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
             ->name('vendors.destroy');
     });
 
+    Route::middleware(['permission:waste_records.view_all|waste_records.view_own'])->group(function () {
+        Route::get('/balance', [WasteBalanceController::class, 'index'])->name('balance.index');
+        Route::get('/balance/export/csv', [WasteBalanceController::class, 'exportCsv'])->name('balance.export.csv');
+    });
+
     // Waste Records Routes
     Route::prefix('records')->name('records.')->group(function () {
         // Index
@@ -354,7 +371,19 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
             ->name('return-to-draft');
     });
 
+    Route::prefix('hauling-plans')->name('hauling-plans.')->group(function () {
+        $controller = \App\Http\Controllers\WasteManagement\WasteHaulingPlansController::class;
+        Route::get('/', [$controller, 'index'])->middleware('permission:waste_hauling.view_all|waste_hauling.view_own|waste_hauling.approve|waste_hauling.reject')->name('index');
+        Route::post('/', [$controller, 'store'])->middleware('permission:waste_hauling.submit')->name('store');
+        Route::get('/{wasteHaulingPlan}', [$controller, 'show'])->middleware('permission:waste_hauling.view_all|waste_hauling.view_own|waste_hauling.approve|waste_hauling.reject')->name('show');
+        Route::post('/{wasteHaulingPlan}/approve', [$controller, 'approve'])->middleware('permission:waste_hauling.approve')->name('approve');
+        Route::post('/{wasteHaulingPlan}/reject', [$controller, 'reject'])->middleware('permission:waste_hauling.reject')->name('reject');
+        Route::post('/{wasteHaulingPlan}/close', [$controller, 'close'])->middleware('permission:waste_hauling.approve')->name('close');
+    });
+
     Route::prefix('haulings')->name('haulings.')->group(function () {
+        Route::middleware(['permission:waste_hauling.view_all|waste_hauling.view_own|waste_hauling.approve|waste_hauling.reject'])
+            ->get('/{wasteHauling}/attachment', [WasteHaulingsController::class, 'attachment'])->name('attachment');
         Route::middleware(['permission:waste_hauling.view_all|waste_hauling.view_own'])
             ->get('/', [WasteHaulingsController::class, 'index'])
             ->name('index');

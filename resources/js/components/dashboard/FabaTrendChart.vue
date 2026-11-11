@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import BaseEChart from '@/components/dashboard/BaseEChart.vue';
+import Link from '@/components/OrganizationLink.vue';
 import {
     Card,
     CardContent,
@@ -191,9 +191,11 @@ const occupancyOption = computed(() =>
 
 <template>
     <Card
-        class="wm-panel-elevated min-w-0 overflow-hidden rounded-2xl border shadow-sm"
+        class="min-w-0 gap-0 overflow-hidden rounded-2xl border border-slate-200 bg-white py-0 shadow-none dark:border-slate-800 dark:bg-slate-900"
     >
-        <CardHeader class="wm-border-default border-b pb-4">
+        <CardHeader
+            class="border-b border-slate-100 px-5 py-5 dark:border-slate-800"
+        >
             <CardTitle class="wm-text-primary text-base"
                 >Produksi, Pemanfaatan & Kapasitas FABA</CardTitle
             >
@@ -206,7 +208,7 @@ const occupancyOption = computed(() =>
                     :key="material.value"
                     type="button"
                     :aria-pressed="selectedMaterial === material.value"
-                    class="rounded-full border px-4 py-2 text-sm font-semibold"
+                    class="min-h-11 rounded-xl border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                     :class="
                         selectedMaterial === material.value
                             ? 'border-blue-700 bg-blue-700 text-white'
@@ -218,7 +220,7 @@ const occupancyOption = computed(() =>
                 </button>
             </div>
         </CardHeader>
-        <CardContent class="space-y-4 pt-4">
+        <CardContent class="space-y-5 px-5 py-5">
             <div class="grid gap-3 sm:grid-cols-3">
                 <div class="wm-surface-subtle rounded-xl border p-3">
                     <p class="wm-text-secondary text-xs">
@@ -297,7 +299,7 @@ const occupancyOption = computed(() =>
                     </h3>
                     <BaseEChart
                         :option="flowOption"
-                        height-class="h-[280px] xl:h-[560px]"
+                        height-class="h-[280px] xl:h-[540px]"
                     />
                 </section>
                 <section class="wm-panel space-y-4 rounded-xl border p-3">

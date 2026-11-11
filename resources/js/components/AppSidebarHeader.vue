@@ -34,7 +34,6 @@ import { dashboard as dashboardRoute } from '@/routes';
 import type { BreadcrumbItem, User } from '@/types';
 
 const page = usePage();
-const props = page.props;
 const { resolvedAppearance, updateAppearance } = useAppearance();
 
 withDefaults(
@@ -81,7 +80,7 @@ onUnmounted(() => {
 // Get header metadata from page props
 const header = computed(
     () =>
-        props?.header as
+        page.props?.header as
             | {
                   organization_name: string;
                   timezone: string;
@@ -100,7 +99,7 @@ const header = computed(
 // Get notification summary
 const notificationSummary = computed(
     () =>
-        props?.notificationSummary as
+        page.props?.notificationSummary as
             | {
                   total_count: number;
                   expired_waste_count: number;
@@ -113,7 +112,7 @@ const notificationSummary = computed(
 );
 
 // Get user from page props
-const user = computed(() => props?.auth?.user as User | undefined);
+const user = computed(() => page.props?.auth?.user as User | undefined);
 
 const isDashboardPage = computed(() => page.component === 'Dashboard');
 const isSuperAdmin = computed(() => user.value?.is_super_admin === true);
@@ -127,7 +126,7 @@ const appearanceToggleIcon = computed(() =>
 
 const dashboardFilters = computed(
     () =>
-        props?.filters as
+        page.props?.filters as
             | {
                   month: string | null;
                   organization_id: string | null;
@@ -137,7 +136,7 @@ const dashboardFilters = computed(
 
 const availableMonths = computed(
     () =>
-        (props?.availableMonths as
+        (page.props?.availableMonths as
             | Array<{
                   value: string;
                   label: string;
@@ -147,7 +146,7 @@ const availableMonths = computed(
 
 const availableOrganizations = computed(
     () =>
-        (props?.availableOrganizations as
+        (page.props?.availableOrganizations as
             | Array<{
                   id: string;
                   name: string;

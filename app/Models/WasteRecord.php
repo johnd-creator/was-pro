@@ -396,6 +396,10 @@ class WasteRecord extends Model
      */
     public function getReservedHaulingQuantity(?string $ignoreHaulingId = null): float
     {
+        if (app(\App\Services\HaulingPlans::class)->installed()) {
+            return app(\App\Services\HaulingPlans::class)->reserved($this, $ignoreHaulingId) / 100;
+        }
+
         if ($this->relationLoaded('haulings')) {
             return (float) $this->haulings
                 ->filter(function (WasteHauling $hauling) use ($ignoreHaulingId): bool {

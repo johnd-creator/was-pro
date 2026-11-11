@@ -76,6 +76,7 @@ Route::prefix('v1')->group(function () {
         });
 
         Route::prefix('waste-haulings')->group(function () {
+            Route::get('/{wasteHauling}/attachment', [WasteHaulingController::class, 'attachment'])->name('api.v1.waste-haulings.attachment');
             Route::get('/', [WasteHaulingController::class, 'index'])->name('api.v1.waste-haulings.index');
             Route::post('/', [WasteHaulingController::class, 'store'])->name('api.v1.waste-haulings.store');
             Route::get('/pending-approval', [WasteHaulingController::class, 'pendingApproval'])->name('api.v1.waste-haulings.pending-approval');

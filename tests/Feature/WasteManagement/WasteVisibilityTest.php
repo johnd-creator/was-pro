@@ -166,7 +166,7 @@ test('super admin can see all waste records created by another user', function (
     );
 
     $response = $this->actingAs($this->john)
-        ->get(route('waste-management.records.index'));
+        ->get(route('waste-management.records.index', ['organization_id' => $this->organization->id]));
 
     $response->assertSuccessful();
     $response->assertInertia(fn (AssertableInertia $page) => $page
@@ -235,7 +235,7 @@ test('super admin can see hauling history created by another user', function () 
     );
 
     $response = $this->actingAs($this->john)
-        ->get(route('waste-management.haulings.index'));
+        ->get(route('waste-management.haulings.index', ['organization_id' => $this->organization->id]));
 
     $response->assertSuccessful();
     $response->assertInertia(fn (AssertableInertia $page) => $page

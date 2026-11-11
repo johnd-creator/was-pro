@@ -18,7 +18,7 @@ class RolePermissionsSeeder extends Seeder
         // Super Admin - All permissions
         if ($roles->has('super_admin')) {
             $superAdmin = $roles->get('super_admin');
-            $allPermissions = Permission::pluck('id');
+            $allPermissions = Permission::whereNotIn('slug', OperationalToolsPermissionsSeeder::SLUGS)->pluck('id')->merge($superAdmin->permissions()->whereIn('slug', OperationalToolsPermissionsSeeder::SLUGS)->pluck('permissions.id'));
             $superAdmin->permissions()->sync($allPermissions);
             $this->command->info('Super Admin permissions assigned.');
         }
@@ -26,7 +26,7 @@ class RolePermissionsSeeder extends Seeder
         // Admin - All permissions except organization management
         if ($roles->has('admin')) {
             $admin = $roles->get('admin');
-            $adminPermissions = Permission::where('module', '!=', 'organizations')->pluck('id');
+            $adminPermissions = Permission::where('module', '!=', 'organizations')->whereNotIn('slug', OperationalToolsPermissionsSeeder::SLUGS)->pluck('id')->merge($admin->permissions()->whereIn('slug', OperationalToolsPermissionsSeeder::SLUGS)->pluck('permissions.id'));
             $admin->permissions()->sync($adminPermissions);
             $this->command->info('Admin permissions assigned.');
         }
@@ -59,7 +59,7 @@ class RolePermissionsSeeder extends Seeder
                 'users.view',
             ];
             $supervisorPermissions = Permission::whereIn('slug', $supervisorPermissionSlugs)->pluck('id');
-            $supervisor->permissions()->sync($supervisorPermissions);
+            $supervisor->permissions()->sync($supervisorPermissions->merge($supervisor->permissions()->whereIn('slug', OperationalToolsPermissionsSeeder::SLUGS)->pluck('permissions.id')));
             $this->command->info('Supervisor permissions assigned.');
         }
 
@@ -87,7 +87,7 @@ class RolePermissionsSeeder extends Seeder
                 'vendors.view',
             ];
             $operatorPermissions = Permission::whereIn('slug', $operatorPermissionSlugs)->pluck('id');
-            $operator->permissions()->sync($operatorPermissions);
+            $operator->permissions()->sync($operatorPermissions->merge($operator->permissions()->whereIn('slug', OperationalToolsPermissionsSeeder::SLUGS)->pluck('permissions.id')));
             $this->command->info('Operator permissions assigned.');
         }
 
