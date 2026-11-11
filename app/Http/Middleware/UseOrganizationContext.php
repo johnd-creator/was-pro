@@ -26,7 +26,8 @@ class UseOrganizationContext
         }
 
         $operational = $request->routeIs('dashboard', 'waste-management.*');
-        $selectsContext = $operational || $request->routeIs('profile.edit');
+        $guide = $request->routeIs('guide');
+        $selectsContext = $operational || $guide || $request->routeIs('profile.edit');
         $organization = $user->isSuperAdmin() ? null : $user->organization;
 
         if ($user->isSuperAdmin()) {
@@ -69,7 +70,7 @@ class UseOrganizationContext
                 ->setStatusCode($user->isSuperAdmin() ? 200 : 403);
         }
 
-        if (! $operational) {
+        if (! $operational && ! $guide) {
             return $next($request);
         }
 
@@ -77,8 +78,18 @@ class UseOrganizationContext
         $previousPath = $connection->selectOne('SHOW search_path', [], false)->search_path;
 
         try {
-            abort_unless($this->tenants->schemaExists($organization->schema_name), 503, 'Data organisasi belum siap.');
-            $this->tenants->switchToSchema($organization->schema_name);
+            if ($guide) {
+                $ready = $organization && $this->tenants->schemaExists($organization->schema_name);
+                $request->attributes->set('guide_tenant_ready', (bool) $ready);
+                if ($ready) {
+                    $this->tenants->switchToSchema($organization->schema_name);
+                } else {
+                    $this->tenants->switchToPublic();
+                }
+            } else {
+                abort_unless($this->tenants->schemaExists($organization->schema_name), 503, 'Data organisasi belum siap.');
+                $this->tenants->switchToSchema($organization->schema_name);
+            }
 
             return $next($request);
         } finally {

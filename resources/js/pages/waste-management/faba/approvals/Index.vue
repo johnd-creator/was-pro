@@ -395,8 +395,10 @@ const { scopedUrl } = useOrganizationContext();
                                         class="text-sm font-semibold text-slate-900 dark:text-slate-100"
                                     >
                                         {{
-                                            item.operational_status ||
-                                            formatFabaStatus(item.status)
+                                            formatFabaStatus(
+                                                item.operational_status ||
+                                                    item.status,
+                                            )
                                         }}
                                     </span>
                                 </div>

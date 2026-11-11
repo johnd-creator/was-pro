@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\WasteManagement\FabaProductionMovementRequest;
 use App\Models\FabaAuditLog;
 use App\Models\FabaMovement;
+use App\Services\ApprovalSeparation;
 use App\Services\FabaAuditService;
 use App\Services\FabaMovementLedgerService;
 use App\Services\FabaRecapService;
@@ -329,7 +330,7 @@ class FabaProductionMovementsController extends Controller
             'rejected_at' => $movement->rejected_at?->format('Y-m-d H:i:s'),
             'rejection_note' => $movement->rejection_note,
             'duplicate_warning' => $duplicateWarning,
-            'can_approve' => Auth::user()?->hasPermission('faba_approvals.approve') && $movement->canApprove() && ! $this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month),
+            'can_approve' => Auth::user()?->hasPermission('faba_approvals.approve') && app(ApprovalSeparation::class)->canApprove(Auth::user(), $movement) && $movement->canApprove() && ! $this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month),
             'can_reject' => Auth::user()?->hasPermission('faba_approvals.reject') && $movement->canReject() && ! $this->fabaRecapService->isPeriodLocked($movement->period_year, $movement->period_month),
             'can_edit' => $this->canModifyMovement($movement, 'faba_production.edit'),
             'period_label' => $this->fabaRecapService->formatPeriodLabel($movement->period_year, $movement->period_month),
@@ -359,7 +360,7 @@ class FabaProductionMovementsController extends Controller
             return false;
         }
 
-        if ($user->hasRole('operator')) {
+        if (! $user->isSuperAdmin() && $user->hasRole('operator')) {
             return (string) $movement->created_by === (string) $user->id;
         }
 

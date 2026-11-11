@@ -8,6 +8,7 @@ export function scopeOrganizationUrl(
         url.origin !== origin ||
         !(
             url.pathname === '/dashboard' ||
+            url.pathname === '/panduan' ||
             url.pathname.startsWith('/waste-management/')
         )
     ) {

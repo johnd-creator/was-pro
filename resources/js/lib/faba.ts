@@ -52,6 +52,8 @@ export function formatFabaStatus(value: string): string {
         approved: 'Disetujui',
         rejected: 'Ditolak',
         locked: 'Terkunci',
+        ready_to_submit: 'Siap diajukan',
+        open: 'Masih terbuka',
     };
 
     return labels[value] ?? value;

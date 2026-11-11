@@ -11,7 +11,7 @@
         "lint": "eslint . --fix",
         "lint:check": "eslint .",
         "types:check": "vue-tsc --noEmit",
-        "test:frontend": "node --experimental-strip-types --test tests/Unit/date.test.mjs tests/Unit/organization-context.test.mjs tests/Unit/waste-storage.test.mjs tests/Unit/waste-quantity.test.mjs tests/Unit/faba-balance-reconciliation.test.mjs tests/Unit/vendor-license.test.mjs tests/Unit/hauling-plan-ui.test.mjs"
+        "test:frontend": "node --experimental-strip-types --test tests/Unit/date.test.mjs tests/Unit/organization-context.test.mjs tests/Unit/waste-storage.test.mjs tests/Unit/waste-quantity.test.mjs tests/Unit/faba-balance-reconciliation.test.mjs tests/Unit/vendor-license.test.mjs tests/Unit/hauling-plan-ui.test.mjs tests/Unit/application-guide.test.mjs"
     },
     "devDependencies": {
         "@eslint/js": "^9.19.0",

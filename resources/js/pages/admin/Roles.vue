@@ -46,6 +46,7 @@ interface Role {
 type Props = {
     roles: Role[];
     permissions: Permission[];
+    can_manage: boolean;
 };
 
 const props = defineProps<Props>();
@@ -189,6 +190,7 @@ function clearModule(roleId: string, module: string): void {
 }
 
 function saveRole(role: Role): void {
+    if (!props.can_manage) return;
     statusMessage.value = null;
     errorMessage.value = null;
     savingRoleId.value = role.id;
@@ -239,6 +241,15 @@ function formatModuleName(module: string): string {
             />
 
             <div class="space-y-8">
+                <Alert v-if="!props.can_manage">
+                    <ShieldCheck />
+                    <AlertTitle>Akses hanya baca</AlertTitle>
+                    <AlertDescription
+                        >Peran berlaku untuk seluruh organisasi. Hanya Super
+                        Admin yang dapat mengubah hak
+                        aksesnya.</AlertDescription
+                    >
+                </Alert>
                 <Alert
                     v-if="statusMessage"
                     class="border-green-200 bg-green-50 text-green-800"
@@ -422,6 +433,7 @@ function formatModuleName(module: string): string {
 
                                 <div class="flex flex-wrap items-center gap-2">
                                     <Button
+                                        :disabled="!props.can_manage"
                                         type="button"
                                         variant="outline"
                                         size="sm"
@@ -430,6 +442,7 @@ function formatModuleName(module: string): string {
                                         Pilih semua
                                     </Button>
                                     <Button
+                                        :disabled="!props.can_manage"
                                         type="button"
                                         variant="ghost"
                                         size="sm"
@@ -441,6 +454,7 @@ function formatModuleName(module: string): string {
                                         variant="outline"
                                         size="sm"
                                         :disabled="
+                                            !props.can_manage ||
                                             !isDirty(role.id) ||
                                             savingRoleId === role.id
                                         "
@@ -452,6 +466,7 @@ function formatModuleName(module: string): string {
                                     <Button
                                         size="sm"
                                         :disabled="
+                                            !props.can_manage ||
                                             !isDirty(role.id) ||
                                             savingRoleId === role.id
                                         "
@@ -526,6 +541,7 @@ function formatModuleName(module: string): string {
                                             }}
                                         </span>
                                         <Button
+                                            :disabled="!props.can_manage"
                                             type="button"
                                             variant="outline"
                                             size="sm"
@@ -536,6 +552,7 @@ function formatModuleName(module: string): string {
                                             Pilih semua
                                         </Button>
                                         <Button
+                                            :disabled="!props.can_manage"
                                             type="button"
                                             variant="ghost"
                                             size="sm"
@@ -560,6 +577,7 @@ function formatModuleName(module: string): string {
                                         class="flex items-start gap-3 rounded-[18px] border border-slate-200/80 bg-white/90 p-3 transition-colors hover:border-amber-200/80 hover:bg-white dark:bg-slate-950 dark:bg-slate-950/85"
                                     >
                                         <Checkbox
+                                            :disabled="!props.can_manage"
                                             :id="`${role.id}-${permission.id}`"
                                             :checked="
                                                 hasPermission(

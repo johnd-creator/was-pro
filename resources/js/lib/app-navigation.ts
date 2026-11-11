@@ -1,5 +1,6 @@
 import {
     Bell,
+    BookOpen,
     Building2,
     Database,
     FileText,
@@ -16,12 +17,13 @@ import { index as fabaMastersIndex } from '@/actions/App/Http/Controllers/WasteM
 import { index as auditIndex } from '@/actions/App/Http/Controllers/WasteManagement/OperationalAuditController';
 import { index as inboxIndex } from '@/actions/App/Http/Controllers/WasteManagement/OperationalInboxController';
 import { index as haulingPlansIndex } from '@/actions/App/Http/Controllers/WasteManagement/WasteHaulingPlansController';
-import { dashboard as dashboardRoute } from '@/routes';
+import { dashboard as dashboardRoute, guide } from '@/routes';
 import adminRoutes from '@/routes/admin';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { NavItem } from '@/types';
 
 export const appNavigationItems: NavItem[] = [
+    { title: 'Panduan', href: guide.url(), icon: BookOpen },
     {
         title: 'Riwayat Audit B3',
         href: auditIndex.url(),

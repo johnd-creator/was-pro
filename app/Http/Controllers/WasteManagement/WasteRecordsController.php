@@ -312,7 +312,7 @@ class WasteRecordsController extends Controller
      */
     public function pendingApproval(): Response
     {
-        if (! $this->canApproveRecords() && ! $this->canViewAllRecords()) {
+        if (! $this->canApproveRecords() && ! $this->canRejectRecords()) {
             abort(403, 'You do not have permission to view pending approvals.');
         }
 
@@ -511,9 +511,13 @@ class WasteRecordsController extends Controller
                 'Created At',
             ]);
 
+            $write = function (array $values) use ($file): void {
+                fputcsv($file, array_map(fn ($value) => is_string($value) && preg_match('/^(?:\s*[=+@\-]|[\t\r\n])/u', $value) ? "'".$value : $value, $values), ',', '"', '');
+            };
+
             // CSV Data
             foreach ($wasteRecords as $record) {
-                fputcsv($file, [
+                $write([
                     $record->record_number,
                     $record->date->format('Y-m-d'),
                     $record->expiry_date ? $record->expiry_date->format('Y-m-d') : 'N/A',

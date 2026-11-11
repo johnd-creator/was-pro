@@ -10,6 +10,7 @@ use App\Models\FabaOpeningBalance;
 use App\Models\FabaTpsCapacity;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -864,11 +865,11 @@ class FabaRecapService
             'submitted_by_user' => $approval->submittedByUser,
             'approved_by_user' => $approval->approvedByUser,
             'rejected_by_user' => $approval->rejectedByUser,
-            'can_submit' => ! $hasPendingTransactions && $approval->canSubmit(),
-            'can_approve' => $approval->canApprove(),
-            'can_reject' => $approval->canReject(),
-            'can_review' => true,
-            'can_reopen' => $approval->canReopen(),
+            'can_submit' => Auth::user()?->hasPermission('faba_approvals.submit') && $hasTransactions && ! $hasPendingTransactions && $approval->canSubmit(),
+            'can_approve' => Auth::user()?->hasPermission('faba_approvals.approve') && app(ApprovalSeparation::class)->canApprove(Auth::user(), $approval) && $approval->canApprove(),
+            'can_reject' => Auth::user()?->hasPermission('faba_approvals.reject') && $approval->canReject(),
+            'can_review' => Auth::user()?->hasPermission('faba_approvals.view') ?? false,
+            'can_reopen' => Auth::user()?->hasPermission('faba_approvals.reopen') && $approval->canReopen(),
         ];
     }
 

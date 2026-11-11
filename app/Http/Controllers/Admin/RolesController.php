@@ -26,12 +26,14 @@ class RolesController extends Controller
             return response()->json([
                 'roles' => $roles,
                 'permissions' => $permissions,
+                'can_manage' => request()->user()?->isSuperAdmin() ?? false,
             ]);
         }
 
         return Inertia::render('admin/Roles', [
             'roles' => $roles,
             'permissions' => $permissions,
+            'can_manage' => request()->user()?->isSuperAdmin() ?? false,
         ]);
     }
 
@@ -40,6 +42,8 @@ class RolesController extends Controller
      */
     public function update(Role $role): SymfonyResponse
     {
+        abort_unless(request()->user()?->isSuperAdmin(), 403, 'Hanya Super Admin yang dapat mengubah hak akses peran global.');
+
         $validated = request()->validate([
             'permissions' => ['array'],
             'permissions.*' => ['uuid', Rule::exists('permissions', 'id')],
