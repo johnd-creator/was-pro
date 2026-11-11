@@ -14,6 +14,7 @@ import { index as fabaMastersIndex } from '@/actions/App/Http/Controllers/WasteM
 import { index as auditIndex } from '@/actions/App/Http/Controllers/WasteManagement/OperationalAuditController';
 import { index as inboxIndex } from '@/actions/App/Http/Controllers/WasteManagement/OperationalInboxController';
 import { index as plansIndex } from '@/actions/App/Http/Controllers/WasteManagement/WasteHaulingPlansController';
+import GuideScreenshot from '@/components/GuideScreenshot.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
@@ -26,6 +27,7 @@ import {
     matchingGuideRole,
 } from '@/lib/application-guide';
 import type { GuideAction } from '@/lib/application-guide';
+import { guideScreenshots } from '@/lib/guide-screenshots';
 import { guide } from '@/routes';
 import admin from '@/routes/admin';
 import { edit as profile } from '@/routes/profile';
@@ -358,6 +360,11 @@ function resetFilters() {
                             />
                         </summary>
                         <div class="space-y-6 border-t p-5 md:p-6">
+                            <GuideScreenshot
+                                v-if="guideScreenshots[item.id]"
+                                :screenshot="guideScreenshots[item.id]"
+                                :title="item.title"
+                            />
                             <div>
                                 <h4 class="text-sm font-semibold">
                                     Sebelum mulai
