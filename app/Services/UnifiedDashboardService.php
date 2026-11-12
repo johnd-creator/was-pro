@@ -290,12 +290,15 @@ class UnifiedDashboardService
     private function getFabaHeroStats(): array
     {
         $yearlyRecap = $this->fabaRecapService->getYearlyRecap($this->selectedYear);
+        $latestPeriod = $this->fabaRecapService->resolveRequestedOrLatestPeriod();
+        $latestRecap = $this->fabaRecapService->getMonthlyRecap($latestPeriod['year'], $latestPeriod['month']);
 
         return [
             'year' => $this->selectedYear,
             'total_production' => $yearlyRecap['totals']['total_production'],
             'total_utilization' => $yearlyRecap['totals']['total_utilization'],
-            'current_balance' => $this->fabaRecapService->getCurrentBalance(),
+            'current_balance' => $latestRecap['closing_balance'],
+            'current_fly_ash_balance' => $latestRecap['closing_fly_ash'],
             'negative_periods' => collect($yearlyRecap['months'])
                 ->filter(fn (array $month): bool => (bool) $month['warning_negative_balance'])
                 ->count(),

@@ -7,6 +7,7 @@ interface FabaHeroStats {
     total_production: number;
     total_utilization: number;
     current_balance: number;
+    current_fly_ash_balance: number;
     negative_periods: number;
 }
 
@@ -49,11 +50,11 @@ const statCards = computed<StatCard[]>(() => {
             unit: 'ton',
         },
         {
-            title: 'Saldo TPS',
-            value: props.stats.current_balance,
-            tone: props.stats.current_balance < 0 ? 'red' : 'blue',
+            title: 'Saldo Fly Ash',
+            value: props.stats.current_fly_ash_balance,
+            tone: props.stats.current_fly_ash_balance < 0 ? 'red' : 'blue',
             icon: Scale,
-            hint: 'Posisi stok terbaru',
+            hint: 'Posisi stok Fly Ash terbaru',
             unit: 'ton',
         },
         {

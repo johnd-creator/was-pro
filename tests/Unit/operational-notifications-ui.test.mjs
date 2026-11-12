@@ -76,3 +76,26 @@ test('requested login and approval copy are exact', () => {
         assert.match(source(file), /Setuju/);
     }
 });
+
+test('dashboard Fly Ash balance uses its own material value instead of the FABA total', () => {
+    const dashboard = source('pages/Dashboard.vue');
+    assert.match(
+        dashboard,
+        /label: 'Saldo Fly Ash',\s+value: props.fabaHeroStats.current_fly_ash_balance/,
+    );
+    assert.doesNotMatch(
+        dashboard,
+        /label: 'Saldo Fly Ash',\s+value: props.fabaHeroStats.current_balance/,
+    );
+    const hero = source('components/dashboard/FabaHeroKpiCards.vue');
+    assert.match(
+        hero,
+        /title: 'Saldo Fly Ash',\s+value: props.stats.current_fly_ash_balance/,
+    );
+    assert.match(hero, /tone: props.stats.current_fly_ash_balance < 0/);
+    assert.match(dashboard, /v-for="material in \['Fly Ash', 'Bottom Ash'\]"/);
+    assert.match(
+        source('pages/waste-management/faba/recaps/Balance.vue'),
+        /Saldo TPS FABA/,
+    );
+});

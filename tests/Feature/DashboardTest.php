@@ -412,6 +412,16 @@ test('dashboard exposes faba hero stats using yearly semantics', function () {
             ->where('fabaHeroStats.total_production', 25)
             ->where('fabaHeroStats.total_utilization', 10)
             ->where('fabaHeroStats.current_balance', 15)
+            ->where('fabaHeroStats.current_fly_ash_balance', 6)
+            ->where('fabaChart.5.closing_bottom_ash', 9)
+        );
+    $this->get(route('dashboard', ['month' => '2026-01']))->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('filters.month', '2026-01')
+            ->where('fabaChart.5.closing_fly_ash', 10)
+            ->where('fabaChart.5.closing_bottom_ash', 0)
+            ->where('fabaHeroStats.current_balance', 15)
+            ->where('fabaHeroStats.current_fly_ash_balance', 6)
         );
 });
 

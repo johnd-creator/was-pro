@@ -115,6 +115,7 @@ interface Props {
     fabaStats: FabaStats;
     fabaHeroStats: FabaStats & {
         year: number;
+        current_fly_ash_balance: number;
     };
     fabaChart: FabaChartData[];
     fabaMaterialBalanceDistribution: CategoryData[];
@@ -182,7 +183,10 @@ const snapshotLabel = computed(
 const annualFabaStats = computed(() => [
     { label: 'Produksi', value: props.fabaHeroStats.total_production },
     { label: 'Pemanfaatan', value: props.fabaHeroStats.total_utilization },
-    { label: 'Saldo TPS', value: props.fabaHeroStats.current_balance },
+    {
+        label: 'Saldo Fly Ash',
+        value: props.fabaHeroStats.current_fly_ash_balance,
+    },
 ]);
 
 function refreshDashboard(): void {
