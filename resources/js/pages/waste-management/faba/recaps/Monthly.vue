@@ -30,6 +30,7 @@ import {
     formatFabaDateTime,
     formatFabaMaterial,
     formatFabaMovementType,
+    formatFabaStatus,
 } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
@@ -326,7 +327,7 @@ const { scopedUrl } = useOrganizationContext();
                                 <p
                                     class="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400"
                                 >
-                                    Period Picker
+                                    Pilih Periode
                                 </p>
                                 <p
                                     class="text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
@@ -365,7 +366,7 @@ const { scopedUrl } = useOrganizationContext();
                                 <p
                                     class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
                                 >
-                                    Snapshot approval
+                                    Rekaman Persetujuan
                                 </p>
                                 <div
                                     v-if="detail.snapshot"
@@ -375,7 +376,11 @@ const { scopedUrl } = useOrganizationContext();
                                         variant="secondary"
                                         class="rounded-full border border-blue-200 bg-white/90 text-blue-700 dark:bg-slate-950/85"
                                     >
-                                        {{ detail.snapshot.status }}
+                                        {{
+                                            formatFabaStatus(
+                                                detail.snapshot.status,
+                                            )
+                                        }}
                                     </Badge>
                                     <p
                                         class="text-sm text-slate-600 dark:text-slate-300"
@@ -401,7 +406,7 @@ const { scopedUrl } = useOrganizationContext();
                                     v-else
                                     class="mt-3 text-sm text-slate-500 dark:text-slate-400"
                                 >
-                                    Belum ada closing snapshot untuk periode
+                                    Belum ada rekaman penutupan untuk periode
                                     ini.
                                 </p>
                             </div>
@@ -621,7 +626,7 @@ const { scopedUrl } = useOrganizationContext();
                         >
                             <CardHeader>
                                 <CardTitle class="text-lg tracking-tight"
-                                    >Opening Balance</CardTitle
+                                    >Saldo Awal</CardTitle
                                 >
                             </CardHeader>
                             <CardContent class="space-y-3">

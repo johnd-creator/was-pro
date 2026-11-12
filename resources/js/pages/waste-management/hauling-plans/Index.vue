@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import {
     index,
     show,
@@ -25,7 +25,12 @@ import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import { usePermissions } from '@/composables/usePermissions';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import { formatLocalDate } from '@/lib/date';
-import { availablePlanRecords, haulingPlanStatus } from '@/lib/hauling-plan';
+import {
+    availablePlanRecords,
+    availablePlanWasteTypes,
+    haulingPlanStatus,
+    planRecordsForType,
+} from '@/lib/hauling-plan';
 import type { HaulingPlan, HaulingPlanRecord } from '@/types/hauling-plan';
 
 const props = defineProps<{
@@ -37,23 +42,45 @@ const page = usePage();
 const { scopedUrl } = useOrganizationContext();
 const { hasPermission } = usePermissions();
 const selectableRecords = computed(() => availablePlanRecords(props.records));
-const preselectedRecord = new URL(
+const preselectedRecordId = new URL(
     page.url,
     'https://local.invalid',
 ).searchParams.get('waste_record');
+const preselectedRecord = selectableRecords.value.find(
+    (record) => record.id === preselectedRecordId,
+);
+const selectedWasteTypeId = ref(preselectedRecord?.waste_type_id ?? '');
+const wasteTypes = computed(() =>
+    availablePlanWasteTypes(selectableRecords.value),
+);
+const filteredRecords = computed(() =>
+    planRecordsForType(selectableRecords.value, selectedWasteTypeId.value),
+);
 const form = useForm({
-    waste_record_id:
-        selectableRecords.value.find(
-            (record) => record.id === preselectedRecord,
-        )?.id ?? '',
+    waste_record_id: preselectedRecord?.id ?? '',
     planned_date: formatLocalDate(),
     quantity: '' as string | number,
     notes: '',
 });
+watch(
+    selectedWasteTypeId,
+    () => {
+        form.waste_record_id = '';
+        form.quantity = '';
+        form.clearErrors('waste_record_id', 'quantity');
+    },
+    { flush: 'sync' },
+);
+watch(
+    () => form.waste_record_id,
+    () => {
+        form.quantity = '';
+        form.clearErrors('quantity');
+    },
+    { flush: 'sync' },
+);
 const selectedRecord = computed(() =>
-    selectableRecords.value.find(
-        (record) => record.id === form.waste_record_id,
-    ),
+    filteredRecords.value.find((record) => record.id === form.waste_record_id),
 );
 const flash = computed(
     () => page.props.flash as { success?: string; error?: string } | undefined,
@@ -62,6 +89,7 @@ const quantity = (value: number) =>
     value.toLocaleString('id-ID', { maximumFractionDigits: 2 });
 let submissionKey: string | undefined;
 function submit(): void {
+    if (!selectedRecord.value || form.processing) return;
     submissionKey ??= crypto.randomUUID();
     form.post(scopedUrl(store.url()), {
         preserveScroll: true,
@@ -130,18 +158,51 @@ function submit(): void {
                         @submit.prevent="submit"
                     >
                         <div class="space-y-2">
-                            <Label for="plan-record">Catatan limbah</Label
-                            ><select
-                                id="plan-record"
-                                v-model="form.waste_record_id"
+                            <Label for="plan-waste-type">Jenis limbah</Label>
+                            <select
+                                id="plan-waste-type"
+                                v-model="selectedWasteTypeId"
+                                :disabled="form.processing"
                                 required
                                 class="h-11 w-full rounded-md border bg-background px-3 text-sm"
                             >
                                 <option value="" disabled>
-                                    Pilih catatan limbah
+                                    Pilih jenis limbah
                                 </option>
                                 <option
-                                    v-for="record in selectableRecords"
+                                    v-for="type in wasteTypes"
+                                    :key="type.id"
+                                    :value="type.id"
+                                >
+                                    {{ type.label }}
+                                </option>
+                            </select>
+                            <p class="text-sm text-muted-foreground">
+                                Pilih jenis limbah, lalu batch catatan yang
+                                sudah disetujui dan masih tersedia untuk
+                                dialokasikan.
+                            </p>
+                        </div>
+                        <div class="space-y-2">
+                            <Label for="plan-record">Batch catatan limbah</Label
+                            ><select
+                                id="plan-record"
+                                v-model="form.waste_record_id"
+                                :disabled="
+                                    !selectedWasteTypeId || form.processing
+                                "
+                                required
+                                class="h-11 w-full rounded-md border bg-background px-3 text-sm"
+                            >
+                                <option value="" disabled>
+                                    {{
+                                        selectedWasteTypeId
+                                            ? 'Pilih batch catatan limbah'
+                                            : 'Pilih jenis limbah terlebih dahulu'
+                                    }}
+                                </option>
+                                <option
+                                    v-for="record in filteredRecords"
                                     :key="record.id"
                                     :value="record.id"
                                 >
@@ -179,6 +240,7 @@ function submit(): void {
                                 min="0.01"
                                 step="0.01"
                                 :max="selectedRecord?.available_quantity"
+                                :disabled="!selectedRecord || form.processing"
                                 required
                                 class="h-11"
                             /><InputError :message="form.errors.quantity" />

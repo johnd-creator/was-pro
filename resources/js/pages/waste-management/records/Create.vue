@@ -195,7 +195,7 @@ const { scopedUrl } = useOrganizationContext();
             <div class="space-y-8">
                 <Heading
                     title="Tambah Catatan Limbah"
-                    description="Catat limbah baru dengan detail yang dibutuhkan untuk proses operasional dan pemantauan masa simpan."
+                    description="Catat limbah baru dengan detail yang dibutuhkan untuk proses operasional dan pemantauan masa simpan. Dicatat oleh akan terisi otomatis dengan akun yang menyimpan catatan ini."
                 />
 
                 <Alert v-if="form.hasErrors" variant="destructive">

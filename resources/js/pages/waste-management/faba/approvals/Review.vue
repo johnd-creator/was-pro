@@ -366,7 +366,7 @@ const { scopedUrl } = useOrganizationContext();
                         <Card>
                             <CardHeader
                                 ><CardTitle
-                                    >Arsip Closing Berversi</CardTitle
+                                    >Arsip Penutupan Berversi</CardTitle
                                 ></CardHeader
                             >
                             <CardContent class="space-y-3">
@@ -378,8 +378,10 @@ const { scopedUrl } = useOrganizationContext();
                                     <p>
                                         Arsip persetujuan tetap tersimpan
                                         setelah periode dibuka kembali.
-                                        Ringkasan operasional adalah data
-                                        langsung.
+                                        Ringkasan operasional menggunakan data
+                                        terkini. Arsip berisi data saat
+                                        persetujuan versi tersebut, bukan
+                                        perubahan setelahnya.
                                     </p>
                                     <p v-if="closing_versions.length === 0">
                                         Belum ada versi arsip.
@@ -484,7 +486,7 @@ const { scopedUrl } = useOrganizationContext();
                                     <p
                                         class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
                                     >
-                                        Closing Snapshot
+                                        Rekaman Penutupan
                                     </p>
                                     <p
                                         class="mt-2 text-base font-semibold text-slate-950 dark:text-slate-100"
@@ -494,7 +496,7 @@ const { scopedUrl } = useOrganizationContext();
                                     <p
                                         class="mt-1 text-sm text-slate-500 dark:text-slate-400"
                                     >
-                                        Approved at
+                                        Disetujui pada
                                         {{
                                             formatFabaDateTime(
                                                 snapshot.approved_at,
@@ -509,7 +511,7 @@ const { scopedUrl } = useOrganizationContext();
                                     <p
                                         class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
                                     >
-                                        Approved By
+                                        Disetujui oleh
                                     </p>
                                     <p
                                         class="mt-2 text-base font-semibold text-slate-950 dark:text-slate-100"

@@ -829,15 +829,17 @@ const { scopedUrl } = useOrganizationContext();
                             <CardHeader>
                                 <CardTitle>Jejak keputusan</CardTitle>
                                 <CardDescription>
-                                    Siapa yang membuat, mengajukan, dan
-                                    memutuskan catatan ini.
+                                    Siapa yang mencatat, mengajukan, dan
+                                    memutuskan catatan ini. Dicatat oleh terisi
+                                    otomatis dengan akun yang pertama kali
+                                    menyimpan catatan.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent
                                 class="grid gap-4 text-sm text-slate-900 sm:grid-cols-2 dark:text-slate-100"
                             >
                                 <div>
-                                    <p class="font-medium">Dibuat oleh</p>
+                                    <p class="font-medium">Dicatat oleh</p>
                                     <p
                                         class="text-slate-600 dark:text-slate-300"
                                     >

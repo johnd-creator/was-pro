@@ -22,7 +22,7 @@ interface ApprovalItem {
     quantity?: number;
     unit?: string;
     submitted_by?: string;
-    submitted_at?: string;
+    submitted_at?: string | null;
     year?: number;
     month?: number;
     period_label?: string;
@@ -48,7 +48,7 @@ const hasApprovals = computed(
     () => wasteApprovals.value.length > 0 || fabaApprovals.value.length > 0,
 );
 
-function approvalAgeHours(date?: string): number {
+function approvalAgeHours(date?: string | null): number {
     if (!date) {
         return 0;
     }
@@ -79,7 +79,7 @@ const urgentFabaApprovals = computed(
         ).length,
 );
 
-function formatAgeLabel(date?: string): string {
+function formatAgeLabel(date?: string | null): string {
     const diffHours = approvalAgeHours(date);
 
     if (diffHours === 0 && !date) {
@@ -95,7 +95,7 @@ function formatAgeLabel(date?: string): string {
     return `${diffDays} hari`;
 }
 
-function urgencyBadgeClass(date?: string): string {
+function urgencyBadgeClass(date?: string | null): string {
     const diffHours = approvalAgeHours(date);
 
     if (diffHours >= 72) {
@@ -109,7 +109,7 @@ function urgencyBadgeClass(date?: string): string {
     return 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300';
 }
 
-function reviewButtonClass(date?: string): string {
+function reviewButtonClass(date?: string | null): string {
     const diffHours = approvalAgeHours(date);
 
     if (diffHours >= 72) {

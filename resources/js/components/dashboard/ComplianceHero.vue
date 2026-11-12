@@ -224,7 +224,7 @@ const metricCards = computed<MetricCard[]>(() => [
         statusText:
             props.fabaWarnings > 0
                 ? 'Butuh telaah data FABA'
-                : 'Tidak ada warning aktif',
+                : 'Tidak ada peringatan aktif',
         barClass:
             props.fabaWarnings > 0
                 ? 'bg-rose-500 dark:bg-rose-400'

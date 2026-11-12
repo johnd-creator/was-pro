@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import ts from 'typescript';
+import { computed, ref, watch, reactive, effectScope } from 'vue';
 import {
     actualQuantityLimit,
     availablePlanRecords,
+    availablePlanWasteTypes,
+    planRecordsForType,
     initialActualDate,
     haulingActualStatus,
     haulingPlanStatus,
@@ -121,11 +125,197 @@ test('plan options, preselection, selected record and empty state share eligible
         'utf8',
     );
     assert.match(source, /availablePlanRecords\(props.records\)/);
-    assert.equal(
-        (source.match(/selectableRecords.value.find/g) ?? []).length,
-        2,
-    );
-    assert.match(source, /v-for="record in selectableRecords"/);
+    assert.match(source, /selectableRecords.value.find/);
+    assert.match(source, /preselectedRecord\?\.waste_type_id/);
+    assert.match(source, /preselectedRecord\?\.id/);
+    assert.match(source, /filteredRecords.value.find/);
+    assert.match(source, /v-for="record in filteredRecords"/);
+    assert.match(source, /v-model="selectedWasteTypeId"/);
+    assert.match(source, /watch\(\s*selectedWasteTypeId/);
+    assert.match(source, /form\.waste_record_id = ''/);
+    assert.match(source, /form\.quantity = ''/);
     assert.match(source, /v-if="!selectableRecords.length"/);
     assert.match(source, /tersedia untuk alokasi baru/);
+});
+
+test('type options use stable IDs and only eligible records, preserving same-name types', () => {
+    const records = [
+        {
+            id: 'one',
+            waste_type_id: 'type-a',
+            available_quantity: 3,
+            waste_type: { name: 'Oli', code: 'A' },
+        },
+        {
+            id: 'two',
+            waste_type_id: 'type-a',
+            available_quantity: 4,
+            waste_type: { name: 'Oli', code: 'A' },
+        },
+        {
+            id: 'three',
+            waste_type_id: 'type-b',
+            available_quantity: 5,
+            waste_type: { name: 'Oli', code: 'B' },
+        },
+        {
+            id: 'four',
+            waste_type_id: 'type-c',
+            available_quantity: 0,
+            waste_type: { name: 'Kosong', code: null },
+        },
+        {
+            id: 'five',
+            waste_type_id: 'type-d',
+            available_quantity: -1,
+            waste_type: null,
+        },
+    ];
+    assert.deepEqual(availablePlanWasteTypes(records), [
+        { id: 'type-a', label: 'Oli \u2022 A' },
+        { id: 'type-b', label: 'Oli \u2022 B' },
+    ]);
+    assert.deepEqual(
+        planRecordsForType(records, 'type-a'),
+        records.slice(0, 2),
+    );
+    assert.deepEqual(planRecordsForType(records, 'type-b'), [records[2]]);
+    assert.deepEqual(planRecordsForType(records, 'type-c'), []);
+    assert.deepEqual(planRecordsForType(records, ''), []);
+    assert.deepEqual(planRecordsForType(records, 'unknown'), []);
+    assert.deepEqual(availablePlanWasteTypes([]), []);
+    assert.equal(records.length, 5);
+});
+
+test('missing waste type labels fall back to the stable identifier without hiding available batches', () => {
+    const records = [
+        {
+            id: 'one',
+            waste_type_id: 'type-a',
+            available_quantity: 3,
+            waste_type: null,
+        },
+    ];
+    assert.deepEqual(availablePlanWasteTypes(records), [
+        { id: 'type-a', label: 'type-a' },
+    ]);
+    assert.deepEqual(planRecordsForType(records, 'type-a'), records);
+});
+
+function mountPicker(records, query = '') {
+    const source = readFileSync(
+        new URL(
+            '../../resources/js/pages/waste-management/hauling-plans/Index.vue',
+            import.meta.url,
+        ),
+        'utf8',
+    );
+    const script = source
+        .split('<script setup lang="ts">')[1]
+        .split('</script>')[0];
+    const compiled = ts
+        .transpileModule(script, {
+            compilerOptions: {
+                module: ts.ModuleKind.ESNext,
+                target: ts.ScriptTarget.ES2022,
+            },
+        })
+        .outputText.replace(/^import[\s\S]*?from ['"][^'"]+['"];\s*/gm, '')
+        .replace(/export \{\};?/g, '');
+    const dependencies = {
+        defineProps: () => ({ records, plans: [], plansEnabled: true }),
+        usePage: () => ({ url: '/hauling-plans' + query, props: {} }),
+        useForm: (initial) =>
+            reactive({ ...initial, processing: false, clearErrors() {} }),
+        useOrganizationContext: () => ({ scopedUrl: (url) => url }),
+        usePermissions: () => ({ hasPermission: () => true }),
+        formatLocalDate: () => '2026-11-12',
+        computed,
+        ref,
+        watch,
+        availablePlanRecords,
+        availablePlanWasteTypes,
+        planRecordsForType,
+    };
+    const scope = effectScope();
+    const state = scope.run(() =>
+        new Function(
+            ...Object.keys(dependencies),
+            compiled +
+                ';return { form, selectedWasteTypeId, filteredRecords, selectedRecord };',
+        )(...Object.values(dependencies)),
+    );
+    return { ...state, stop: () => scope.stop() };
+}
+
+test('picker preserves eligible deep links and clears stale batch and quantity on type or batch changes', () => {
+    const records = [
+        {
+            id: 'one',
+            waste_type_id: 'a',
+            available_quantity: 3,
+            waste_type: null,
+        },
+        {
+            id: 'two',
+            waste_type_id: 'b',
+            available_quantity: 4,
+            waste_type: null,
+        },
+        {
+            id: 'three',
+            waste_type_id: 'b',
+            available_quantity: 5,
+            waste_type: null,
+        },
+    ];
+    const picker = mountPicker(records, '?waste_record=one');
+    try {
+        assert.equal(picker.selectedWasteTypeId.value, 'a');
+        assert.equal(picker.selectedRecord.value.id, 'one');
+        picker.form.quantity = 2;
+        picker.selectedWasteTypeId.value = 'b';
+        assert.equal(picker.form.waste_record_id, '');
+        assert.equal(picker.form.quantity, '');
+        assert.equal(picker.selectedRecord.value, undefined);
+        assert.deepEqual(
+            picker.filteredRecords.value.map((record) => record.id),
+            ['two', 'three'],
+        );
+        picker.form.waste_record_id = 'two';
+        picker.form.quantity = 4;
+        picker.form.waste_record_id = 'three';
+        assert.equal(picker.form.quantity, '');
+        assert.equal(picker.selectedRecord.value.id, 'three');
+        picker.form.waste_record_id = 'one';
+        assert.equal(picker.selectedRecord.value, undefined);
+    } finally {
+        picker.stop();
+    }
+});
+
+test('picker rejects exhausted or unavailable deep links and starts with no batches until a type is chosen', () => {
+    const records = [
+        {
+            id: 'empty',
+            waste_type_id: 'a',
+            available_quantity: 0,
+            waste_type: null,
+        },
+    ];
+    for (const query of [
+        '',
+        '?waste_record=empty',
+        '?waste_record=not-authorized',
+    ]) {
+        const picker = mountPicker(records, query);
+        try {
+            assert.equal(picker.selectedWasteTypeId.value, '');
+            assert.equal(picker.form.waste_record_id, '');
+            assert.equal(picker.selectedRecord.value, undefined);
+            assert.deepEqual(picker.filteredRecords.value, []);
+        } finally {
+            picker.stop();
+        }
+    }
 });

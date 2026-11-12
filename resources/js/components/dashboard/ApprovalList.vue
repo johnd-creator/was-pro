@@ -33,7 +33,7 @@ interface PendingApproval {
     quantity: number;
     unit: string;
     submitted_by: string;
-    submitted_at: string;
+    submitted_at: string | null;
 }
 
 interface Props {
@@ -57,8 +57,10 @@ const selectedApproval = computed(
         ) ?? null,
 );
 
-function formatTime(dateString: string): string {
+function formatTime(dateString: string | null): string {
+    if (!dateString) return 'Waktu pengajuan belum tercatat';
     const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return 'Waktu pengajuan belum tercatat';
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);

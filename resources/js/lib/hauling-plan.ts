@@ -48,3 +48,30 @@ export function availablePlanRecords<T extends { available_quantity: number }>(
 ): T[] {
     return records.filter((record) => record.available_quantity > 0);
 }
+
+export function planRecordsForType<
+    T extends { available_quantity: number; waste_type_id: string },
+>(records: T[], wasteTypeId: string): T[] {
+    return availablePlanRecords(records).filter(
+        (record) => record.waste_type_id === wasteTypeId,
+    );
+}
+
+export function availablePlanWasteTypes<
+    T extends {
+        available_quantity: number;
+        waste_type_id: string;
+        waste_type: { name: string | null; code: string | null } | null;
+    },
+>(records: T[]): { id: string; label: string }[] {
+    const types = new Map<string, string>();
+    for (const record of availablePlanRecords(records)) {
+        types.set(
+            record.waste_type_id,
+            [record.waste_type?.name, record.waste_type?.code]
+                .filter(Boolean)
+                .join(' • ') || record.waste_type_id,
+        );
+    }
+    return Array.from(types, ([id, label]) => ({ id, label }));
+}

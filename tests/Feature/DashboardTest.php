@@ -1125,7 +1125,7 @@ test('dashboard separates material capacity risk from integrity warnings across 
         'material_type' => 'fly_ash', 'movement_type' => FabaMovement::TYPE_PRODUCTION,
         'stock_effect' => FabaMovement::STOCK_EFFECT_IN, 'quantity' => 196,
     ]);
-    WasteRecord::factory()->create(['date' => '2026-03-01']);
+    WasteRecord::factory()->draft()->create(['date' => '2026-03-01']);
     $tenant->switchToPublic();
     $user = User::factory()->create(['organization_id' => $organization->id, 'role_id' => dashboardViewerRole()->id]);
     $this->actingAs($user)->get(route('dashboard', ['month' => '2026-03']))
@@ -1346,3 +1346,24 @@ test('dashboard schema scopes restore exact caller context for nested and except
         expect(config('database.connections.pgsql'))->toBe($configuration);
     }
 })->with(['success', 'exception', 'sql exception', 'missing']);
+
+test('dashboard tolerates pending records with missing submission dates without changing their status', function (?string $submittedAt) {
+    $organization = Organization::factory()->create(['schema_name' => 'tenant_pending_submission_date']);
+    migrateTenantSchema($organization);
+    $user = User::factory()->create(['organization_id' => $organization->id, 'role_id' => dashboardViewerRole()->id]);
+    $tenant = app(TenantService::class);
+    $tenant->switchToSchema($organization->schema_name);
+    $record = WasteRecord::factory()->pendingReview()->create(['date' => '2026-03-01', 'submitted_at' => $submittedAt]);
+    $tenant->switchToPublic();
+
+    $this->actingAs($user)->get(route('dashboard', ['month' => '2026-03']))->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->has('pendingApprovals', 1)
+            ->where('pendingApprovals.0.id', $record->id)
+            ->where('pendingApprovals.0.submitted_at', $submittedAt ? CarbonImmutable::parse($submittedAt)->toIso8601String() : null)
+            ->where('stats.pending_records', 1));
+    $tenant->switchToSchema($organization->schema_name);
+    expect($record->fresh()->status)->toBe('pending_review')
+        ->and($record->fresh()->submitted_at?->toIso8601String())->toBe($submittedAt ? CarbonImmutable::parse($submittedAt)->toIso8601String() : null);
+    $tenant->switchToPublic();
+})->with([null, '2026-03-01 08:15:00']);

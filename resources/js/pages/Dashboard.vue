@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowUpRight, CalendarDays, RefreshCw } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import { index as notificationIndex } from '@/actions/App/Http/Controllers/WasteManagement/OperationalInboxController';
 import CompactStat from '@/components/dashboard/CompactStat.vue';
@@ -13,6 +13,7 @@ import WasteFlowChart from '@/components/dashboard/WasteFlowChart.vue';
 
 // UI components
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import { usePermissions } from '@/composables/usePermissions';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard as dashboardRoute } from '@/routes';
@@ -63,7 +64,7 @@ interface ApprovalItem {
     quantity?: number;
     unit?: string;
     submitted_by?: string;
-    submitted_at?: string;
+    submitted_at?: string | null;
     year?: number;
     month?: number;
     period_label?: string;
@@ -140,6 +141,7 @@ interface Props {
 
 const props = defineProps<Props>();
 const { hasPermission } = usePermissions();
+const { scopedUrl } = useOrganizationContext();
 const canViewRecords = computed(
     () =>
         hasPermission('waste_records.view_all') ||
@@ -167,19 +169,53 @@ const criticalActionHref = computed(() =>
 const wasteStatsContext = computed(() => {
     const snapshotLabel = props.header.snapshot_month_label ?? 'periode aktif';
     return {
-        label: 's.d. Snapshot',
+        label: 'Hingga periode terpilih',
         totalHint: `Tercatat sampai ${snapshotLabel}`,
         transportedHint: `Sudah terangkut valid`,
-        backlogHint: `Carry-over aktif`,
-        fabaLabel: props.header.snapshot_month_label ?? 'Snapshot',
+        backlogHint: `Termasuk sisa periode sebelumnya`,
+        fabaLabel: props.header.snapshot_month_label ?? 'Periode terpilih',
     };
 });
 
 const isRefreshing = ref(false);
 const refreshError = ref(false);
-const snapshotLabel = computed(
-    () => props.header.snapshot_month_label ?? 'Periode aktif',
+const selectedMonth = ref(props.filters.month ?? '');
+watch(
+    () => props.filters.month,
+    (month) => {
+        selectedMonth.value = month ?? '';
+    },
 );
+
+function changePeriod(): void {
+    if (
+        isRefreshing.value ||
+        !props.availableMonths.some(
+            (month) => month.value === selectedMonth.value,
+        ) ||
+        selectedMonth.value === props.filters.month
+    )
+        return;
+    refreshError.value = false;
+    router.get(
+        scopedUrl(dashboardRoute.url()),
+        { month: selectedMonth.value },
+        {
+            preserveScroll: true,
+            preserveState: true,
+            onStart: () => {
+                isRefreshing.value = true;
+            },
+            onError: () => {
+                refreshError.value = true;
+            },
+            onFinish: () => {
+                selectedMonth.value = props.filters.month ?? '';
+                isRefreshing.value = false;
+            },
+        },
+    );
+}
 const annualFabaStats = computed(() => [
     { label: 'Produksi', value: props.fabaHeroStats.total_production },
     { label: 'Pemanfaatan', value: props.fabaHeroStats.total_utilization },
@@ -237,19 +273,37 @@ function refreshDashboard(): void {
                     </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
-                    <div
-                        class="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                    >
-                        <CalendarDays
-                            class="size-4 text-slate-400"
-                            aria-hidden="true"
-                        />
-                        <span
-                            >Snapshot
-                            <strong class="font-semibold">{{
-                                snapshotLabel
-                            }}</strong></span
+                    <div class="space-y-1">
+                        <label
+                            for="dashboard-period"
+                            class="text-xs font-medium text-slate-600 dark:text-slate-300"
+                            >Periode ringkasan</label
                         >
+                        <div
+                            class="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                        >
+                            <CalendarDays
+                                class="size-4 shrink-0 text-slate-400"
+                                aria-hidden="true"
+                            />
+                            <select
+                                id="dashboard-period"
+                                v-model="selectedMonth"
+                                :disabled="
+                                    isRefreshing || !availableMonths.length
+                                "
+                                class="min-h-11 min-w-40 bg-transparent font-semibold focus-visible:outline-2 focus-visible:outline-blue-600 disabled:cursor-wait"
+                                @change="changePeriod"
+                            >
+                                <option
+                                    v-for="month in availableMonths"
+                                    :key="month.value"
+                                    :value="month.value"
+                                >
+                                    {{ month.label }}
+                                </option>
+                            </select>
+                        </div>
                     </div>
                     <button
                         type="button"
@@ -305,7 +359,7 @@ function refreshDashboard(): void {
             </nav>
             <section
                 id="ringkasan"
-                aria-label="Ringkasan snapshot"
+                aria-label="Ringkasan periode terpilih"
                 class="scroll-mt-24 space-y-4"
             >
                 <ComplianceHero
@@ -337,8 +391,8 @@ function refreshDashboard(): void {
                         title="Menunggu Ditinjau"
                         :href="recordsHref('pending')"
                         :value="stats.pending_records"
-                        context-label="Periode aktif"
-                        hint="Catatan yang menunggu review"
+                        context-label="Periode terpilih"
+                        hint="Catatan yang menunggu pemeriksaan"
                         :color="stats.pending_records > 0 ? 'orange' : 'blue'"
                     />
                     <CompactStat
@@ -346,7 +400,7 @@ function refreshDashboard(): void {
                         :href="recordsHref('backlog')"
                         :value="stats.waste_untransported_records_snapshot"
                         :context-label="wasteStatsContext.label"
-                        hint="Catatan backlog, termasuk carry-over"
+                        hint="Termasuk sisa dari periode sebelumnya"
                     />
                     <CompactStat
                         title="Melewati Batas Simpan"
@@ -380,8 +434,8 @@ function refreshDashboard(): void {
                     <p
                         class="max-w-lg text-sm leading-6 text-slate-500 dark:text-slate-400"
                     >
-                        Intake dan pengangkutan enam bulan, dengan backlog pada
-                        snapshot terakhir.
+                        Limbah masuk dan pengangkutan enam bulan, dengan sisa
+                        limbah pada periode terpilih.
                     </p>
                 </div>
                 <div
@@ -430,7 +484,7 @@ function refreshDashboard(): void {
                                 >Batas penyimpanan</CardTitle
                             >
                             <p class="text-xs text-slate-500">
-                                Sisa limbah pada snapshot yang dipilih.
+                                Sisa limbah pada periode yang dipilih.
                             </p></CardHeader
                         >
                         <CardContent class="px-5 pb-5"
@@ -502,8 +556,9 @@ function refreshDashboard(): void {
                     <p
                         class="mb-4 text-xs font-medium text-slate-500 dark:text-slate-400"
                     >
-                        Ringkasan tahun {{ fabaHeroStats.year }} · terpisah dari
-                        tren enam bulan di bawah
+                        Produksi dan pemanfaatan tahun {{ fabaHeroStats.year }}.
+                        Saldo Fly Ash memakai periode FABA terbaru, bukan
+                        periode ringkasan yang dipilih.
                     </p>
                     <dl class="grid gap-5 sm:grid-cols-3">
                         <div v-for="stat in annualFabaStats" :key="stat.label">

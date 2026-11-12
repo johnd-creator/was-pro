@@ -276,7 +276,7 @@ const occupancyOption = computed(() =>
                 </p>
                 <p class="wm-text-secondary">
                     Kapasitas dan ambang mengikuti konfigurasi TPS saat ini;
-                    saldo mengikuti snapshot bulanan.
+                    saldo mengikuti posisi akhir periode.
                 </p>
             </div>
             <p

@@ -37,7 +37,7 @@ class WasteHaulingPlansController extends Controller
         $this->enabled();
         $plans = WasteHaulingPlan::query()->with(['wasteRecord', 'createdBy', 'approvedByUser', 'closedByUser', 'haulings'])
             ->when(! $this->all() && ! $this->reviewer(), fn ($q) => $q->where('created_by', auth()->id()))->latest()->get();
-        $records = WasteRecord::query()->approved()->when(! $this->all(), fn ($q) => $q->where('created_by', auth()->id()))->orderBy('date')->get();
+        $records = WasteRecord::query()->with('wasteType')->approved()->when(! $this->all(), fn ($q) => $q->where('created_by', auth()->id()))->orderBy('date')->get();
 
         return Inertia::render('waste-management/hauling-plans/Index', ['plansEnabled' => true,
             'plans' => $plans->map(fn ($plan) => $this->serialize($plan)),
@@ -100,7 +100,8 @@ class WasteHaulingPlansController extends Controller
 
     public function record(WasteRecord $record): array
     {
-        return ['id' => $record->id, 'record_number' => $record->record_number, 'unit' => $record->unit, 'quantity' => (float) $record->quantity,
+        return ['waste_type_id' => $record->waste_type_id, 'waste_type' => $record->wasteType?->only(['name', 'code']),
+            'id' => $record->id, 'record_number' => $record->record_number, 'unit' => $record->unit, 'quantity' => (float) $record->quantity,
             'remaining_quantity' => $record->getRemainingQuantity(), 'available_quantity' => app(HaulingPlans::class)->availableFor($record)];
     }
 

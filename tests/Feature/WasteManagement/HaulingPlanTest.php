@@ -492,3 +492,23 @@ test('enabled lifecycle records incoming plan partial actual closure and scoped 
     $this->actingAs($this->creator)->get(route('waste-management.notifications.index', $params))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->where('available', true)->has('notifications', 3));
     $this->actingAs($this->supervisor)->get(route('waste-management.audit.index', [...$params, 'module' => 'waste_hauling_plans']))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->has('entries', 3));
 });
+
+test('plan picker supplies waste type metadata only for approved records within operator access', function () {
+    $this->tenants->switchToPublic();
+    $operator = User::factory()->create(['organization_id' => $this->organization->id, 'role_id' => Role::where('slug', 'operator')->value('id'), 'is_super_admin' => false, 'email_verified_at' => now()]);
+    $this->actingAs($operator);
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    $own = WasteRecord::factory()->approved()->create(['created_by' => $operator->id, 'quantity' => 25, 'unit' => 'kg']);
+    WasteRecord::factory()->draft()->create(['created_by' => $operator->id]);
+    $type = $own->wasteType;
+
+    $this->get(planRoute($this, 'index'))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('waste-management/hauling-plans/Index')
+        ->has('records', 1)
+        ->where('records.0.id', $own->id)
+        ->where('records.0.waste_type_id', $type->id)
+        ->where('records.0.waste_type.name', $type->name)
+        ->where('records.0.waste_type.code', $type->code)
+        ->where('records.0.available_quantity', 25)
+        ->where('records.0.remaining_quantity', 25));
+});

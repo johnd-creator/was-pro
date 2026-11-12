@@ -135,7 +135,7 @@ class UnifiedDashboardService
                     'quantity' => $record->quantity,
                     'unit' => $record->unit,
                     'submitted_by' => $record->submittedByUser?->name ?? 'Unknown',
-                    'submitted_at' => $record->submitted_at->toIso8601String(),
+                    'submitted_at' => $record->submitted_at?->toIso8601String(),
                     'type' => 'waste_record',
                 ];
             })->all();

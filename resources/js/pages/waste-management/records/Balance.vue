@@ -177,7 +177,8 @@ function exportCsv() {
                     role="status"
                     class="font-semibold text-destructive"
                 >
-                    {{ anomalies }} anomali. Periksa referensi catatan di bawah.
+                    {{ anomalies }} temuan perlu diperiksa. Lihat referensi
+                    catatan di bawah.
                 </p>
             </div>
             <div class="wm-panel overflow-x-auto rounded-xl border">
@@ -191,7 +192,7 @@ function exportCsv() {
                             ><TableHead class="text-right">Keluar</TableHead
                             ><TableHead class="text-right"
                                 >Saldo akhir</TableHead
-                            ><TableHead>Anomali</TableHead></TableRow
+                            ><TableHead>Perlu diperiksa</TableHead></TableRow
                         ></TableHeader
                     >
                     <TableBody>
@@ -229,7 +230,7 @@ function exportCsv() {
                             ><TableCell
                                 :colspan="7"
                                 class="py-8 text-center text-muted-foreground"
-                                >Tidak ada transaksi approved yang dapat Anda
+                                >Tidak ada transaksi disetujui yang dapat Anda
                                 akses sampai tanggal akhir.</TableCell
                             ></TableRow
                         >
@@ -258,12 +259,16 @@ function exportCsv() {
             </div>
             <section class="space-y-3" aria-labelledby="balance-references">
                 <h2 id="balance-references" class="text-lg font-semibold">
-                    Referensi dan anomali
+                    Referensi dan pemeriksaan data
                 </h2>
                 <p class="text-sm text-muted-foreground">
                     Rincian kontribusi setiap catatan, termasuk saldo bawaan
                     sebelum periode. Asal limbah adalah teks asal pada catatan,
-                    bukan lokasi TPS terstruktur.
+                    bukan lokasi TPS terstruktur. Anomali adalah penanda data
+                    yang perlu diperiksa, bukan kategori limbah: saldo awal atau
+                    akhir negatif, tanggal pengangkutan sebelum tanggal catatan,
+                    atau satuan pengangkutan berbeda dari catatan. Satu catatan
+                    dapat memiliki lebih dari satu temuan.
                 </p>
                 <details
                     v-for="row in report.rows"
@@ -277,7 +282,7 @@ function exportCsv() {
                         {{ row.references.length }} catatan<span
                             v-if="row.anomaly_count"
                             class="ml-2 text-destructive"
-                            >({{ row.anomaly_count }} anomali)</span
+                            >({{ row.anomaly_count }} temuan)</span
                         >
                     </summary>
                     <ul class="mt-4 divide-y">

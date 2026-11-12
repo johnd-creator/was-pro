@@ -75,25 +75,25 @@ const kpis = computed(() => [
     {
         label: 'Limbah Masuk',
         value: totalInput.value,
-        context: 'Approved · enam bulan',
+        context: 'Disetujui · enam bulan',
         tone: 'wm-text-primary',
     },
     {
         label: 'Terangkut',
         value: totalCompleted.value,
-        context: 'Approved · enam bulan',
+        context: 'Disetujui · enam bulan',
         tone: 'wm-text-primary',
     },
     {
-        label: 'Backlog Aktif',
+        label: 'Belum Terangkut',
         value: latestBacklog.value,
-        context: `${latestBacklogCount.value} catatan · snapshot terakhir`,
+        context: `${latestBacklogCount.value} catatan · periode terpilih`,
         tone: 'text-blue-700 dark:text-blue-300',
     },
     {
-        label: 'Backlog Expired',
+        label: 'Melewati Batas Simpan',
         value: latestExpiredBacklog.value,
-        context: `${latest.value?.expired_backlog_count ?? 0} catatan · ${latestExpiredBacklog.value > 0 ? 'perlu penanganan' : 'snapshot terakhir'}`,
+        context: `${latest.value?.expired_backlog_count ?? 0} catatan · ${latestExpiredBacklog.value > 0 ? 'perlu penanganan' : 'periode terpilih'}`,
         tone:
             latestExpiredBacklog.value > 0
                 ? 'text-red-700 dark:text-red-300'
@@ -211,7 +211,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
 
                 for (const point of entries) {
                     if (
-                        point.seriesName === 'Risiko Expired' ||
+                        point.seriesName === 'Melewati Batas Simpan' ||
                         point.seriesName === 'Risiko Mendekati Batas'
                     ) {
                         continue;
@@ -228,7 +228,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
                 }
 
                 lines.push(
-                    `<div style="display:flex;justify-content:space-between;gap:16px;"><span>${tooltipMarker('Risiko Expired')}Backlog expired</span><strong>${formatNumber(row?.expired_backlog_quantity ?? 0)} ${chartUnit.value}</strong></div>`,
+                    `<div style="display:flex;justify-content:space-between;gap:16px;"><span>${tooltipMarker('Melewati Batas Simpan')}Sisa melewati batas simpan</span><strong>${formatNumber(row?.expired_backlog_quantity ?? 0)} ${chartUnit.value}</strong></div>`,
                 );
                 lines.push(
                     `<div style="display:flex;justify-content:space-between;gap:16px;"><span>${tooltipMarker('Risiko Mendekati Batas')}Mendekati batas</span><strong>${formatNumber(row?.expiring_soon_backlog_quantity ?? 0)} ${chartUnit.value}</strong></div>`,
@@ -239,7 +239,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
         },
         series: [
             {
-                name: 'Intake approved',
+                name: 'Limbah masuk disetujui',
                 type: 'bar',
                 barMaxWidth: 22,
                 itemStyle: {
@@ -259,7 +259,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
                 data: completedData,
             },
             {
-                name: 'Backlog akhir',
+                name: 'Sisa akhir periode',
                 type: 'line',
                 smooth: false,
                 symbol: 'circle',
@@ -289,7 +289,7 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
                 },
             },
             {
-                name: 'Risiko Expired',
+                name: 'Melewati Batas Simpan',
                 type: 'scatter',
                 symbolSize: 8,
                 symbolOffset: [-6, -5],
@@ -316,10 +316,10 @@ const wasteChartOption = computed<DashboardEChartsOption>(() => {
 
 function tooltipMarker(series: string): string {
     const colors: Record<string, string> = {
-        'Intake approved': dashboardChartPalette.intake,
+        'Limbah masuk disetujui': dashboardChartPalette.intake,
         'Selesai diangkut': dashboardChartPalette.completed,
-        'Backlog akhir': dashboardChartPalette.backlog,
-        'Risiko Expired': dashboardChartPalette.critical,
+        'Sisa akhir periode': dashboardChartPalette.backlog,
+        'Melewati Batas Simpan': dashboardChartPalette.critical,
         'Risiko Mendekati Batas': dashboardChartPalette.warning,
     };
     return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:${colors[series] ?? dashboardChartPalette.axisLabel}"></span>`;
@@ -346,13 +346,13 @@ function formatQuantity(value: number): string {
             >
                 <div class="space-y-1.5">
                     <CardTitle class="wm-text-primary text-base">
-                        Intake, pengangkutan & backlog
+                        Limbah masuk, pengangkutan & sisa
                     </CardTitle>
                     <CardDescription
                         class="wm-text-secondary text-sm leading-6"
                     >
-                        Memantau kuantitas limbah approved yang masuk, kuantitas
-                        terangkut, posisi backlog akhir, dan risiko batas simpan
+                        Memantau jumlah limbah masuk yang disetujui, jumlah
+                        terangkut, sisa akhir periode, dan risiko batas simpan
                         tiap periode.
                     </CardDescription>
                     <p
@@ -373,7 +373,7 @@ function formatQuantity(value: number): string {
                             }"
                         />
                         <span class="wm-text-secondary font-medium"
-                            >Intake approved</span
+                            >Limbah masuk disetujui</span
                         >
                     </div>
                     <div class="flex items-center gap-1.5">
@@ -396,7 +396,7 @@ function formatQuantity(value: number): string {
                             }"
                         />
                         <span class="wm-text-secondary font-medium"
-                            >Backlog akhir</span
+                            >Sisa akhir periode</span
                         >
                     </div>
                     <div class="flex items-center gap-1.5">
@@ -407,7 +407,7 @@ function formatQuantity(value: number): string {
                             }"
                         />
                         <span class="wm-text-secondary font-medium"
-                            >Expired</span
+                            >Melewati batas simpan</span
                         >
                     </div>
                     <div class="flex items-center gap-1.5">
@@ -453,7 +453,7 @@ function formatQuantity(value: number): string {
                     bulan</span
                 >
                 <span class="text-xs">{{
-                    latest?.snapshot_label ?? 'Snapshot belum tersedia'
+                    latest?.snapshot_label ?? 'Periode belum tersedia'
                 }}</span>
             </div>
             <p
@@ -508,8 +508,8 @@ function formatQuantity(value: number): string {
                     <p class="font-semibold">
                         {{
                             latestExpiredBacklog > 0
-                                ? `${formatQuantity(latestExpiredBacklog)} expired dari ${formatQuantity(latestBacklog)} backlog aktif (${latest?.expired_backlog_count ?? 0} catatan). Prioritaskan pengangkutan.`
-                                : 'Tidak ada backlog expired pada snapshot ini.'
+                                ? `${formatQuantity(latestExpiredBacklog)} melewati batas simpan dari ${formatQuantity(latestBacklog)} yang belum terangkut (${latest?.expired_backlog_count ?? 0} catatan). Prioritaskan pengangkutan.`
+                                : 'Tidak ada sisa limbah melewati batas simpan pada periode ini.'
                         }}
                     </p>
                     <p class="text-xs">
@@ -517,7 +517,7 @@ function formatQuantity(value: number): string {
                         pada halaman tujuan mengikuti hak akses Anda.
                     </p>
                     <p class="text-xs">
-                        Backlog
+                        Sisa limbah
                         {{
                             backlogChange > 0
                                 ? 'naik'
@@ -534,7 +534,7 @@ function formatQuantity(value: number): string {
                     v-if="latestExpiredBacklog > 0"
                     :href="expiredHref"
                     class="inline-flex min-h-11 shrink-0 items-center rounded-lg border border-current px-3 py-2 text-xs font-semibold"
-                    >Lihat Limbah Expired</Link
+                    >Lihat Limbah Melewati Batas Simpan</Link
                 >
             </div>
 

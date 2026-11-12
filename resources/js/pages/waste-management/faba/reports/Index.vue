@@ -597,7 +597,7 @@ function applyFilters(): void {
                                     <h3
                                         class="text-xl font-semibold tracking-tight text-slate-950 dark:text-slate-100"
                                     >
-                                        Rekap Closing Bulanan
+                                        Rekap Penutupan Bulanan
                                     </h3>
                                     <p
                                         class="text-sm leading-6 text-slate-600 dark:text-slate-300"
@@ -684,20 +684,24 @@ function applyFilters(): void {
 
                             <div class="mt-5 space-y-2">
                                 <p class="text-sm">
-                                    Ringkasan di atas: Draft / Data Langsung.
-                                    Pilih sumber ekspor:
+                                    Ringkasan di atas: Draf / Data Terkini. Draf
+                                    mengikuti data terkini dan bukan arsip
+                                    persetujuan. Arsip disetujui berisi data
+                                    saat persetujuan versi tersebut. Pilihan
+                                    sumber hanya mengubah ekspor, bukan
+                                    ringkasan di atas. Pilih sumber ekspor:
                                 </p>
                                 <Select
                                     v-if="archiveAvailable"
                                     v-model="exportVersion"
                                 >
                                     <SelectTrigger
-                                        aria-label="Sumber ekspor closing"
+                                        aria-label="Sumber ekspor penutupan"
                                         ><SelectValue
                                     /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="draft"
-                                            >Draft / Data Langsung</SelectItem
+                                            >Draf / Data Terkini</SelectItem
                                         >
                                         <SelectItem
                                             v-for="version in closingVersions"
@@ -715,7 +719,7 @@ function applyFilters(): void {
                                 </Select>
                                 <p v-else class="text-sm text-muted-foreground">
                                     Arsip berversi belum diaktifkan. Ekspor
-                                    hanya Draft / Data Langsung.
+                                    hanya Draf / Data Terkini.
                                 </p>
                                 <p
                                     v-if="
@@ -1538,7 +1542,7 @@ function applyFilters(): void {
                                         class="text-sm leading-6 text-slate-600 dark:text-slate-300"
                                     >
                                         Rekap item yang perlu ditinjau ulang
-                                        sebelum laporan atau closing dipakai
+                                        sebelum laporan atau penutupan dipakai
                                         untuk keputusan.
                                     </p>
                                 </div>

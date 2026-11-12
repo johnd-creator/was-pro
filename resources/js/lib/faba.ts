@@ -46,7 +46,7 @@ export function formatFabaDateTime(value: string | null | undefined): string {
 
 export function formatFabaStatus(value: string): string {
     const labels: Record<string, string> = {
-        draft: 'Draft',
+        draft: 'Draf',
         submitted: 'Diajukan',
         pending_approval: 'Menunggu Persetujuan',
         approved: 'Disetujui',
@@ -93,7 +93,7 @@ export function formatFabaUtilizationType(value: string): string {
 
 export function formatFabaMovementType(value: string): string {
     const labels: Record<string, string> = {
-        opening_balance: 'Opening Balance',
+        opening_balance: 'Saldo Awal',
         production: 'Produksi',
         workshop: 'Workshop',
         utilization_external: 'Pemanfaatan Eksternal',

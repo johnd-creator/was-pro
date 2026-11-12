@@ -149,7 +149,7 @@ const { scopedUrl } = useOrganizationContext();
                                 </p>
                                 <Heading
                                     title="Saldo TPS FABA"
-                                    description="Lihat posisi saldo aktif dan arus bersih tahunan, lalu kelola opening balance dari satu panel yang lebih rapi."
+                                    description="Lihat posisi saldo aktif dan arus bersih tahunan, lalu kelola saldo awal dari satu panel yang lebih rapi."
                                 />
                             </div>
 
@@ -306,7 +306,7 @@ const { scopedUrl } = useOrganizationContext();
                                 <h2
                                     class="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100"
                                 >
-                                    Set opening balance
+                                    Atur saldo awal
                                 </h2>
                                 <p
                                     class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300"
@@ -379,7 +379,7 @@ const { scopedUrl } = useOrganizationContext();
                                 <p
                                     class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
                                 >
-                                    Draft Input
+                                    Draf Input
                                 </p>
                                 <p
                                     class="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
@@ -420,7 +420,7 @@ const { scopedUrl } = useOrganizationContext();
                                 :disabled="form.processing"
                                 @click="submit"
                             >
-                                Simpan opening balance
+                                Simpan saldo awal
                                 <ArrowRight class="h-4 w-4" />
                             </Button>
                         </div>
@@ -576,9 +576,9 @@ const { scopedUrl } = useOrganizationContext();
                     v-else
                     class="rounded-[26px] border border-dashed border-slate-200 bg-white/85 px-6 py-10 text-sm leading-6 text-slate-600 shadow-sm dark:text-slate-300"
                 >
-                    Anda dapat melihat saldo TPS, tetapi perubahan opening
-                    balance hanya tersedia untuk role yang memiliki izin
-                    pengelolaan saldo awal.
+                    Anda dapat melihat saldo TPS, tetapi perubahan saldo awal
+                    hanya tersedia untuk role yang memiliki izin pengelolaan
+                    saldo awal.
                 </section>
             </div>
         </div>

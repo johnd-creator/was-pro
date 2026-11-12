@@ -249,9 +249,9 @@ const latestAuditCount = computed(() => props.auditLogs.length);
                                 >
                                     <TableHead>Periode</TableHead>
                                     <TableHead>Status</TableHead>
-                                    <TableHead>Submitted</TableHead>
-                                    <TableHead>Approved</TableHead>
-                                    <TableHead>Rejected Note</TableHead>
+                                    <TableHead>Diajukan oleh</TableHead>
+                                    <TableHead>Disetujui oleh</TableHead>
+                                    <TableHead>Catatan Penolakan</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>

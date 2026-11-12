@@ -1,4 +1,6 @@
 export interface HaulingPlanRecord {
+    waste_type_id: string;
+    waste_type: { name: string | null; code: string | null } | null;
     id: string;
     record_number: string;
     unit: string;

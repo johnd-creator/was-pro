@@ -250,7 +250,7 @@ const { scopedUrl } = useOrganizationContext();
                                     <p
                                         class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
                                     >
-                                        Status Closing
+                                        Status Penutupan
                                     </p>
                                     <p
                                         class="mt-1 text-sm font-semibold text-slate-950 dark:text-slate-100"
