@@ -71,8 +71,11 @@ test('guide safely handles legacy empty schema without exposing optional links',
     $this->tenant->createSchema($legacy->schema_name);
     $this->actingAs($this->superAdmin)->get(route('guide', ['organization_id' => $legacy->id]))
         ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('notificationSummary.total_count', 0)->has('operationalAlerts', 0)
         ->where('guideTenantReady', true)->where('guideModules.waste', false)->where('guideModules.faba', false)
         ->where('guideModules.audit', false)->where('hauling_plans_available', false)->where('operational_inbox_available', false));
+    $this->get(route('profile.edit'))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('notificationSummary.total_count', 0)->has('operationalAlerts', 0));
 });
 
 test('guide is available when assigned tenant schema is missing without provisioning it', function () {

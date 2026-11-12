@@ -17,6 +17,8 @@ class UnifiedDashboardService
 
     private int $selectedMonth;
 
+    private array $notificationData = [];
+
     /**
      * @var array<int, array{value: string, label: string, year: int, month: int}>
      */
@@ -34,6 +36,11 @@ class UnifiedDashboardService
 
             $resolvedMonth = $this->resolveRequestedMonth($requestedMonth);
             [$this->selectedYear, $this->selectedMonth] = array_map('intval', explode('-', $resolvedMonth));
+            $user = Auth::user();
+            abort_unless($user instanceof User && $user->canAccessOrganization($organization->id), 403);
+            $this->notificationData = app(OperationalAlerts::class)->summary($user, $organization, $resolvedMonth);
+            request()->attributes->set('notification_month', $resolvedMonth);
+            request()->attributes->set('operational_alerts.'.$resolvedMonth, $this->notificationData);
 
             return [
                 'waste_stats' => $this->getWasteStats(),
@@ -99,14 +106,9 @@ class UnifiedDashboardService
             'total_transportations' => (clone $wasteHaulingsForSelectedMonth)->count(),
             'in_transit_transportations' => (clone $wasteHaulingsForSelectedMonth)->pendingApproval()->count(),
             'expired_waste' => $backlogRecords
-                ->filter(fn (WasteRecord $record): bool => $record->expiry_date !== null && $record->expiry_date->lt($snapshotDate))
-                ->count(),
+                ->filter(fn (WasteRecord $record): bool => app(OperationalAlerts::class)->storageAlert($record, $snapshotDate) === 'expired')->count(),
             'expiring_soon_waste' => $backlogRecords
-                ->filter(fn (WasteRecord $record): bool => $record->expiry_date !== null && $record->expiry_date->between(
-                    $snapshotDate,
-                    $snapshotDate->copy()->addDays(7)->endOfDay()
-                ))
-                ->count(),
+                ->filter(fn (WasteRecord $record): bool => app(OperationalAlerts::class)->storageAlert($record, $snapshotDate) === 'expiring_soon')->count(),
         ];
     }
 
@@ -116,7 +118,8 @@ class UnifiedDashboardService
             return [];
         }
 
-        return WasteRecord::pendingApproval()
+        return app(OperationalAlerts::class)->records(Auth::user())->pendingApproval()
+            ->whereDate('date', '<=', $this->snapshotDate()->toDateString())
             ->whereYear('date', $this->selectedYear)
             ->whereMonth('date', $this->selectedMonth)
             ->with(['wasteType', 'wasteType.category', 'submittedByUser'])
@@ -902,23 +905,7 @@ class UnifiedDashboardService
 
     private function getNotificationSummary(): array
     {
-        $wasteStats = $this->getWasteStats();
-        $fabaWarnings = $this->getFabaWarnings();
-        $criticalFabaWarnings = $this->getCriticalFabaWarnings($fabaWarnings);
-        $fabaPending = $this->getFabaPendingApprovals();
-
-        return [
-            'expired_waste_count' => $wasteStats['expired_waste'],
-            'expiring_soon_waste_count' => $wasteStats['expiring_soon_waste'],
-            'pending_waste_approvals_count' => count($this->getPendingApprovals()),
-            'pending_faba_approvals_count' => count($fabaPending),
-            'faba_warnings_count' => count($criticalFabaWarnings),
-            'total_count' => $wasteStats['expired_waste'] +
-                            $wasteStats['expiring_soon_waste'] +
-                            count($this->getPendingApprovals()) +
-                            count($fabaPending) +
-                            count($criticalFabaWarnings),
-        ];
+        return $this->notificationData['summary'];
     }
 
     private function getCriticalFabaWarnings(array $warnings): array
@@ -935,11 +922,11 @@ class UnifiedDashboardService
         $notificationSummary = $this->getNotificationSummary();
         $capacity = $this->fabaRecapService->getTpsCapacitySummary($this->selectedYear, $this->selectedMonth);
         $capacityItems = collect([$capacity['total'], ...$capacity['materials']]);
-        $capacityCritical = $capacityItems->contains(fn (array $item): bool => $item['available'] && $item['status'] === 'critical');
-        $capacityWarning = $capacityItems->contains(fn (array $item): bool => ! $item['available'] || $item['status'] === 'warning');
+        $capacityCritical = ($user?->hasPermission('faba_recaps.view') ?? false) && $capacityItems->contains(fn (array $item): bool => $item['available'] && $item['status'] === 'critical');
+        $capacityWarning = ($user?->hasPermission('faba_recaps.view') ?? false) && $capacityItems->contains(fn (array $item): bool => ! $item['available'] || $item['status'] === 'warning');
         $riskStatus = 'normal';
 
-        if ($capacityCritical || $notificationSummary['expired_waste_count'] > 0 || $notificationSummary['faba_warnings_count'] > 0) {
+        if ($capacityCritical || $notificationSummary['expired_waste_count'] > 0 || collect($this->notificationData['alerts'])->contains(fn (array $alert): bool => $alert['tone'] === 'red' && $alert['id'] !== 'expired')) {
             $riskStatus = 'critical';
         } elseif ($capacityWarning || $notificationSummary['expiring_soon_waste_count'] > 0 ||
                    $notificationSummary['pending_waste_approvals_count'] > 5 ||
@@ -1035,14 +1022,15 @@ class UnifiedDashboardService
 
     private function wasteRecordsForSelectedMonth()
     {
-        return WasteRecord::query()
+        return app(OperationalAlerts::class)->records(Auth::user())
+            ->whereDate('date', '<=', $this->snapshotDate()->toDateString())
             ->whereYear('date', $this->selectedYear)
             ->whereMonth('date', $this->selectedMonth);
     }
 
     private function wasteRecordsUntilSnapshot()
     {
-        return WasteRecord::query()
+        return app(OperationalAlerts::class)->records(Auth::user())
             ->whereDate('date', '<=', $this->snapshotDate()->toDateString());
     }
 
@@ -1173,7 +1161,7 @@ class UnifiedDashboardService
     {
         $snapshotDate = $date->toDateString();
 
-        return WasteRecord::query()
+        return app(OperationalAlerts::class)->records(Auth::user())
             ->approved()
             ->whereDate('date', '<=', $snapshotDate)
             ->with([

@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import { Bell, Check, Mail } from 'lucide-vue-next';
+import {
+    AlertTriangle,
+    ArrowUpRight,
+    Bell,
+    Check,
+    Mail,
+} from 'lucide-vue-next';
 import { ref } from 'vue';
 import {
     index,
@@ -12,6 +18,10 @@ import { Button } from '@/components/ui/button';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import type { BreadcrumbItem } from '@/types';
+import type {
+    NotificationContext,
+    OperationalAlert,
+} from '@/types/notifications';
 
 interface InboxNotification {
     id: string;
@@ -26,6 +36,8 @@ interface InboxNotification {
 }
 
 const props = defineProps<{
+    currentAlerts: OperationalAlert[];
+    notificationContext: NotificationContext | null;
     available: boolean;
     notifications: InboxNotification[];
     unreadCount: number;
@@ -45,7 +57,11 @@ function setRead(notification: InboxNotification): void {
     errorMessage.value = '';
     router.patch(
         scopedUrl(update.url(notification.id)),
-        { read: notification.read_at === null, page: props.page },
+        {
+            read: notification.read_at === null,
+            page: props.page,
+            month: props.notificationContext?.month,
+        },
         {
             preserveScroll: true,
             onError: () => {
@@ -93,13 +109,80 @@ function statusLabel(status: string | null): string {
         <div class="flex flex-col gap-6 p-4 md:p-6">
             <Heading
                 title="Notifikasi Operasional"
-                description="Riwayat pengajuan dan keputusan persetujuan untuk organisasi yang sedang dipilih."
+                description="Indikator yang perlu ditindaklanjuti dan riwayat pengajuan dalam satu halaman."
             />
+            <section
+                class="space-y-4"
+                aria-labelledby="active-notifications-title"
+            >
+                <div>
+                    <h2
+                        id="active-notifications-title"
+                        class="text-lg font-semibold"
+                    >
+                        Perlu ditindaklanjuti
+                    </h2>
+                    <p
+                        v-if="notificationContext"
+                        class="mt-1 text-sm text-muted-foreground"
+                    >
+                        Snapshot {{ notificationContext.as_of }}. Jumlah ini
+                        sama dengan indikator pada dashboard dan lonceng
+                        notifikasi untuk periode yang sama.
+                    </p>
+                </div>
+                <ul
+                    v-if="currentAlerts.length"
+                    class="grid gap-3 md:grid-cols-2"
+                    aria-label="Indikator operasional aktif"
+                >
+                    <li v-for="alert in currentAlerts" :key="alert.id">
+                        <Link
+                            :href="alert.source_url"
+                            class="flex h-full items-start gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        >
+                            <AlertTriangle
+                                class="mt-0.5 size-5 shrink-0"
+                                :class="
+                                    alert.tone === 'red'
+                                        ? 'text-destructive'
+                                        : 'text-amber-600'
+                                "
+                                aria-hidden="true"
+                            />
+                            <div class="min-w-0 flex-1 space-y-1">
+                                <h3 class="font-semibold">
+                                    {{ alert.count }} {{ alert.title }}
+                                </h3>
+                                <p class="text-sm text-muted-foreground">
+                                    {{ alert.description }}
+                                </p>
+                                <span
+                                    class="inline-flex items-center gap-1 text-sm font-medium text-primary"
+                                    >Tindak lanjuti
+                                    <ArrowUpRight
+                                        class="size-4"
+                                        aria-hidden="true"
+                                /></span>
+                            </div>
+                        </Link>
+                    </li>
+                </ul>
+                <p
+                    v-else
+                    class="rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground"
+                >
+                    Tidak ada indikator aktif untuk organisasi, periode, dan
+                    akses Anda.
+                </p>
+            </section>
+            <h2 class="text-lg font-semibold">Riwayat notifikasi</h2>
             <div
                 v-if="!available"
                 class="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground"
             >
-                Kotak notifikasi belum tersedia untuk organisasi ini.
+                Riwayat kejadian belum tersedia untuk organisasi ini. Indikator
+                aktif tetap ditampilkan di atas.
             </div>
             <template v-else>
                 <div
@@ -130,7 +213,8 @@ function statusLabel(status: string | null): string {
                     v-if="notifications.length === 0"
                     class="rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground"
                 >
-                    Belum ada notifikasi yang dapat ditampilkan.
+                    Belum ada riwayat kejadian yang dapat ditampilkan. Indikator
+                    aktif di atas tidak bergantung pada riwayat ini.
                 </div>
                 <ul
                     v-else
@@ -231,7 +315,15 @@ function statusLabel(status: string | null): string {
                         variant="outline"
                         size="sm"
                     >
-                        <Link :href="index.url({ query: { page: page - 1 } })"
+                        <Link
+                            :href="
+                                index.url({
+                                    query: {
+                                        page: page - 1,
+                                        month: notificationContext?.month,
+                                    },
+                                })
+                            "
                             >Sebelumnya</Link
                         >
                     </Button>
@@ -240,7 +332,15 @@ function statusLabel(status: string | null): string {
                         >Halaman {{ props.page }}</span
                     >
                     <Button v-if="hasMore" as-child variant="outline" size="sm">
-                        <Link :href="index.url({ query: { page: page + 1 } })"
+                        <Link
+                            :href="
+                                index.url({
+                                    query: {
+                                        page: page + 1,
+                                        month: notificationContext?.month,
+                                    },
+                                })
+                            "
                             >Berikutnya</Link
                         >
                     </Button>

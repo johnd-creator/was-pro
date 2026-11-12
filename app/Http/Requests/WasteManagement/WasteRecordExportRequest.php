@@ -15,6 +15,8 @@ class WasteRecordExportRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'month' => ['nullable', 'date_format:Y-m'],
+            'attention' => ['nullable', Rule::in(['all', 'expired', 'expiring_soon', 'critical', 'backlog', 'pending', 'fresh', 'completed'])],
             'search' => ['nullable', 'string', 'max:1000'],
             'storage_status' => ['nullable', Rule::in(['all', 'expired', 'expiring_soon', 'fresh', 'completed'])],
             'storage_date' => ['nullable', 'date_format:Y-m-d'],
@@ -25,6 +27,8 @@ class WasteRecordExportRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'attention.in' => 'Filter perhatian tidak valid.',
+            'month.date_format' => 'Bulan harus berformat YYYY-MM.',
             'search.string' => 'Pencarian harus berupa teks.',
             'search.max' => 'Pencarian maksimal 1000 karakter.',
             'storage_status.in' => 'Filter masa simpan tidak valid.',

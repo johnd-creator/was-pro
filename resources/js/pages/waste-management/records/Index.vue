@@ -41,7 +41,6 @@ import ExpiryBadge from '@/components/waste-management/ExpiryBadge.vue';
 import StatusBadge from '@/components/waste-management/StatusBadge.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
-import { getWasteStorageState } from '@/lib/waste-storage';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 
@@ -89,49 +88,62 @@ interface WasteRecord {
 }
 
 type Props = {
+    filters: { month: string; attention: string | null; as_of: string };
+    recordSummary: {
+        total: number;
+        draft: number;
+        pending: number;
+        expired: number;
+        expiring_soon: number;
+    };
     wasteRecords: WasteRecord[];
     wasteTypes?: WasteType[];
 };
 
-const { download } = useOrganizationContext();
+const { download, scopedUrl } = useOrganizationContext();
 
 const props = defineProps<Props>();
 
 const isCreateDialogOpen = ref(false);
 
-const expiryFilter = ref<
-    'all' | 'expired' | 'expiring_soon' | 'fresh' | 'completed'
->('all');
+const expiryFilter = computed(() => props.filters.attention || 'all');
 const searchQuery = ref('');
 const sortKey = ref<'latest' | 'oldest' | 'quantity_high' | 'quantity_low'>(
     'latest',
 );
 const currentPage = ref(1);
 const perPage = 10;
-const hasAnyRecords = computed(() => props.wasteRecords.length > 0);
+const hasAnyRecords = computed(() => props.recordSummary.total > 0);
 const hasActiveFilters = computed(
     () => searchQuery.value.trim().length > 0 || expiryFilter.value !== 'all',
 );
-const totalDraftRecords = computed(
-    () =>
-        props.wasteRecords.filter((record) => record.status === 'draft').length,
+const totalDraftRecords = computed(() => props.recordSummary.draft);
+const totalPendingRecords = computed(() => props.recordSummary.pending);
+const totalExpiredRecords = computed(() => props.recordSummary.expired);
+const totalExpiringSoonRecords = computed(
+    () => props.recordSummary.expiring_soon,
 );
-const totalPendingRecords = computed(
-    () =>
-        props.wasteRecords.filter(
-            (record) => record.status === 'pending_review',
-        ).length,
-);
-const totalExpiredRecords = computed(
-    () =>
-        props.wasteRecords.filter(
-            (record) =>
-                getWasteStorageState(
-                    record.expiry_date,
-                    record.remaining_quantity,
-                ).status === 'expired',
-        ).length,
-);
+const attentionLabels: Record<string, string> = {
+    all: 'Semua catatan',
+    expired: 'Melewati batas simpan',
+    expiring_soon: 'Mendekati batas simpan',
+    critical: 'Risiko masa simpan',
+    backlog: 'Belum terangkut / masih bersisa',
+    pending: 'Menunggu ditinjau pada periode ini',
+    fresh: 'Masih aman',
+    completed: 'Selesai diangkut',
+};
+function changeAttention(value: unknown): void {
+    if (typeof value !== 'string' || !(value in attentionLabels)) return;
+    router.get(
+        scopedUrl(wasteManagementRoutes.records.index.url()),
+        {
+            month: props.filters.month,
+            ...(value !== 'all' ? { attention: value } : {}),
+        },
+        { preserveScroll: true, preserveState: false },
+    );
+}
 
 const filteredRecords = computed(() => {
     const query = searchQuery.value.trim().toLowerCase();
@@ -152,16 +164,7 @@ const filteredRecords = computed(() => {
                 return false;
             }
 
-            if (expiryFilter.value === 'all') {
-                return true;
-            }
-
-            return (
-                getWasteStorageState(
-                    record.expiry_date,
-                    record.remaining_quantity,
-                ).status === expiryFilter.value
-            );
+            return true;
         })
         .sort((left, right) => {
             if (sortKey.value === 'oldest') {
@@ -209,7 +212,7 @@ const pageRangeLabel = computed(() => {
 const breadcrumbItems: BreadcrumbItem[] = [
     {
         title: 'Catatan Limbah',
-        href: '/waste-management/records',
+        href: wasteManagementRoutes.records.index.url(),
     },
 ];
 
@@ -240,19 +243,12 @@ function getOperationalStatusClass(status: WasteRecord['operational_status']) {
 }
 
 function exportCsv(): void {
-    const today = new Date();
-    const storageDate = [
-        today.getFullYear(),
-        String(today.getMonth() + 1).padStart(2, '0'),
-        String(today.getDate()).padStart(2, '0'),
-    ].join('-');
-
     download(
         wasteManagementRoutes.records.export.csv.url({
             query: {
                 search: searchQuery.value.trim(),
-                storage_status: expiryFilter.value,
-                storage_date: storageDate,
+                month: props.filters.month,
+                attention: props.filters.attention,
                 sort: sortKey.value,
             },
         }),
@@ -265,7 +261,7 @@ function resetPage(): void {
 
 function resetFilters(): void {
     searchQuery.value = '';
-    expiryFilter.value = 'all';
+    if (expiryFilter.value !== 'all') changeAttention('all');
     sortKey.value = 'latest';
     resetPage();
 }
@@ -276,7 +272,7 @@ function changePage(page: number): void {
 
 function handleCreateSuccess(): void {
     isCreateDialogOpen.value = false;
-    router.reload({ only: ['wasteRecords'] });
+    router.reload();
 }
 </script>
 
@@ -301,6 +297,23 @@ function handleCreateSuccess(): void {
             />
 
             <div class="space-y-8">
+                <div
+                    class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm"
+                >
+                    <p>
+                        <strong>Snapshot {{ filters.as_of }}</strong> ·
+                        {{ attentionLabels[expiryFilter] }}. Indikator masa
+                        simpan hanya menghitung catatan disetujui yang masih
+                        memiliki sisa limbah.
+                    </p>
+                    <Button
+                        v-if="expiryFilter !== 'all'"
+                        variant="outline"
+                        size="sm"
+                        @click="changeAttention('all')"
+                        >Lihat semua catatan</Button
+                    >
+                </div>
                 <section
                     class="wm-surface-hero overflow-hidden rounded-[30px] via-slate-50/80 to-teal-50/20 dark:via-slate-900 dark:to-teal-950/18"
                 >
@@ -324,7 +337,7 @@ function handleCreateSuccess(): void {
                                 <div
                                     class="wm-chip px-3 py-1.5 text-xs font-medium"
                                 >
-                                    Total data: {{ wasteRecords.length }}
+                                    Total data: {{ recordSummary.total }}
                                 </div>
                                 <div
                                     class="wm-chip-amber px-3 py-1.5 text-xs font-medium"
@@ -334,7 +347,11 @@ function handleCreateSuccess(): void {
                                 <div
                                     class="wm-chip-rose px-3 py-1.5 text-xs font-medium"
                                 >
-                                    Risiko simpan: {{ totalExpiredRecords }}
+                                    Risiko simpan:
+                                    {{
+                                        totalExpiredRecords +
+                                        totalExpiringSoonRecords
+                                    }}
                                 </div>
                             </div>
 
@@ -364,13 +381,13 @@ function handleCreateSuccess(): void {
                                     <p
                                         class="mt-2 text-3xl font-black tracking-tight text-slate-950 dark:text-slate-100"
                                     >
-                                        {{ wasteRecords.length }}
+                                        {{ recordSummary.total }}
                                     </p>
                                     <p
                                         class="mt-2 text-[12px] leading-5 text-slate-600 dark:text-slate-300"
                                     >
-                                        Seluruh catatan limbah yang tercatat
-                                        saat ini.
+                                        Catatan tercatat sampai
+                                        {{ filters.as_of }}.
                                     </p>
                                 </div>
 
@@ -404,8 +421,9 @@ function handleCreateSuccess(): void {
                                     <p
                                         class="mt-2 text-[12px] leading-5 text-slate-600 dark:text-slate-300"
                                     >
-                                        {{ totalDraftRecords }} masih dalam draf
-                                        dan belum diajukan.
+                                        {{ totalPendingRecords }} catatan sudah
+                                        diajukan dan menunggu tinjauan. Draf
+                                        ditampilkan terpisah.
                                     </p>
                                 </div>
 
@@ -439,8 +457,22 @@ function handleCreateSuccess(): void {
                                     <p
                                         class="mt-2 text-[12px] leading-5 text-slate-600 dark:text-slate-300"
                                     >
-                                        Gunakan filter masa simpan untuk fokus
-                                        pada catatan berisiko.
+                                        {{ totalExpiringSoonRecords }} catatan
+                                        mendekati batas simpan dalam 7 hari.
+                                    </p>
+                                    <button
+                                        v-if="totalExpiringSoonRecords > 0"
+                                        type="button"
+                                        class="mt-2 text-xs font-semibold text-amber-700 underline underline-offset-4 dark:text-amber-300"
+                                        @click="
+                                            changeAttention('expiring_soon')
+                                        "
+                                    >
+                                        Lihat yang mendekati batas
+                                    </button>
+                                    <p class="sr-only">
+                                        Gunakan filter masa simpan untuk
+                                        meninjau catatan
                                     </p>
                                 </div>
                             </div>
@@ -530,15 +562,26 @@ function handleCreateSuccess(): void {
                         </div>
 
                         <Select
-                            v-model="expiryFilter"
-                            @update:model-value="resetPage"
+                            :model-value="expiryFilter"
+                            @update:model-value="changeAttention"
                         >
                             <SelectTrigger>
-                                <SelectValue placeholder="Filter masa simpan" />
+                                <SelectValue placeholder="Filter catatan" />
                             </SelectTrigger>
                             <SelectContent>
+                                <SelectItem value="pending"
+                                    >Menunggu ditinjau</SelectItem
+                                >
+                                <SelectItem value="backlog"
+                                    >Belum terangkut / masih bersisa</SelectItem
+                                >
+                                <SelectItem
+                                    v-if="expiryFilter === 'critical'"
+                                    value="critical"
+                                    >Risiko masa simpan</SelectItem
+                                >
                                 <SelectItem value="all"
-                                    >Semua status masa simpan</SelectItem
+                                    >Semua catatan</SelectItem
                                 >
                                 <SelectItem value="expired"
                                     >Sudah melewati batas</SelectItem
@@ -800,6 +843,8 @@ function handleCreateSuccess(): void {
                                     </TableCell>
                                     <TableCell>
                                         <ExpiryBadge
+                                            v-if="record.status === 'approved'"
+                                            :reference-date="filters.as_of"
                                             :expiry-date="record.expiry_date"
                                             :remaining-quantity="
                                                 record.remaining_quantity
@@ -809,6 +854,11 @@ function handleCreateSuccess(): void {
                                             "
                                             size="sm"
                                         />
+                                        <span
+                                            v-else
+                                            class="text-xs text-muted-foreground"
+                                            >Belum berlaku</span
+                                        >
                                     </TableCell>
                                     <TableCell>
                                         <StatusBadge

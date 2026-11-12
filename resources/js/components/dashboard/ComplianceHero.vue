@@ -10,9 +10,10 @@ import type { LucideIcon } from 'lucide-vue-next';
 import { computed } from 'vue';
 import Link from '@/components/OrganizationLink.vue';
 import { Button } from '@/components/ui/button';
-import wasteManagementRoutes from '@/routes/waste-management';
 
 interface Props {
+    actionHref?: string;
+    inboxHref?: string;
     expiredWaste: number;
     expiringSoonWaste: number;
     pendingWasteApprovals: number;
@@ -55,7 +56,7 @@ const primaryMessage = computed(() => {
     }
 
     if (props.fabaWarnings > 0) {
-        return `${props.fabaWarnings} periode FABA memerlukan perhatian karena warning saldo atau konsistensi data.`;
+        return `${props.fabaWarnings} indikator FABA memerlukan perhatian pada saldo, kapasitas TPS, atau konsistensi data.`;
     }
 
     if (props.pendingWasteApprovals + props.pendingFabaApprovals > 0) {
@@ -84,9 +85,7 @@ const totalApprovalCount = computed(
 
 const bannerBadgeLabel = computed(() => `Kepatuhan ${props.riskLabel}`);
 const actionLabel = computed(() =>
-    props.riskStatus === 'critical'
-        ? 'Tinjau Catatan Kritis'
-        : 'Tinjau Catatan',
+    props.expiredWaste > 0 ? 'Tinjau Catatan Kritis' : 'Lihat Notifikasi',
 );
 
 const toneMap: Record<Props['riskTone'], HeroTone> = {
@@ -204,7 +203,7 @@ const metricCards = computed<MetricCard[]>(() => [
     {
         title: 'Peringatan FABA',
         value: props.fabaWarnings,
-        description: 'Periode bermasalah',
+        description: 'Indikator perlu perhatian',
         icon: AlertTriangle,
         shellClass:
             props.fabaWarnings > 0
@@ -266,24 +265,27 @@ const metricCards = computed<MetricCard[]>(() => [
                         >
                             {{ primaryMessage }}
                         </p>
-                        <p class="wm-text-secondary text-xs font-medium">
-                            {{ totalRiskCount }} indikator aktif
+                        <Link
+                            v-if="inboxHref"
+                            :href="inboxHref"
+                            class="wm-text-secondary text-xs font-medium underline underline-offset-4"
+                            >{{ totalRiskCount }} indikator aktif · lihat
+                            semua</Link
+                        >
+                        <p class="wm-text-secondary text-xs">
+                            Ringkasan prioritas dari catatan yang sama, bukan
+                            tambahan jumlah catatan.
                         </p>
                     </div>
                 </div>
 
-                <div class="flex shrink-0 items-center">
+                <div v-if="actionHref" class="flex shrink-0 items-center">
                     <Button
                         as-child
                         class="h-9 rounded-lg px-4"
                         :class="tone.buttonClass"
                     >
-                        <Link
-                            :href="
-                                wasteManagementRoutes.records.pendingApproval()
-                                    .url
-                            "
-                        >
+                        <Link :href="actionHref">
                             {{ actionLabel }}
                             <ArrowRight class="ml-2 size-4" />
                         </Link>

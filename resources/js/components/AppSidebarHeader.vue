@@ -1,22 +1,15 @@
 <script setup lang="ts">
 import { router, usePage } from '@inertiajs/vue3';
-import {
-    AlertTriangle,
-    Bell,
-    ChevronDown,
-    Moon,
-    Shield,
-    Sun,
-} from 'lucide-vue-next';
+import { Bell, ChevronDown, Moon, Sun } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { index as notificationIndex } from '@/actions/App/Http/Controllers/WasteManagement/OperationalInboxController';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
+import Link from '@/components/OrganizationLink.vue';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -108,6 +101,14 @@ const notificationSummary = computed(
                   pending_faba_approvals_count: number;
                   faba_warnings_count: number;
               }
+            | undefined,
+);
+
+const notificationContext = computed(
+    () =>
+        page.props.notificationContext as
+            | { month: string; as_of: string; organization_id: string }
+            | null
             | undefined,
 );
 
@@ -447,202 +448,37 @@ function toggleAppearance(): void {
                 <span class="sr-only">{{ appearanceToggleLabel }}</span>
             </Button>
 
-            <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        class="wm-trigger-ghost relative rounded-full"
-                    >
-                        <Bell class="h-4 w-4" />
-                        <span
-                            v-if="
-                                notificationSummary &&
-                                notificationSummary.total_count > 0
-                            "
-                            class="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white"
-                        >
-                            {{
-                                notificationSummary.total_count > 99
-                                    ? '99+'
-                                    : notificationSummary.total_count
-                            }}
-                        </span>
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                    align="end"
-                    class="wm-dropdown-surface w-80"
+            <Button
+                v-if="notificationContext?.organization_id"
+                as-child
+                variant="ghost"
+                size="icon"
+                class="wm-trigger-ghost relative rounded-full"
+            >
+                <Link
+                    :href="
+                        notificationIndex.url({
+                            query: { month: notificationContext.month },
+                        })
+                    "
+                    :aria-label="`Notifikasi operasional, ${notificationSummary?.total_count ?? 0} indikator aktif`"
+                    title="Buka notifikasi operasional"
                 >
-                    <DropdownMenuLabel class="font-normal">
-                        <div class="flex items-center justify-between">
-                            <span>Notifikasi</span>
-                            <span
-                                v-if="
-                                    notificationSummary &&
-                                    notificationSummary.total_count > 0
-                                "
-                                class="text-xs text-muted-foreground"
-                            >
-                                {{ notificationSummary.total_count }} aktif
-                            </span>
-                        </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-
-                    <div
-                        v-if="notificationSummary"
-                        class="max-h-80 overflow-y-auto"
+                    <Bell class="h-4 w-4" aria-hidden="true" />
+                    <span
+                        v-if="
+                            notificationSummary &&
+                            notificationSummary.total_count > 0
+                        "
+                        class="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white"
+                        >{{
+                            notificationSummary.total_count > 99
+                                ? '99+'
+                                : notificationSummary.total_count
+                        }}</span
                     >
-                        <!-- Expired waste -->
-                        <div
-                            v-if="notificationSummary.expired_waste_count > 0"
-                            class="px-3 py-2"
-                        >
-                            <div class="flex items-start gap-2 text-sm">
-                                <AlertTriangle
-                                    class="mt-0.5 h-4 w-4 text-red-500"
-                                />
-                                <div>
-                                    <p
-                                        class="font-medium text-red-600 dark:text-red-400"
-                                    >
-                                        {{
-                                            notificationSummary.expired_waste_count
-                                        }}
-                                        limbah melewati batas simpan
-                                    </p>
-                                    <p class="text-xs text-muted-foreground">
-                                        Segera tindak lanjuti catatan yang sudah
-                                        melewati masa simpan aman.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Expiring soon -->
-                        <div
-                            v-if="
-                                notificationSummary.expiring_soon_waste_count >
-                                0
-                            "
-                            class="px-3 py-2"
-                        >
-                            <div class="flex items-start gap-2 text-sm">
-                                <AlertTriangle
-                                    class="mt-0.5 h-4 w-4 text-orange-500"
-                                />
-                                <div>
-                                    <p
-                                        class="font-medium text-orange-600 dark:text-orange-400"
-                                    >
-                                        {{
-                                            notificationSummary.expiring_soon_waste_count
-                                        }}
-                                        limbah mendekati batas simpan
-                                    </p>
-                                    <p class="text-xs text-muted-foreground">
-                                        Catatan limbah akan mencapai batas
-                                        simpan dalam 7 hari.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Pending approvals -->
-                        <div
-                            v-if="
-                                notificationSummary.pending_waste_approvals_count >
-                                0
-                            "
-                            class="px-3 py-2"
-                        >
-                            <div class="flex items-start gap-2 text-sm">
-                                <Shield class="mt-0.5 h-4 w-4 text-blue-500" />
-                                <div>
-                                    <p
-                                        class="font-medium text-blue-600 dark:text-blue-400"
-                                    >
-                                        {{
-                                            notificationSummary.pending_waste_approvals_count
-                                        }}
-                                        approval limbah menunggu
-                                    </p>
-                                    <p class="text-xs text-muted-foreground">
-                                        Terdapat catatan limbah yang belum
-                                        direview.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- FABA approvals -->
-                        <div
-                            v-if="
-                                notificationSummary.pending_faba_approvals_count >
-                                0
-                            "
-                            class="px-3 py-2"
-                        >
-                            <div class="flex items-start gap-2 text-sm">
-                                <Shield
-                                    class="mt-0.5 h-4 w-4 text-purple-500"
-                                />
-                                <div>
-                                    <p
-                                        class="font-medium text-purple-600 dark:text-purple-400"
-                                    >
-                                        {{
-                                            notificationSummary.pending_faba_approvals_count
-                                        }}
-                                        approval FABA menunggu
-                                    </p>
-                                    <p class="text-xs text-muted-foreground">
-                                        Rekap bulanan FABA menunggu keputusan.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- FABA warnings -->
-                        <div
-                            v-if="notificationSummary.faba_warnings_count > 0"
-                            class="px-3 py-2"
-                        >
-                            <div class="flex items-start gap-2 text-sm">
-                                <AlertTriangle
-                                    class="mt-0.5 h-4 w-4 text-red-500"
-                                />
-                                <div>
-                                    <p
-                                        class="font-medium text-red-600 dark:text-red-400"
-                                    >
-                                        {{
-                                            notificationSummary.faba_warnings_count
-                                        }}
-                                        peringatan FABA
-                                    </p>
-                                    <p class="text-xs text-muted-foreground">
-                                        Terdeteksi anomali seperti saldo negatif
-                                        atau data belum konsisten.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- No notifications -->
-                        <div
-                            v-if="
-                                notificationSummary &&
-                                notificationSummary.total_count === 0
-                            "
-                            class="px-3 py-4 text-center text-sm text-muted-foreground"
-                        >
-                            <p>Tidak ada notifikasi aktif</p>
-                        </div>
-                    </div>
-                </DropdownMenuContent>
-            </DropdownMenu>
+                </Link>
+            </Button>
 
             <!-- User menu -->
             <DropdownMenu v-if="user">

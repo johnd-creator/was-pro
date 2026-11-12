@@ -61,8 +61,8 @@ defineProps<{
                             <h2
                                 class="max-w-xl text-5xl font-semibold tracking-[-0.04em] text-balance"
                             >
-                                Kelola operasional limbah dan FABA dalam satu
-                                sistem.
+                                Kelola Operasional Limbah B3 dan FABA dalam Satu
+                                Sistem
                             </h2>
                             <p
                                 class="max-w-md text-[15px] leading-7 text-slate-600 dark:text-slate-300"

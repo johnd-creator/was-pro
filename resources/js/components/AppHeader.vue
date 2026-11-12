@@ -31,7 +31,10 @@ import {
 import UserMenuContent from '@/components/UserMenuContent.vue';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { getInitials } from '@/composables/useInitials';
-import { appNavigationItems } from '@/lib/app-navigation';
+import {
+    appFooterNavigationItems,
+    appNavigationItems,
+} from '@/lib/app-navigation';
 import { dashboard } from '@/routes';
 import type { BreadcrumbItem, NavItem } from '@/types';
 
@@ -54,7 +57,7 @@ const activeItemStyles =
 const mobileExpandedSections = ref<Record<string, boolean>>({});
 
 const availableNavItems = computed(() =>
-    appNavigationItems
+    [...appNavigationItems, ...appFooterNavigationItems]
         .map((item) => filterNavItem(item))
         .filter((item): item is NavItem => item !== null),
 );

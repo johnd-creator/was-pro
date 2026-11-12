@@ -17,6 +17,7 @@ class OperationalInboxController extends Controller
 
         return Inertia::render('waste-management/notifications/Index', [
             'available' => $available,
+            'currentAlerts' => fn (): array => app(\App\Services\OperationalAlerts::class)->forRequest($request)['alerts'],
             ...($available ? $inbox->page($request->user(), (int) $request->validated('page', 1)) : [
                 'notifications' => [], 'unreadCount' => 0, 'page' => 1, 'hasMore' => false,
             ]),
@@ -32,6 +33,7 @@ class OperationalInboxController extends Controller
         return redirect()->route('waste-management.notifications.index', [
             'organization_id' => $inbox->organization()->id,
             'page' => $request->validated('page', 1),
+            'month' => $request->validated('month'),
         ]);
     }
 }

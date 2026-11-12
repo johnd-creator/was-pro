@@ -73,16 +73,23 @@ class WasteRecordsController extends Controller
             return $this->expiredSnapshot($request);
         }
 
-        $query = WasteRecord::with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser', 'haulings'])
-            ->orderBy('date', 'desc')
-            ->orderBy('created_at', 'desc');
-
-        // Filter by user permissions
-        if (! $this->canViewAllRecords()) {
-            $query->byUser(Auth::id());
-        }
-
-        $wasteRecords = $query->get();
+        $alerts = app(\App\Services\OperationalAlerts::class);
+        $snapshot = $alerts->snapshot($request->validated('month'));
+        $attention = $request->validated('attention');
+        $query = $alerts->records($request->user())
+            ->with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser',
+                'haulings' => fn ($query) => $query->whereDate('hauling_date', '<=', $snapshot->toDateString())])
+            ->whereDate('date', '<=', $snapshot->toDateString())
+            ->orderBy('date', 'desc')->orderBy('created_at', 'desc');
+        $allRecords = $query->get();
+        $summary = [
+            'total' => $allRecords->count(),
+            'draft' => $allRecords->where('status', 'draft')->count(),
+            'pending' => $allRecords->filter(fn (WasteRecord $record): bool => $alerts->matchesAttention($record, 'pending', $snapshot))->count(),
+            'expiring_soon' => $allRecords->filter(fn (WasteRecord $record): bool => $alerts->matchesAttention($record, 'expiring_soon', $snapshot))->count(),
+            'expired' => $allRecords->filter(fn (WasteRecord $record): bool => $alerts->matchesAttention($record, 'expired', $snapshot))->count(),
+        ];
+        $wasteRecords = $allRecords->filter(fn (WasteRecord $record): bool => $alerts->matchesAttention($record, $attention, $snapshot))->values();
 
         $wasteTypes = WasteType::with(['category', 'characteristic'])
             ->active()
@@ -90,7 +97,12 @@ class WasteRecordsController extends Controller
             ->get();
 
         return Inertia::render('waste-management/records/Index', [
-            'wasteRecords' => $wasteRecords->map(fn (WasteRecord $record): array => $this->serializeWasteRecord($record))->all(),
+            'wasteRecords' => $wasteRecords->map(fn (WasteRecord $record): array => [
+                ...$this->serializeWasteRecord($record),
+                'storage_alert' => $alerts->storageAlert($record, $snapshot),
+            ])->all(),
+            'recordSummary' => $summary,
+            'filters' => ['month' => $snapshot->format('Y-m'), 'attention' => $attention, 'as_of' => $snapshot->toDateString()],
             'wasteTypes' => $wasteTypes,
         ]);
     }
@@ -445,27 +457,33 @@ class WasteRecordsController extends Controller
      */
     public function exportCsv(WasteRecordExportRequest $request): StreamedResponse
     {
-        $query = WasteRecord::with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser', 'haulings'])
-            ->orderBy('date', 'desc')
-            ->orderBy('created_at', 'desc');
-
-        if (! $this->canViewAllRecords()) {
-            $query->byUser(Auth::id());
-        }
+        $alerts = app(\App\Services\OperationalAlerts::class);
+        $snapshotExport = $request->validated('month') !== null;
+        $storageDate = $snapshotExport
+            ? $alerts->snapshot($request->validated('month'))
+            : CarbonImmutable::parse($request->validated('storage_date') ?? today()->toDateString())->startOfDay();
+        $query = $alerts->records($request->user())
+            ->with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser',
+                'haulings' => fn ($query) => $query->when($snapshotExport, fn ($query) => $query->whereDate('hauling_date', '<=', $storageDate->toDateString()))])
+            ->when($snapshotExport, fn ($query) => $query->whereDate('date', '<=', $storageDate->toDateString()))
+            ->orderBy('date', 'desc')->orderBy('created_at', 'desc');
 
         $search = mb_strtolower(trim($request->validated('search') ?? ''));
-        $storageStatus = $request->validated('storage_status') ?? 'all';
-        $storageDate = CarbonImmutable::parse($request->validated('storage_date') ?? today()->toDateString())->startOfDay();
-        $wasteRecords = $query->get()->filter(function (WasteRecord $record) use ($search, $storageStatus, $storageDate): bool {
+        $storageStatus = $request->validated('attention') ?? $request->validated('storage_status') ?? 'all';
+        $wasteRecords = $query->get()->filter(function (WasteRecord $record) use ($search, $storageStatus, $storageDate, $alerts, $snapshotExport, $request): bool {
             $fields = [$record->record_number, $record->wasteType?->name, $record->wasteType?->code, $record->wasteType?->category?->name, $record->source];
             if ($search !== '' && ! collect($fields)->contains(fn (?string $value): bool => str_contains(mb_strtolower($value ?? ''), $search))) {
                 return false;
             }
 
+            if ($snapshotExport || $request->validated('attention') !== null) {
+                return $alerts->matchesAttention($record, $storageStatus, $storageDate);
+            }
+
+            /** Legacy storage_date only sets the expiry reference, not a historical stock snapshot. */
             if ($storageStatus === 'all') {
                 return true;
             }
-
             $status = match (true) {
                 $record->getRemainingQuantity() <= 0 => 'completed',
                 $record->expiry_date === null => 'na',

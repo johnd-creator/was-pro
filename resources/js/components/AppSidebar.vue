@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import AppLogo from '@/components/AppLogo.vue';
-import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import Link from '@/components/OrganizationLink.vue';
@@ -13,11 +12,11 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { appNavigationItems } from '@/lib/app-navigation';
+import {
+    appFooterNavigationItems,
+    appNavigationItems,
+} from '@/lib/app-navigation';
 import { dashboard as dashboardRoute } from '@/routes';
-import type { NavItemWithRequiredHref } from '@/types';
-
-const footerNavItems: NavItemWithRequiredHref[] = [];
 </script>
 
 <template>
@@ -48,7 +47,7 @@ const footerNavItems: NavItemWithRequiredHref[] = [];
         </SidebarContent>
 
         <SidebarFooter>
-            <NavFooter :items="footerNavItems" />
+            <NavMain :items="appFooterNavigationItems" />
             <NavUser />
         </SidebarFooter>
     </Sidebar>

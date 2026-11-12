@@ -15,6 +15,8 @@ class WasteRecordIndexRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'month' => ['nullable', 'date_format:Y-m'],
+            'attention' => ['nullable', Rule::in(['all', 'expired', 'expiring_soon', 'critical', 'backlog', 'pending', 'fresh', 'completed'])],
             'expiry' => ['nullable', Rule::in(['expired'])],
             'as_of' => ['required_with:expiry', 'nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
             'unit' => ['nullable', 'string', 'max:30'],
@@ -25,6 +27,8 @@ class WasteRecordIndexRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'attention.in' => 'Filter perhatian tidak valid.',
+            'month.date_format' => 'Bulan harus berformat YYYY-MM.',
             'expiry.in' => 'Filter masa simpan tidak valid.',
             'as_of.required_with' => 'Tanggal snapshot wajib diisi.',
             'as_of.date_format' => 'Tanggal snapshot harus berformat YYYY-MM-DD.',

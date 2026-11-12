@@ -3,6 +3,7 @@ import { Head, router } from '@inertiajs/vue3';
 import { ArrowUpRight, CalendarDays, RefreshCw } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
+import { index as notificationIndex } from '@/actions/App/Http/Controllers/WasteManagement/OperationalInboxController';
 import CompactStat from '@/components/dashboard/CompactStat.vue';
 import ComplianceHero from '@/components/dashboard/ComplianceHero.vue';
 import DistributionSummary from '@/components/dashboard/DistributionSummary.vue';
@@ -12,9 +13,15 @@ import WasteFlowChart from '@/components/dashboard/WasteFlowChart.vue';
 
 // UI components
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { usePermissions } from '@/composables/usePermissions';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard as dashboardRoute } from '@/routes';
+import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem, FabaChartData, WasteChartData } from '@/types';
+import type {
+    OperationalAlert,
+    NotificationSummary,
+} from '@/types/notifications';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -78,6 +85,8 @@ interface DashboardTaskItem {
 
 interface Props {
     organizationName: string;
+    operationalAlerts: OperationalAlert[];
+    notificationSummary: NotificationSummary;
     header: {
         current_date: string;
         current_time: string;
@@ -129,6 +138,30 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const { hasPermission } = usePermissions();
+const canViewRecords = computed(
+    () =>
+        hasPermission('waste_records.view_all') ||
+        hasPermission('waste_records.view_own'),
+);
+function recordsHref(attention?: string): string | undefined {
+    return canViewRecords.value
+        ? wasteManagementRoutes.records.index.url({
+              query: {
+                  month: props.filters.month,
+                  ...(attention ? { attention } : {}),
+              },
+          })
+        : undefined;
+}
+const notificationHref = computed(() =>
+    notificationIndex.url({ query: { month: props.filters.month } }),
+);
+const criticalActionHref = computed(() =>
+    props.stats.expired_waste > 0
+        ? recordsHref('expired')
+        : notificationHref.value,
+);
 
 const wasteStatsContext = computed(() => {
     const snapshotLabel = props.header.snapshot_month_label ?? 'periode aktif';
@@ -274,23 +307,31 @@ function refreshDashboard(): void {
                 <ComplianceHero
                     :expired-waste="stats.expired_waste"
                     :expiring-soon-waste="stats.expiring_soon_waste"
-                    :pending-waste-approvals="pendingApprovals.length"
-                    :pending-faba-approvals="fabaPendingApprovals.length"
-                    :faba-warnings="fabaWarnings.length"
+                    :pending-waste-approvals="
+                        notificationSummary.pending_waste_approvals_count
+                    "
+                    :pending-faba-approvals="
+                        notificationSummary.pending_faba_approvals_count
+                    "
+                    :faba-warnings="notificationSummary.faba_warnings_count"
                     :risk-status="header.risk_status"
                     :risk-label="header.risk_label"
                     :risk-tone="header.risk_tone"
                     :show-metric-cards="false"
+                    :action-href="criticalActionHref"
+                    :inbox-href="notificationHref"
                 />
                 <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
                     <CompactStat
                         title="Total Catatan Limbah"
+                        :href="recordsHref()"
                         :value="stats.waste_total_records_snapshot"
                         :context-label="wasteStatsContext.label"
                         :hint="wasteStatsContext.totalHint"
                     />
                     <CompactStat
                         title="Menunggu Ditinjau"
+                        :href="recordsHref('pending')"
                         :value="stats.pending_records"
                         context-label="Periode aktif"
                         hint="Catatan yang menunggu review"
@@ -298,12 +339,14 @@ function refreshDashboard(): void {
                     />
                     <CompactStat
                         title="Belum Terangkut"
+                        :href="recordsHref('backlog')"
                         :value="stats.waste_untransported_records_snapshot"
                         :context-label="wasteStatsContext.label"
                         hint="Catatan backlog, termasuk carry-over"
                     />
                     <CompactStat
                         title="Melewati Batas Simpan"
+                        :href="recordsHref('expired')"
                         :value="stats.expired_waste"
                         context-label="Kepatuhan"
                         hint="Catatan yang perlu ditindaklanjuti"

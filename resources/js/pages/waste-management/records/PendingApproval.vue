@@ -517,7 +517,7 @@ const { scopedUrl } = useOrganizationContext();
                                                             v-else
                                                             class="mr-2 h-4 w-4"
                                                         />
-                                                        Setujui cepat
+                                                        Setuju
                                                     </Button>
                                                     <Button
                                                         size="sm"

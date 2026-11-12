@@ -101,10 +101,7 @@ test('super admin still needs tenant and installed enabled features for operatio
         canOpenGuideAction('plans', { ...admin, plans: false }),
         false,
     );
-    assert.equal(
-        canOpenGuideAction('inbox', { ...admin, inbox: false }),
-        false,
-    );
+    assert.equal(canOpenGuideAction('inbox', { ...admin, inbox: false }), true);
     assert.equal(
         canOpenGuideAction('records', { ...admin, tenantReady: false }),
         false,
@@ -220,4 +217,19 @@ test('FABA report and review display clean separators and translated secondary s
     );
     assert.equal(formatFabaStatus('approved'), 'Disetujui');
     assert.equal(formatFabaStatus('ready_to_submit'), 'Siap diajukan');
+});
+
+test('unified notifications stay available without history but require a ready tenant', () => {
+    assert.equal(
+        canOpenGuideAction('inbox', { ...access, inbox: false }),
+        true,
+    );
+    assert.equal(
+        canOpenGuideAction('inbox', { ...access, tenantReady: false }),
+        false,
+    );
+    const help = guideCases.find((item) => item.id === 'notifikasi');
+    assert.ok(
+        help.steps.some((step) => step.includes('lonceng di kanan atas')),
+    );
 });

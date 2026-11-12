@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import {
     Activity,
+    ArrowUpRight,
     CircleAlert,
     ClipboardList,
     ShieldAlert,
 } from 'lucide-vue-next';
 import { computed } from 'vue';
+import Link from '@/components/OrganizationLink.vue';
 
 interface Props {
     title: string;
@@ -43,7 +45,17 @@ const formattedValue = computed(() =>
 </script>
 
 <template>
-    <article
+    <component
+        :is="href ? Link : 'article'"
+        :href="href"
+        :aria-label="
+            href ? `${title}: ${formattedValue}. Lihat catatan` : undefined
+        "
+        :class="
+            href
+                ? 'group transition-colors hover:border-blue-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600'
+                : undefined
+        "
         class="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 dark:border-slate-800 dark:bg-slate-900"
     >
         <div class="flex items-start justify-between gap-3">
@@ -80,5 +92,10 @@ const formattedValue = computed(() =>
         >
             {{ hint }}
         </p>
-    </article>
+        <span
+            v-if="href"
+            class="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-blue-700 dark:text-blue-300"
+            >Lihat catatan <ArrowUpRight class="size-3.5" aria-hidden="true"
+        /></span>
+    </component>
 </template>

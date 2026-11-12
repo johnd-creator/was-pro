@@ -32,6 +32,17 @@ function migrateTenantSchema(Organization $organization): void
     $tenantService->switchToPublic();
 }
 
+function dashboardViewerRole(): Role
+{
+    $role = Role::factory()->create();
+    $permissions = collect(['waste_records.view_all', 'faba_recaps.view'])->map(fn (string $slug): Permission => Permission::firstOrCreate(
+        ['slug' => $slug], ['name' => $slug, 'module' => explode('.', $slug)[0]],
+    ));
+    $role->permissions()->sync($permissions->pluck('id'));
+
+    return $role;
+}
+
 function createDashboardWasteType(int $storagePeriodDays): WasteType
 {
     return WasteType::factory()->create([
@@ -53,6 +64,7 @@ test('authenticated users can visit the dashboard', function () {
 
     $user = User::factory()->create([
         'organization_id' => $organization->id,
+        'role_id' => dashboardViewerRole()->id,
         'email_verified_at' => now(),
     ]);
     $this->actingAs($user);
@@ -308,6 +320,7 @@ test('dashboard reads movement-based faba data from migrated tenant schema', fun
 
     $user = User::factory()->create([
         'organization_id' => $organization->id,
+        'role_id' => dashboardViewerRole()->id,
         'email_verified_at' => now(),
     ]);
 
@@ -382,6 +395,7 @@ test('dashboard exposes faba hero stats using yearly semantics', function () {
 
     $user = User::factory()->create([
         'organization_id' => $organization->id,
+        'role_id' => dashboardViewerRole()->id,
         'email_verified_at' => now(),
     ]);
 
@@ -474,6 +488,7 @@ test('dashboard hauling status distribution reflects approved snapshot records',
 
     $user = User::factory()->create([
         'organization_id' => $organization->id,
+        'role_id' => dashboardViewerRole()->id,
         'email_verified_at' => now(),
     ]);
 
@@ -600,6 +615,7 @@ test('dashboard exposes waste flow chart and backlog urgency distribution', func
 
     $user = User::factory()->create([
         'organization_id' => $organization->id,
+        'role_id' => dashboardViewerRole()->id,
         'email_verified_at' => now(),
     ]);
 
@@ -698,6 +714,7 @@ test('dashboard filters metrics by selected month', function () {
 
     $user = User::factory()->create([
         'organization_id' => $organization->id,
+        'role_id' => dashboardViewerRole()->id,
         'email_verified_at' => now(),
     ]);
 
@@ -777,6 +794,7 @@ test('dashboard exposes waste snapshot stats and untransported backlog up to the
 
     $user = User::factory()->create([
         'organization_id' => $organization->id,
+        'role_id' => dashboardViewerRole()->id,
         'email_verified_at' => now(),
     ]);
 
@@ -852,6 +870,7 @@ test('dashboard waste backlog carries over across years until transportation is 
 
     $user = User::factory()->create([
         'organization_id' => $organization->id,
+        'role_id' => dashboardViewerRole()->id,
         'email_verified_at' => now(),
     ]);
 
@@ -963,13 +982,16 @@ test('dashboard exposes critical risk metadata when expired waste exists', funct
 
     WasteRecord::factory()->approved()->create([
         'waste_type_id' => $wasteType->id,
-        'date' => '2026-04-01',
+        'date' => '2026-03-31',
     ]);
+
+    WasteRecord::factory()->draft()->create(['waste_type_id' => $wasteType->id, 'date' => '2026-04-01']);
 
     $tenantService->switchToPublic();
 
     $user = User::factory()->create([
         'organization_id' => $organization->id,
+        'role_id' => dashboardViewerRole()->id,
         'email_verified_at' => now(),
     ]);
 
@@ -980,6 +1002,7 @@ test('dashboard exposes critical risk metadata when expired waste exists', funct
     $response
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('filters.month', '2026-04')
             ->where('header.risk_status', 'critical')
             ->where('header.risk_tone', 'red')
             ->where('header.risk_label', 'Kritis')
@@ -1013,6 +1036,7 @@ test('dashboard exposes warning risk metadata when waste is expiring soon', func
 
     $user = User::factory()->create([
         'organization_id' => $organization->id,
+        'role_id' => dashboardViewerRole()->id,
         'email_verified_at' => now(),
     ]);
 
@@ -1057,6 +1081,7 @@ test('dashboard exposes normal risk metadata when no active compliance issues ex
 
     $user = User::factory()->create([
         'organization_id' => $organization->id,
+        'role_id' => dashboardViewerRole()->id,
         'email_verified_at' => now(),
     ]);
 
@@ -1092,7 +1117,7 @@ test('dashboard separates material capacity risk from integrity warnings across 
     ]);
     WasteRecord::factory()->create(['date' => '2026-03-01']);
     $tenant->switchToPublic();
-    $user = User::factory()->create(['organization_id' => $organization->id]);
+    $user = User::factory()->create(['organization_id' => $organization->id, 'role_id' => dashboardViewerRole()->id]);
     $this->actingAs($user)->get(route('dashboard', ['month' => '2026-03']))
         ->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
         ->where('header.risk_status', 'critical')
@@ -1117,7 +1142,7 @@ test('dashboard keeps mixed units and partial expired backlog separate at histor
         WasteHauling::factory()->create(['waste_record_id' => $record->id, 'hauling_date' => $date, 'quantity' => $quantity, 'unit' => 'kg', 'status' => 'approved']);
     }
     $tenant->switchToPublic();
-    $user = User::factory()->create(['organization_id' => $organization->id]);
+    $user = User::factory()->create(['organization_id' => $organization->id, 'role_id' => dashboardViewerRole()->id]);
     $this->actingAs($user)->get(route('dashboard', ['month' => '2026-02']))
         ->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
         ->where('wasteChart.5.unit_series.kg.closing_backlog_quantity', 6)
@@ -1134,7 +1159,7 @@ test('dashboard marks unavailable capacity without reporting a genuine zero perc
     $tenant->switchToSchema($organization->schema_name);
     app(\App\Services\FabaRecapService::class)->setTpsCapacity('fly_ash', 0, 70, 90, null);
     $tenant->switchToPublic();
-    $user = User::factory()->create(['organization_id' => $organization->id]);
+    $user = User::factory()->create(['organization_id' => $organization->id, 'role_id' => dashboardViewerRole()->id]);
     $this->actingAs($user)->get(route('dashboard'))->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->where('fabaChart.5.capacity.total.utilization_percentage', null)
@@ -1155,7 +1180,7 @@ test('waste chart snapshot labels use the backend date across year boundaries', 
         WasteRecord::factory()->approved()->create(['waste_type_id' => $type->id, 'date' => '2026-12-01', 'quantity' => 10, 'unit' => 'kg']);
         WasteRecord::factory()->create(['waste_type_id' => $type->id, 'date' => '2027-01-01']);
         $tenant->switchToPublic();
-        $user = User::factory()->create(['organization_id' => $organization->id]);
+        $user = User::factory()->create(['organization_id' => $organization->id, 'role_id' => dashboardViewerRole()->id]);
         $this->actingAs($user)->get(route('dashboard', ['month' => '2026-12']))->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->where('wasteChart.5.snapshot_date', '2026-12-31')

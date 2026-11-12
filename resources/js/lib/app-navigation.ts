@@ -1,5 +1,4 @@
 import {
-    Bell,
     BookOpen,
     Building2,
     Database,
@@ -15,7 +14,6 @@ import {
 } from 'lucide-vue-next';
 import { index as fabaMastersIndex } from '@/actions/App/Http/Controllers/WasteManagement/MasterData/FabaMastersController';
 import { index as auditIndex } from '@/actions/App/Http/Controllers/WasteManagement/OperationalAuditController';
-import { index as inboxIndex } from '@/actions/App/Http/Controllers/WasteManagement/OperationalInboxController';
 import { index as haulingPlansIndex } from '@/actions/App/Http/Controllers/WasteManagement/WasteHaulingPlansController';
 import { dashboard as dashboardRoute, guide } from '@/routes';
 import adminRoutes from '@/routes/admin';
@@ -23,18 +21,11 @@ import wasteManagementRoutes from '@/routes/waste-management';
 import type { NavItem } from '@/types';
 
 export const appNavigationItems: NavItem[] = [
-    { title: 'Panduan', href: guide.url(), icon: BookOpen },
     {
         title: 'Riwayat Audit B3',
         href: auditIndex.url(),
         icon: FileText,
         permission: 'operational_audit.view',
-    },
-    {
-        title: 'Notifikasi Operasional',
-        href: inboxIndex.url(),
-        icon: Bell,
-        capability: 'operational_inbox_available',
     },
     {
         title: 'Dashboard',
@@ -188,4 +179,8 @@ export const appNavigationItems: NavItem[] = [
             },
         ],
     },
+];
+
+export const appFooterNavigationItems: NavItem[] = [
+    { title: 'Panduan', href: guide.url(), icon: BookOpen },
 ];

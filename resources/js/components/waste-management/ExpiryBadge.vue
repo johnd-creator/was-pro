@@ -5,6 +5,7 @@ import { getWasteStorageState } from '@/lib/waste-storage';
 
 interface Props {
     expiryDate: string | null;
+    referenceDate?: string;
     remainingQuantity?: number;
     simulated?: boolean;
     size?: 'sm' | 'md' | 'lg';
@@ -15,11 +16,19 @@ const props = withDefaults(defineProps<Props>(), {
     simulated: false,
 });
 
+const referenceDate = computed(() => {
+    const parts = props.referenceDate?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return parts
+        ? new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]))
+        : new Date();
+});
+
 const state = computed(() =>
     getWasteStorageState(
         props.expiryDate,
         props.remainingQuantity,
         props.simulated,
+        referenceDate.value,
     ),
 );
 

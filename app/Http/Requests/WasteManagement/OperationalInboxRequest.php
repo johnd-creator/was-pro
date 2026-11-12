@@ -14,6 +14,7 @@ class OperationalInboxRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'month' => ['nullable', 'date_format:Y-m'],
             'page' => ['sometimes', 'integer', 'min:1', 'max:100000'],
             'read' => [$this->isMethod('PATCH') ? 'required' : 'sometimes', 'boolean'],
         ];
@@ -22,6 +23,7 @@ class OperationalInboxRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'month.date_format' => 'Bulan harus berformat YYYY-MM.',
             'page.integer' => 'Halaman harus berupa angka bulat.',
             'page.min' => 'Halaman minimal 1.',
             'page.max' => 'Halaman di luar jangkauan.',

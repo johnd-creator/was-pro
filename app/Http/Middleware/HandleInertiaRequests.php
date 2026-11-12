@@ -61,6 +61,9 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'notificationSummary' => fn (): array => app(\App\Services\OperationalAlerts::class)->forRequest($request)['summary'],
+            'notificationContext' => fn (): array => app(\App\Services\OperationalAlerts::class)->forRequest($request)['context'],
+            'operationalAlerts' => fn (): array => app(\App\Services\OperationalAlerts::class)->forRequest($request)['alerts'],
             'hauling_plans_available' => fn (): bool => app(\App\Services\HaulingPlans::class)->enabled(),
             'hauling_plans_enabled' => fn (): bool => app(\App\Services\HaulingPlans::class)->enabled(),
             'operational_inbox_available' => fn (): bool => app(\App\Services\OperationalInbox::class)->available(),

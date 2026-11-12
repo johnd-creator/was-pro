@@ -442,14 +442,15 @@ export const guideCases: GuideCase[] = [
         title: 'Menindaklanjuti notifikasi operasional',
         category: 'Pemantauan',
         roles: everyone,
-        summary: 'Baca pengajuan dan hasil review di dalam aplikasi.',
+        summary:
+            'Tindak lanjuti indikator aktif dan baca riwayat pengajuan dalam satu halaman.',
         prerequisites: [
-            'Fitur notifikasi aktif dan tersedia pada organisasi. Akses sumber masih mengikuti hak serta kepemilikan saat ini.',
+            'Organisasi aktif dan datanya siap. Indikator mengikuti hak akses, kepemilikan, dan periode; riwayat kejadian tersedia jika fiturnya aktif.',
         ],
         steps: [
-            'Buka Notifikasi Operasional dan baca status pengajuan atau keputusan yang relevan bagi akun Anda.',
+            'Klik lonceng di kanan atas dari halaman mana pun untuk membuka Notifikasi Operasional. Periksa tanggal snapshot, lalu pilih indikator yang perlu ditindaklanjuti.',
             'Buka tautan sumber untuk memeriksa status terkini sebelum bertindak.',
-            'Tandai telah dibaca bila selesai meninjau.',
+            'Pada bagian Riwayat notifikasi, tandai telah dibaca bila selesai meninjau. Indikator aktif hilang setelah sumber masalah ditangani, bukan setelah riwayat ditandai dibaca.',
         ],
         outcome:
             'Notifikasi membantu tindak lanjut di dalam aplikasi; bukan pengiriman email/WhatsApp atau pengingat berkala eksternal.',
@@ -587,7 +588,7 @@ export function canOpenGuideAction(
     if (action === 'roles')
         return (access.isSuperAdmin || access.tenantReady) && can('roles.view');
     if (!access.tenantReady) return false;
-    if (action === 'inbox') return access.inbox;
+    if (action === 'inbox') return true;
     if (action === 'masterTypes')
         return access.modules.waste && can('waste_types.view');
     if (action === 'fabaMasters')
