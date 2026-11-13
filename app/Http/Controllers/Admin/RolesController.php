@@ -19,7 +19,7 @@ class RolesController extends Controller
      */
     public function index(): Response|JsonResponse
     {
-        $roles = Role::with(['permissions:id,slug'])->orderBy('name')->get();
+        $roles = Role::with(['permissions:id,slug'])->orderByDesc('level')->orderBy('name')->get();
         $permissions = Permission::orderBy('module')->orderBy('name')->get();
 
         if (request()->expectsJson() || request()->wantsJson() || app()->runningUnitTests()) {

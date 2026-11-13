@@ -104,6 +104,8 @@ class RolePermissionsSeeder extends Seeder
             $supervisor->permissions()->syncWithoutDetaching($viewOnly);
         }
 
+        $this->call(CoordinatorRoleSeeder::class);
+
         $this->command->info('Role permissions seeded successfully.');
     }
 }

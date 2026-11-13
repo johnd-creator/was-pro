@@ -22,7 +22,7 @@ test('super admin can view roles index', function () {
     $response = $this->getJson(route('admin.roles.index'));
 
     $response->assertSuccessful();
-    $response->assertJsonPath('roles.0.slug', 'admin');
+    $response->assertJsonPath('roles.0.slug', 'super_admin');
     $response->assertJsonFragment(['slug' => 'test_role']);
     $response->assertJsonFragment(['slug' => 'perm_1']);
 });

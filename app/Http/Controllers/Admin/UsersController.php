@@ -30,7 +30,7 @@ class UsersController extends Controller
             ->get();
 
         $organizations = Organization::active()->when(! $viewer->isSuperAdmin(), fn ($query) => $query->where('id', $viewer->organization_id))->get();
-        $roles = Role::active()->get();
+        $roles = Role::active()->orderByDesc('level')->orderBy('name')->get();
 
         return Inertia::render('admin/Users', [
             'users' => $users,
