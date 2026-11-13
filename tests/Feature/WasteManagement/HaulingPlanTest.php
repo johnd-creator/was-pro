@@ -512,3 +512,25 @@ test('plan picker supplies waste type metadata only for approved records within 
         ->where('records.0.available_quantity', 25)
         ->where('records.0.remaining_quantity', 25));
 });
+
+test('http plan over-allocation explains the batch limit and saves no plan or audit', function () {
+    haulingPlan($this, '60.00');
+    $auditCount = OperationalAuditLog::where('module', 'waste_hauling_plans')->count();
+    $payload = ['waste_record_id' => $this->record->id, 'planned_date' => now()->addWeek()->toDateString(), 'quantity' => '40.01'];
+    $this->post(planRoute($this, 'store'), $payload)->assertSessionHas('error', fn ($message) => str_contains($message, '40,00 kg') && str_contains($message, $this->record->record_number));
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(1)
+        ->and(OperationalAuditLog::where('module', 'waste_hauling_plans')->count())->toBe($auditCount)
+        ->and($this->record->getRemainingQuantity())->toBe(100.0);
+    $this->post(planRoute($this, 'store'), [...$payload, 'quantity' => '40.00'])->assertSessionHas('success');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(2)
+        ->and(app(HaulingPlans::class)->availableFor($this->record))->toBe(0.0)
+        ->and($this->record->getRemainingQuantity())->toBe(100.0);
+});
+
+test('invalid plan quantities return field warnings without creating operational rows', function (mixed $quantity) {
+    $this->post(planRoute($this, 'store'), ['waste_record_id' => $this->record->id, 'planned_date' => now()->addWeek()->toDateString(), 'quantity' => $quantity])->assertSessionHasErrors('quantity');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(0)->and(WasteHauling::count())->toBe(0);
+})->with(['empty' => '', 'zero' => '0', 'negative' => '-1', 'precision' => '1.001', 'non-numeric' => 'asal', 'too-large' => '10000000000']);

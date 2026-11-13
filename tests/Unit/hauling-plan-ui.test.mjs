@@ -8,6 +8,7 @@ import {
     availablePlanRecords,
     availablePlanWasteTypes,
     planRecordsForType,
+    planQuantityError,
     initialActualDate,
     haulingActualStatus,
     haulingPlanStatus,
@@ -222,30 +223,40 @@ function mountPicker(records, query = '') {
         })
         .outputText.replace(/^import[\s\S]*?from ['"][^'"]+['"];\s*/gm, '')
         .replace(/export \{\};?/g, '');
+    const submissions = [];
     const dependencies = {
         defineProps: () => ({ records, plans: [], plansEnabled: true }),
         usePage: () => ({ url: '/hauling-plans' + query, props: {} }),
         useForm: (initial) =>
-            reactive({ ...initial, processing: false, clearErrors() {} }),
+            reactive({
+                ...initial,
+                processing: false,
+                clearErrors() {},
+                post() {
+                    submissions.push({ ...this });
+                },
+            }),
         useOrganizationContext: () => ({ scopedUrl: (url) => url }),
         usePermissions: () => ({ hasPermission: () => true }),
         formatLocalDate: () => '2026-11-12',
+        store: { url: () => '/hauling-plans' },
         computed,
         ref,
         watch,
         availablePlanRecords,
         availablePlanWasteTypes,
         planRecordsForType,
+        planQuantityError,
     };
     const scope = effectScope();
     const state = scope.run(() =>
         new Function(
             ...Object.keys(dependencies),
             compiled +
-                ';return { form, selectedWasteTypeId, filteredRecords, selectedRecord };',
+                ';return { form, selectedWasteTypeId, filteredRecords, selectedRecord, quantityError, canSubmit, submit };',
         )(...Object.values(dependencies)),
     );
-    return { ...state, stop: () => scope.stop() };
+    return { ...state, submissions, stop: () => scope.stop() };
 }
 
 test('picker preserves eligible deep links and clears stale batch and quantity on type or batch changes', () => {
@@ -317,5 +328,93 @@ test('picker rejects exhausted or unavailable deep links and starts with no batc
         } finally {
             picker.stop();
         }
+    }
+});
+
+test('plan quantity validation rejects invalid or over-allocated quantities and preserves valid full balances', () => {
+    const record = { available_quantity: 2457, unit: 'kg' };
+    for (const value of [
+        '',
+        ' ',
+        0,
+        -1,
+        '1.001',
+        'NaN',
+        Infinity,
+        '1e3',
+        '2,457',
+        '10000000000',
+        2457.01,
+    ]) {
+        assert.notEqual(planQuantityError(value, record), '', String(value));
+    }
+    for (const value of [0.01, '0.10', 2457, '2457.00', '100.23']) {
+        assert.equal(planQuantityError(value, record), '', String(value));
+    }
+    assert.match(planQuantityError(2457.01, record), /2.457 kg/);
+    assert.notEqual(
+        planQuantityError(0.01, { available_quantity: 0, unit: 'ton' }),
+        '',
+    );
+    assert.notEqual(
+        planQuantityError(1, { available_quantity: NaN, unit: 'kg' }),
+        '',
+    );
+    assert.notEqual(planQuantityError(1), '');
+    assert.equal(
+        planQuantityError('0.29', { available_quantity: 0.29, unit: 'ton' }),
+        '',
+    );
+    assert.notEqual(
+        planQuantityError('0.30', { available_quantity: 0.29, unit: 'ton' }),
+        '',
+    );
+});
+
+test('plan submit blocks invalid entries, accepts exact headroom, and rechecks changed batch or availability', () => {
+    const records = reactive([
+        {
+            id: 'one',
+            waste_type_id: 'a',
+            available_quantity: 20,
+            unit: 'kg',
+            waste_type: null,
+        },
+        {
+            id: 'two',
+            waste_type_id: 'a',
+            available_quantity: 5,
+            unit: 'kg',
+            waste_type: null,
+        },
+    ]);
+    const picker = mountPicker(records, '?waste_record=one');
+    try {
+        assert.equal(picker.canSubmit.value, false);
+        for (const value of ['', 0, -2, '0.001', 20.01]) {
+            picker.form.quantity = value;
+            assert.equal(picker.canSubmit.value, false);
+            picker.submit();
+        }
+        assert.equal(picker.submissions.length, 0);
+        picker.form.quantity = 20;
+        assert.equal(picker.canSubmit.value, true);
+        picker.submit();
+        assert.equal(picker.submissions.length, 1);
+        picker.form.processing = true;
+        picker.submit();
+        assert.equal(picker.submissions.length, 1);
+        picker.form.processing = false;
+        records[0].available_quantity = 19;
+        assert.equal(picker.canSubmit.value, false);
+        picker.submit();
+        assert.equal(picker.submissions.length, 1);
+        picker.form.waste_record_id = 'two';
+        assert.equal(picker.form.quantity, '');
+        assert.equal(picker.canSubmit.value, false);
+        picker.form.quantity = 5;
+        assert.equal(picker.canSubmit.value, true);
+    } finally {
+        picker.stop();
     }
 });

@@ -136,8 +136,12 @@ class HaulingPlans
             if (in_array($model->status, ['pending_approval', 'approved'], true)) {
                 $used = $model->exists ? $model->haulings()->whereIn('status', ['approved', 'pending_approval'])->get()->sum(fn ($row) => $this->cents($row->quantity)) : 0;
                 $remaining = max(0, $this->cents($model->quantity) - $used);
-                if (! $record->isApproved() || $model->unit !== $record->unit || $this->cents($model->quantity) < 1 || $remaining > $this->cents($record->quantity) - $this->reserved($record, null, $model->id)) {
-                    throw new OperationalConflict('Jumlah rencana melebihi kapasitas limbah yang belum dialokasikan.');
+                if (! $record->isApproved() || $model->unit !== $record->unit || $this->cents($model->quantity) < 1) {
+                    throw new OperationalConflict('Rencana harus memakai catatan limbah yang disetujui, satuan yang sama, dan jumlah minimal 0,01.');
+                }
+                $available = $this->cents($record->quantity) - $this->reserved($record, null, $model->id);
+                if ($remaining > $available) {
+                    throw new OperationalConflict('Rencana tidak dapat diproses: jumlah melebihi sisa yang dapat dialokasikan untuk batch '.$record->record_number.' ('.number_format(max(0, $available) / 100, 2, ',', '.').' '.$record->unit.'). Periksa jumlah, batch, dan satuannya; alokasi rencana lain serta realisasi aktif sudah diperhitungkan.');
                 }
             }
         }

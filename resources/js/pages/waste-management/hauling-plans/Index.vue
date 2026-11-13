@@ -30,6 +30,7 @@ import {
     availablePlanWasteTypes,
     haulingPlanStatus,
     planRecordsForType,
+    planQuantityError,
 } from '@/lib/hauling-plan';
 import type { HaulingPlan, HaulingPlanRecord } from '@/types/hauling-plan';
 
@@ -82,6 +83,16 @@ watch(
 const selectedRecord = computed(() =>
     filteredRecords.value.find((record) => record.id === form.waste_record_id),
 );
+const quantityError = computed(() =>
+    planQuantityError(form.quantity, selectedRecord.value),
+);
+const canSubmit = computed(
+    () => !form.processing && !!selectedRecord.value && !quantityError.value,
+);
+watch(
+    () => form.quantity,
+    () => form.clearErrors('quantity'),
+);
 const flash = computed(
     () => page.props.flash as { success?: string; error?: string } | undefined,
 );
@@ -89,11 +100,14 @@ const quantity = (value: number) =>
     value.toLocaleString('id-ID', { maximumFractionDigits: 2 });
 let submissionKey: string | undefined;
 function submit(): void {
-    if (!selectedRecord.value || form.processing) return;
+    if (!canSubmit.value) return;
     submissionKey ??= crypto.randomUUID();
     form.post(scopedUrl(store.url()), {
         preserveScroll: true,
         headers: { 'Idempotency-Key': submissionKey },
+        onError: () => {
+            submissionKey = undefined;
+        },
         onSuccess: () => {
             if (!flash.value?.error) submissionKey = undefined;
         },
@@ -128,7 +142,8 @@ function submit(): void {
             <p class="rounded-lg border bg-muted/40 p-4 text-sm leading-6">
                 Persetujuan rencana hanya mencadangkan alokasi. Saldo tercatat
                 berkurang setelah realisasi disetujui supervisor. Realisasi
-                dapat dilakukan sebagian.
+                dapat dilakukan sebagian. Rencana yang diajukan tampil di daftar
+                rencana pada halaman ini, bukan sebagai pengangkutan aktual.
             </p>
             <p
                 v-if="flash?.success"
@@ -243,9 +258,22 @@ function submit(): void {
                                 :disabled="!selectedRecord || form.processing"
                                 required
                                 class="h-11"
-                            /><InputError :message="form.errors.quantity" />
+                                :aria-invalid="
+                                    !!quantityError && form.quantity !== ''
+                                "
+                                aria-describedby="plan-quantity-help plan-quantity-error"
+                            />
+                            <InputError
+                                id="plan-quantity-error"
+                                role="alert"
+                                :message="
+                                    form.errors.quantity ||
+                                    (form.quantity !== '' ? quantityError : '')
+                                "
+                            />
                             <p
                                 v-if="selectedRecord"
+                                id="plan-quantity-help"
                                 class="text-sm text-muted-foreground"
                             >
                                 Saldo tercatat
@@ -257,7 +285,13 @@ function submit(): void {
                                 {{
                                     quantity(selectedRecord.available_quantity)
                                 }}
-                                {{ selectedRecord.unit }}.
+                                {{ selectedRecord.unit }}. Batas ini hanya untuk
+                                batch yang dipilih, setelah dikurangi alokasi
+                                rencana dan realisasi yang masih aktif. Masukkan
+                                jumlah berdasarkan rencana muatan yang sudah
+                                diperiksa, bukan total saldo seluruh jenis
+                                limbah. Satuan mengikuti catatan dan tidak
+                                dikonversi otomatis.
                             </p>
                         </div>
                         <div class="space-y-2">
@@ -269,19 +303,11 @@ function submit(): void {
                             /><InputError :message="form.errors.notes" />
                         </div>
                         <div class="md:col-span-2">
-                            <Button
-                                type="submit"
-                                :disabled="
-                                    form.processing ||
-                                    !selectedRecord ||
-                                    selectedRecord.available_quantity <= 0
-                                "
-                                >{{
-                                    form.processing
-                                        ? 'Mengajukan...'
-                                        : 'Ajukan rencana'
-                                }}</Button
-                            >
+                            <Button type="submit" :disabled="!canSubmit">{{
+                                form.processing
+                                    ? 'Mengajukan...'
+                                    : 'Ajukan rencana'
+                            }}</Button>
                             <p
                                 v-if="!selectableRecords.length"
                                 class="mt-2 text-sm text-muted-foreground"

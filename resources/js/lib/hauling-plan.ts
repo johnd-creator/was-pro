@@ -75,3 +75,23 @@ export function availablePlanWasteTypes<
     }
     return Array.from(types, ([id, label]) => ({ id, label }));
 }
+
+export function planQuantityError(
+    value: string | number,
+    record?: { available_quantity: number; unit: string },
+): string {
+    if (!record) return 'Pilih batch catatan limbah terlebih dahulu.';
+    const input = String(value).trim();
+    if (!input) return 'Jumlah rencana wajib diisi.';
+    if (!/^\d{1,10}(?:\.\d{1,2})?$/.test(input)) {
+        return 'Jumlah rencana harus berupa angka positif dengan maksimal dua angka desimal.';
+    }
+    const amount = Math.round(Number(input) * 100);
+    if (amount < 1) return 'Jumlah rencana minimal 0,01.';
+    const available = Math.max(0, Math.round(record.available_quantity * 100));
+    if (!Number.isFinite(available) || amount > available) {
+        const limit = Number.isFinite(available) ? available / 100 : 0;
+        return `Jumlah rencana melebihi sisa yang dapat dialokasikan (${limit.toLocaleString('id-ID', { maximumFractionDigits: 2 })} ${record.unit}). Periksa batch dan satuannya.`;
+    }
+    return '';
+}
