@@ -18,6 +18,6 @@ class WasteHaulingPlanRequest extends FormRequest
 
     public function messages(): array
     {
-        return ['waste_record_id.required' => 'Catatan limbah wajib dipilih.', 'quantity.decimal' => 'Jumlah maksimal dua angka desimal.', 'quantity.min' => 'Jumlah minimal 0,01.', 'planned_date.required' => 'Tanggal rencana wajib diisi.'];
+        return ['waste_record_id.required' => 'Catatan limbah wajib dipilih.', 'quantity.required' => 'Jumlah rencana wajib diisi.', 'quantity.numeric' => 'Jumlah rencana harus berupa angka.', 'quantity.max' => 'Jumlah rencana melebihi batas yang diizinkan.', 'quantity.decimal' => 'Jumlah maksimal dua angka desimal.', 'quantity.min' => 'Jumlah minimal 0,01.', 'planned_date.required' => 'Tanggal rencana wajib diisi.'];
     }
 }

@@ -492,3 +492,25 @@ test('enabled lifecycle records incoming plan partial actual closure and scoped 
     $this->actingAs($this->creator)->get(route('waste-management.notifications.index', $params))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->where('available', true)->has('notifications', 3));
     $this->actingAs($this->supervisor)->get(route('waste-management.audit.index', [...$params, 'module' => 'waste_hauling_plans']))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->has('entries', 3));
 });
+
+test('http plan over-allocation explains the batch limit and saves no plan or audit', function () {
+    haulingPlan($this, '60.00');
+    $auditCount = OperationalAuditLog::where('module', 'waste_hauling_plans')->count();
+    $payload = ['waste_record_id' => $this->record->id, 'planned_date' => now()->addWeek()->toDateString(), 'quantity' => '40.01'];
+    $this->post(planRoute($this, 'store'), $payload)->assertSessionHas('error', fn ($message) => str_contains($message, '40,00 kg') && str_contains($message, $this->record->record_number));
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(1)
+        ->and(OperationalAuditLog::where('module', 'waste_hauling_plans')->count())->toBe($auditCount)
+        ->and($this->record->getRemainingQuantity())->toBe(100.0);
+    $this->post(planRoute($this, 'store'), [...$payload, 'quantity' => '40.00'])->assertSessionHas('success');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(2)
+        ->and(app(HaulingPlans::class)->availableFor($this->record))->toBe(0.0)
+        ->and($this->record->getRemainingQuantity())->toBe(100.0);
+});
+
+test('invalid plan quantities return field warnings without creating operational rows', function (mixed $quantity) {
+    $this->post(planRoute($this, 'store'), ['waste_record_id' => $this->record->id, 'planned_date' => now()->addWeek()->toDateString(), 'quantity' => $quantity])->assertSessionHasErrors('quantity');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(0)->and(WasteHauling::count())->toBe(0);
+})->with(['empty' => '', 'zero' => '0', 'negative' => '-1', 'precision' => '1.001', 'non-numeric' => 'asal', 'too-large' => '10000000000']);
