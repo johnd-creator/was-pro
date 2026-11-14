@@ -82,7 +82,7 @@ const totalBacklog = computed(() =>
                     <p
                         class="text-[11px] font-semibold tracking-wide text-blue-700 uppercase"
                     >
-                        Total backlog
+                        Total Limbah Belum Terkelola
                     </p>
                     <p class="mt-1 text-lg font-semibold text-blue-900">
                         {{ totalBacklog.toLocaleString('id-ID') }}
@@ -116,7 +116,7 @@ const totalBacklog = computed(() =>
                     <span
                         class="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 shadow-sm"
                     >
-                        {{ item.closing_backlog_count }} backlog
+                        {{ item.closing_backlog_count }} limbah belum terkelola
                     </span>
                 </div>
 
@@ -185,7 +185,7 @@ const totalBacklog = computed(() =>
                         <div
                             class="flex items-center justify-between text-[11px] font-medium tracking-wide text-blue-700 uppercase"
                         >
-                            <span>Backlog akhir</span>
+                            <span>Limbah Belum Terkelola</span>
                             <span>{{
                                 item.closing_backlog_count.toLocaleString(
                                     'id-ID',
@@ -236,7 +236,9 @@ const totalBacklog = computed(() =>
                         class="h-2 w-3 rounded-full"
                         :style="{ backgroundColor: backlogBarColor }"
                     />
-                    <span class="text-muted-foreground">Backlog akhir</span>
+                    <span class="text-muted-foreground"
+                        >Limbah Belum Terkelola</span
+                    >
                 </div>
             </div>
         </CardContent>

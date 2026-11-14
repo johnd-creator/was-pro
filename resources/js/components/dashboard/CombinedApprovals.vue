@@ -140,7 +140,7 @@ function reviewButtonClass(date?: string | null): string {
                         class="wm-text-secondary text-sm leading-6"
                     >
                         Putuskan antrian yang memengaruhi ritme operasional,
-                        backlog limbah, dan review periode FABA.
+                        limbah belum terkelola, dan review periode FABA.
                     </CardDescription>
                 </div>
 

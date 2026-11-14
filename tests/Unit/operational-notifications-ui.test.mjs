@@ -52,9 +52,12 @@ test('records preserve snapshot for filter navigation and export without legacy 
     const records = source('pages/waste-management/records/Index.vue');
     assert.match(records, /recordSummary.pending/);
     assert.match(records, /props.recordSummary.total > 0/);
-    assert.match(records, /props.filters.attention/);
-    assert.match(records, /month: props.filters.month/);
-    assert.match(records, /attention: props.filters.attention/);
+    assert.match(records, /parseRecordListState\(page.url, props.filters\)/);
+    assert.match(records, /month: committedState.value.month/);
+    assert.match(
+        records,
+        /attention:\s*expiryFilter.value === 'all' \? null : expiryFilter.value/,
+    );
     assert.match(records, /:reference-date="filters.as_of"/);
     assert.doesNotMatch(records, /storage_status: expiryFilter/);
     assert.doesNotMatch(records, /masih dalam draf\s+dan belum diajukan/);
@@ -252,4 +255,57 @@ test('approval time display does not invent an age for a missing submission date
     assert.equal(formatTime(null), 'Waktu pengajuan belum tercatat');
     assert.equal(formatTime(''), 'Waktu pengajuan belum tercatat');
     assert.equal(formatTime('invalid'), 'Waktu pengajuan belum tercatat');
+});
+
+test('dashboard removes the large header and keeps the period control in its section toolbar', () => {
+    const dashboard = source('pages/Dashboard.vue');
+    assert.doesNotMatch(dashboard, /Ikhtisar operasional/);
+    assert.doesNotMatch(dashboard, /Pusat kendali operasional/i);
+    assert.match(
+        dashboard,
+        /aria-label="Bagian dashboard"[\s\S]*id="dashboard-period"/,
+    );
+    assert.match(dashboard, /for="dashboard-period"/);
+    assert.match(dashboard, /@change="changePeriod"/);
+    assert.match(dashboard, /@click="refreshDashboard"/);
+});
+
+test('B3 navigation groups existing scoped routes and protects hauling approval access', () => {
+    const navigation = source('lib/app-navigation.ts');
+    const b3 = navigation
+        .split("title: 'Limbah B3'")[1]
+        .split("title: 'FABA'")[0];
+    assert.match(b3, /labelOnly: true/);
+    for (const title of [
+        'Dashboard Limbah B3',
+        'Laporan Limbah B3',
+        'Catatan Limbah B3',
+        'Neraca Limbah B3',
+        'Rencana Angkut',
+        'Pengangkutan Limbah B3',
+        'Riwayat Audit B3',
+    ]) {
+        assert.ok(b3.includes(`title: '${title}'`));
+    }
+    assert.match(b3, /capability: 'hauling_plans_available'/);
+    assert.match(
+        b3,
+        /pendingApproval.url\(\)[\s\S]*permissions: \['waste_hauling.approve', 'waste_hauling.reject'\]/,
+    );
+    assert.match(b3, /permission: 'operational_audit.view'/);
+    assert.match(source('components/NavMain.vue'), /OrganizationLink.vue/);
+});
+
+test('records keeps compact actions and filtering after removing promotional panels', () => {
+    const records = source('pages/waste-management/records/Index.vue');
+    assert.doesNotMatch(
+        records,
+        /Snapshot|Waste Operations|Aksi Cepat|Aksi cepat operasional|Fokus halaman/,
+    );
+    assert.match(records, /aria-label="Tindakan catatan limbah"/);
+    assert.match(records, /v-if="props.wasteTypes"/);
+    assert.match(records, /@click="exportCsv"/);
+    assert.match(records, /@click="isCreateDialogOpen = true"/);
+    assert.match(records, /@click="changeAttention\('all'\)"/);
+    assert.match(records, /flex flex-wrap items-center gap-2/);
 });

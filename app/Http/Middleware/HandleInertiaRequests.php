@@ -2,8 +2,10 @@
 
 namespace App\Http\Middleware;
 
+use Closure;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Symfony\Component\HttpFoundation\Response;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -15,6 +17,19 @@ class HandleInertiaRequests extends Middleware
      * @var string
      */
     protected $rootView = 'app';
+
+    public function handle(Request $request, Closure $next): Response
+    {
+        $response = parent::handle($request, $next);
+        if ($request->routeIs('waste-management.records.index')) {
+            $response->setVary('X-Waspro-Records-Contract', false);
+        }
+        if ($request->routeIs('waste-management.haulings.index')) {
+            $response->setVary('X-Waspro-Backlog-Contract', false);
+        }
+
+        return $response;
+    }
 
     /**
      * Determines the current asset version.

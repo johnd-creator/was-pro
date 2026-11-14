@@ -76,35 +76,76 @@ class WasteRecordsController extends Controller
         $alerts = app(\App\Services\OperationalAlerts::class);
         $snapshot = $alerts->snapshot($request->validated('month'));
         $attention = $request->validated('attention');
-        $query = $alerts->records($request->user())
-            ->with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser',
-                'haulings' => fn ($query) => $query->whereDate('hauling_date', '<=', $snapshot->toDateString())])
-            ->whereDate('date', '<=', $snapshot->toDateString())
-            ->orderBy('date', 'desc')->orderBy('created_at', 'desc');
-        $allRecords = $query->get();
+        $base = $alerts->records($request->user())->whereDate('date', '<=', $snapshot->toDateString());
         $summary = [
-            'total' => $allRecords->count(),
-            'draft' => $allRecords->where('status', 'draft')->count(),
-            'pending' => $allRecords->filter(fn (WasteRecord $record): bool => $alerts->matchesAttention($record, 'pending', $snapshot))->count(),
-            'expiring_soon' => $allRecords->filter(fn (WasteRecord $record): bool => $alerts->matchesAttention($record, 'expiring_soon', $snapshot))->count(),
-            'expired' => $allRecords->filter(fn (WasteRecord $record): bool => $alerts->matchesAttention($record, 'expired', $snapshot))->count(),
+            'total' => (clone $base)->count(),
+            'draft' => (clone $base)->where('status', 'draft')->count(),
+            'pending' => $this->applyRecordAttention(clone $base, 'pending', $snapshot)->count(),
+            'expiring_soon' => $this->applyRecordAttention(clone $base, 'expiring_soon', $snapshot)->count(),
+            'expired' => $this->applyRecordAttention(clone $base, 'expired', $snapshot)->count(),
         ];
-        $wasteRecords = $allRecords->filter(fn (WasteRecord $record): bool => $alerts->matchesAttention($record, $attention, $snapshot))->values();
-
-        $wasteTypes = WasteType::with(['category', 'characteristic'])
-            ->active()
-            ->orderBy('name')
-            ->get();
+        $paginated = $request->header('X-Waspro-Records-Contract') === '2';
+        $query = $this->applyRecordAttention(clone $base, $attention, $snapshot);
+        $search = trim((string) $request->validated('search', ''));
+        if ($paginated && $search !== '') {
+            $pattern = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], strtolower($search)).'%';
+            $query->where(function ($q) use ($pattern): void {
+                $q->whereRaw('LOWER(record_number) LIKE ?', [$pattern])
+                    ->orWhereRaw('LOWER(COALESCE(source, \'\')) LIKE ?', [$pattern])
+                    ->orWhereHas('wasteType', fn ($type) => $type->whereRaw('LOWER(name) LIKE ?', [$pattern])->orWhereRaw('LOWER(code) LIKE ?', [$pattern]));
+                if (\App\Models\WasteSource::available()) {
+                    $q->orWhereHas('wasteSource', fn ($source) => $source->whereRaw('LOWER(name) LIKE ?', [$pattern]));
+                }
+            });
+        }
+        $sort = $request->validated('sort', 'latest');
+        match ($paginated ? $sort : 'latest') {
+            'oldest' => $query->orderBy('date')->orderBy('created_at')->orderBy('id'),
+            'quantity_high' => $query->orderByDesc('quantity')->orderByDesc('date')->orderBy('id'),
+            'quantity_low' => $query->orderBy('quantity')->orderByDesc('date')->orderBy('id'),
+            default => $query->orderByDesc('date')->orderByDesc('created_at')->orderBy('id'),
+        };
+        $query->when(\App\Models\WasteSource::available(), fn ($q) => $q->with('wasteSource'))
+            ->with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser', 'createdBy',
+                'haulings' => fn ($q) => $q->whereDate('hauling_date', '<=', $snapshot->toDateString())]);
+        $page = $paginated ? $query->paginate(10)->withQueryString() : null;
+        $records = $page?->getCollection() ?? $query->get();
+        $allocation = app(\App\Services\HaulingPlans::class)->summaries($records);
+        $records = $records->map(fn (WasteRecord $record): array => [
+            ...$this->serializeWasteRecord($record, false, $allocation[(string) $record->id]),
+            'storage_alert' => $alerts->storageAlert($record, $snapshot),
+        ])->values();
+        $page?->setCollection($records);
+        $wasteTypes = WasteType::with(['category', 'characteristic'])->active()->orderBy('name')->get();
 
         return Inertia::render('waste-management/records/Index', [
-            'wasteRecords' => $wasteRecords->map(fn (WasteRecord $record): array => [
-                ...$this->serializeWasteRecord($record),
-                'storage_alert' => $alerts->storageAlert($record, $snapshot),
-            ])->all(),
+            'wasteRecords' => $page ?? $records,
             'recordSummary' => $summary,
-            'filters' => ['month' => $snapshot->format('Y-m'), 'attention' => $attention, 'as_of' => $snapshot->toDateString()],
+            'filters' => ['month' => $snapshot->format('Y-m'), 'attention' => $attention, 'as_of' => $snapshot->toDateString(), 'search' => $search, 'sort' => $sort],
             'wasteTypes' => $wasteTypes,
+            'wasteSources' => \App\Models\WasteSource::options(),
         ]);
+    }
+
+    private function applyRecordAttention(\Illuminate\Database\Eloquent\Builder $query, ?string $attention, CarbonImmutable $snapshot): \Illuminate\Database\Eloquent\Builder
+    {
+        if ($attention === 'pending') {
+            return $query->where('status', 'pending_review')->whereDate('date', '>=', $snapshot->startOfMonth()->toDateString());
+        }
+        if (! in_array($attention, ['expired', 'expiring_soon', 'critical', 'backlog', 'completed', 'fresh'], true)) {
+            return $query;
+        }
+        $query->where('status', 'approved');
+        $remaining = "waste_records.quantity - COALESCE((SELECT SUM(wh.quantity) FROM waste_haulings wh WHERE wh.waste_record_id = waste_records.id AND wh.deleted_at IS NULL AND wh.status = 'approved' AND wh.hauling_date <= ?), 0)";
+        $query->whereRaw($remaining.($attention === 'completed' ? ' <= 0' : ' > 0'), [$snapshot->toDateString()]);
+
+        return match ($attention) {
+            'expired' => $query->whereDate('expiry_date', '<', $snapshot->toDateString()),
+            'expiring_soon' => $query->whereBetween('expiry_date', [$snapshot->toDateString(), $snapshot->addDays(7)->toDateString()]),
+            'critical' => $query->whereDate('expiry_date', '<=', $snapshot->addDays(7)->toDateString()),
+            'fresh' => $query->whereDate('expiry_date', '>', $snapshot->addDays(7)->toDateString()),
+            default => $query,
+        };
     }
 
     private function expiredSnapshot(WasteRecordIndexRequest $request): Response
@@ -163,6 +204,7 @@ class WasteRecordsController extends Controller
 
         return Inertia::render('waste-management/records/Create', [
             'wasteTypes' => $wasteTypes,
+            'wasteSources' => \App\Models\WasteSource::options(),
         ]);
     }
 
@@ -185,6 +227,7 @@ class WasteRecordsController extends Controller
             'quantity' => $request->validated('quantity'),
             'unit' => $request->validated('unit'),
             'source' => $request->validated('source'),
+            ...$request->safe()->only(['source_id']),
             'description' => $request->validated('description'),
             'notes' => $request->validated('notes'),
             'status' => 'draft',
@@ -210,6 +253,9 @@ class WasteRecordsController extends Controller
 
         $wasteRecord->load(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser', 'createdBy']);
         $wasteRecord->load(['haulings.createdBy', 'haulings.approvedByUser']);
+        if (\App\Models\WasteSource::available()) {
+            $wasteRecord->load('wasteSource');
+        }
 
         return Inertia::render('waste-management/records/Show', [
             'wasteRecord' => $this->serializeWasteRecord($wasteRecord, true),
@@ -251,6 +297,7 @@ class WasteRecordsController extends Controller
         return Inertia::render('waste-management/records/Edit', [
             'wasteRecord' => $wasteRecord,
             'wasteTypes' => $wasteTypes,
+            'wasteSources' => \App\Models\WasteSource::options(isset($wasteRecord) ? $wasteRecord->source_id : null),
         ]);
     }
 
@@ -285,8 +332,7 @@ class WasteRecordsController extends Controller
             'waste_type_id' => $request->validated('waste_type_id'),
             'quantity' => $request->validated('quantity'),
             'unit' => $request->validated('unit'),
-            'source' => $request->validated('source'),
-            'description' => $request->validated('description'),
+            ...$request->safe()->only(['source', 'description', 'source_id']),
             'notes' => $request->validated('notes'),
             'updated_by' => Auth::id(),
         ]);
@@ -463,7 +509,8 @@ class WasteRecordsController extends Controller
             ? $alerts->snapshot($request->validated('month'))
             : CarbonImmutable::parse($request->validated('storage_date') ?? today()->toDateString())->startOfDay();
         $query = $alerts->records($request->user())
-            ->with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser',
+            ->when(\App\Models\WasteSource::available(), fn ($query) => $query->with('wasteSource'))
+            ->with(['wasteType.category', 'wasteType.characteristic', 'submittedByUser', 'approvedByUser', 'createdBy',
                 'haulings' => fn ($query) => $query->when($snapshotExport, fn ($query) => $query->whereDate('hauling_date', '<=', $storageDate->toDateString()))])
             ->when($snapshotExport, fn ($query) => $query->whereDate('date', '<=', $storageDate->toDateString()))
             ->orderBy('date', 'desc')->orderBy('created_at', 'desc');
@@ -471,7 +518,7 @@ class WasteRecordsController extends Controller
         $search = mb_strtolower(trim($request->validated('search') ?? ''));
         $storageStatus = $request->validated('attention') ?? $request->validated('storage_status') ?? 'all';
         $wasteRecords = $query->get()->filter(function (WasteRecord $record) use ($search, $storageStatus, $storageDate, $alerts, $snapshotExport, $request): bool {
-            $fields = [$record->record_number, $record->wasteType?->name, $record->wasteType?->code, $record->wasteType?->category?->name, $record->source];
+            $fields = [$record->record_number, $record->wasteType?->name, $record->wasteType?->code, $record->source_name, $record->source];
             if ($search !== '' && ! collect($fields)->contains(fn (?string $value): bool => str_contains(mb_strtolower($value ?? ''), $search))) {
                 return false;
             }
@@ -545,7 +592,7 @@ class WasteRecordsController extends Controller
                     $record->wasteType?->characteristic->name ?? 'N/A',
                     $record->quantity,
                     $record->unit,
-                    $record->source ?? 'N/A',
+                    $record->source_name ?? $record->source ?? 'N/A',
                     $record->description ?? 'N/A',
                     $record->getStatusLabel(),
                     $record->submittedByUser?->name ?? 'N/A',
@@ -565,7 +612,7 @@ class WasteRecordsController extends Controller
     /**
      * @return array<string, mixed>
      */
-    protected function serializeWasteRecord(WasteRecord $record, bool $includeHistory = false): array
+    protected function serializeWasteRecord(WasteRecord $record, bool $includeHistory = false, ?array $allocation = null): array
     {
         $payload = [
             'id' => $record->id,
@@ -576,6 +623,8 @@ class WasteRecordsController extends Controller
             'quantity' => (float) $record->quantity,
             'unit' => $record->unit,
             'source' => $record->source,
+            'source_id' => $record->source_id,
+            'source_name' => $record->source_name,
             'description' => $record->description,
             'notes' => $record->notes,
             'status' => $record->status,
@@ -588,8 +637,7 @@ class WasteRecordsController extends Controller
             'approved_hauled_quantity' => $record->getApprovedHauledQuantity(),
             'remaining_quantity' => $record->getRemainingQuantity(),
             'has_simulated_hauling' => $record->haulings->contains(fn ($hauling): bool => $hauling->status === 'approved' && str_starts_with((string) $hauling->hauling_number, 'SIMULASI-')),
-            'reserved_quantity' => $record->getReservedHaulingQuantity(),
-            ...app(\App\Services\HaulingPlans::class)->summary($record),
+            ...($allocation ?? ['reserved_quantity' => $record->getReservedHaulingQuantity(), ...app(\App\Services\HaulingPlans::class)->summary($record)]),
             'waste_type' => $record->wasteType ? [
                 'name' => $record->wasteType->name,
                 'code' => $record->wasteType->code,

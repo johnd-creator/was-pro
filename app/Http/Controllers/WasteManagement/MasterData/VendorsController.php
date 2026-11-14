@@ -5,8 +5,10 @@ namespace App\Http\Controllers\WasteManagement\MasterData;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\WasteManagement\MasterData\VendorRequest;
 use App\Models\Vendor;
+use App\Models\VendorAgreement;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -24,6 +26,8 @@ class VendorsController extends Controller
         return Inertia::render('waste-management/master-data/Vendors', [
             'vendors' => $vendors->map(fn (Vendor $vendor) => [...$vendor->toArray(), 'license_expiry_day' => $vendor->license_expiry_date?->format('Y-m-d')]),
             'licenseReferenceDate' => now()->toDateString(),
+            'agreementsReady' => Schema::hasTable('vendor_agreements'),
+            'agreements' => Schema::hasTable('vendor_agreements') ? VendorAgreement::with(['transporter:id,name', 'receiver:id,name'])->latest()->get()->map(fn (VendorAgreement $agreement) => [...$agreement->toArray(), 'valid_from' => $agreement->valid_from?->format('Y-m-d'), 'valid_until' => $agreement->valid_until?->format('Y-m-d'), 'period_status' => $agreement->periodStatus()]) : [],
         ]);
     }
 
@@ -33,6 +37,7 @@ class VendorsController extends Controller
     public function store(VendorRequest $request): RedirectResponse
     {
         $vendor = Vendor::create([
+            ...$request->safe()->only(['is_transporter', 'is_processor', 'is_utilizer']),
             'name' => $request->validated('name'),
             'code' => $request->validated('code'),
             'description' => $request->validated('description'),
@@ -57,6 +62,7 @@ class VendorsController extends Controller
     public function update(VendorRequest $request, Vendor $vendor): RedirectResponse
     {
         $vendor->update([
+            ...$request->safe()->only(['is_transporter', 'is_processor', 'is_utilizer']),
             'name' => $request->validated('name'),
             'code' => $request->validated('code'),
             'description' => $request->validated('description'),
@@ -80,9 +86,9 @@ class VendorsController extends Controller
     public function destroy(Vendor $vendor): RedirectResponse
     {
         // Preserve vendor references in operational history.
-        if ($vendor->fabaMovements()->exists() || (\Illuminate\Support\Facades\Schema::hasColumn('waste_haulings', 'vendor_id') && \App\Models\WasteHauling::withTrashed()->where('vendor_id', $vendor->id)->exists())) {
+        if ((Schema::hasTable('vendor_agreements') && VendorAgreement::where('transporter_vendor_id', $vendor->id)->orWhere('receiver_vendor_id', $vendor->id)->exists()) || $vendor->fabaMovements()->exists() || (\Illuminate\Support\Facades\Schema::hasColumn('waste_haulings', 'vendor_id') && \App\Models\WasteHauling::withTrashed()->where('vendor_id', $vendor->id)->exists())) {
             return Redirect::back()
-                ->with('error', 'Vendor memiliki riwayat transaksi FABA atau pengangkutan dan tidak dapat dihapus. Nonaktifkan vendor bila tidak lagi digunakan.');
+                ->with('error', 'Vendor memiliki MoU atau riwayat transaksi FABA/pengangkutan dan tidak dapat dihapus. Nonaktifkan vendor bila tidak lagi digunakan.');
         }
 
         $vendor->delete();

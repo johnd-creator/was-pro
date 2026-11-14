@@ -90,6 +90,13 @@ function formatNumber(value: number): string {
 }
 
 function submit(): void {
+    if (props.record.requires_plan && !selectedPlan.value) {
+        form.setError(
+            'waste_hauling_plan_id',
+            'Pilih rencana koordinator yang sudah disetujui.',
+        );
+        return;
+    }
     submissionKey ??= crypto.randomUUID();
     form.post(scopedUrl(WasteHaulingsController.store().url), {
         preserveScroll: true,
@@ -130,7 +137,12 @@ const { scopedUrl } = useOrganizationContext();
                     v-model="form.waste_hauling_plan_id"
                     class="h-11 w-full rounded-md border bg-background px-3 text-sm"
                 >
-                    <option value="">Tanpa tautan rencana (alur lama)</option>
+                    <option v-if="!record.requires_plan" value="">
+                        Tanpa tautan rencana (alur lama)
+                    </option>
+                    <option v-else value="" disabled>
+                        Pilih rencana koordinator yang disetujui
+                    </option>
                     <option
                         v-for="plan in eligiblePlans"
                         :key="plan.id"
@@ -371,7 +383,8 @@ const { scopedUrl } = useOrganizationContext();
                     form.processing ||
                     !form.quantity ||
                     maximumQuantity <= 0 ||
-                    (!!form.waste_hauling_plan_id && !selectedPlan)
+                    (!!form.waste_hauling_plan_id && !selectedPlan) ||
+                    (record.requires_plan && !selectedPlan)
                 "
                 @click="submit"
             >

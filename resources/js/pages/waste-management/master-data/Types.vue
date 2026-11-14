@@ -3,8 +3,6 @@ import { Head, router } from '@inertiajs/vue3';
 import { Plus } from 'lucide-vue-next';
 import { ref } from 'vue';
 import TypesController from '@/actions/App/Http/Controllers/WasteManagement/MasterData/TypesController';
-import Heading from '@/components/Heading.vue';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -34,6 +32,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import type { BreadcrumbItem } from '@/types';
@@ -56,7 +55,7 @@ interface WasteType {
     name: string;
     code: string;
     category_id: string;
-    characteristic_id: string;
+
     description: string | null;
     storage_period_days: number;
     transport_cost: number;
@@ -87,12 +86,13 @@ const breadcrumbItems: BreadcrumbItem[] = [
 ];
 
 const dialogOpen = ref(false);
+const errors = ref<Record<string, string>>({});
 const editingWasteType = ref<WasteType | null>(null);
 const formData = ref({
     name: '',
     code: '',
     category_id: '',
-    characteristic_id: '',
+
     description: '',
     storage_period_days: 30,
     transport_cost: 0,
@@ -100,12 +100,13 @@ const formData = ref({
 });
 
 function openCreateDialog() {
+    errors.value = {};
     editingWasteType.value = null;
     formData.value = {
         name: '',
         code: '',
         category_id: '',
-        characteristic_id: '',
+
         description: '',
         storage_period_days: 30,
         transport_cost: 0,
@@ -115,12 +116,13 @@ function openCreateDialog() {
 }
 
 function openEditDialog(wasteType: WasteType) {
+    errors.value = {};
     editingWasteType.value = wasteType;
     formData.value = {
         name: wasteType.name,
         code: wasteType.code,
         category_id: wasteType.category_id,
-        characteristic_id: wasteType.characteristic_id,
+
         description: wasteType.description || '',
         storage_period_days: wasteType.storage_period_days,
         transport_cost: parseFloat(String(wasteType.transport_cost)),
@@ -130,11 +132,15 @@ function openEditDialog(wasteType: WasteType) {
 }
 
 function submit() {
+    errors.value = {};
     if (editingWasteType.value) {
         router.put(
             scopedUrl(TypesController.update(editingWasteType.value.id)),
             formData.value,
             {
+                onError: (validationErrors) => {
+                    errors.value = validationErrors;
+                },
                 onSuccess: () => {
                     dialogOpen.value = false;
                 },
@@ -142,6 +148,9 @@ function submit() {
         );
     } else {
         router.post(scopedUrl(TypesController.store()), formData.value, {
+            onError: (validationErrors) => {
+                errors.value = validationErrors;
+            },
             onSuccess: () => {
                 dialogOpen.value = false;
             },
@@ -155,11 +164,6 @@ function deleteWasteType(wasteType: WasteType) {
     }
 }
 
-function getHazardousBadgeClass(isHazardous: boolean) {
-    return isHazardous
-        ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-        : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-}
 const { scopedUrl } = useOrganizationContext();
 </script>
 
@@ -167,37 +171,16 @@ const { scopedUrl } = useOrganizationContext();
     <WasteManagementLayout :breadcrumbs="breadcrumbItems" title="Jenis Limbah">
         <Head title="Jenis Limbah - Waste Management" />
 
-        <div
-            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
-        >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-10 left-1/4 -z-10 h-56 w-56 rounded-full bg-amber-200/18 blur-3xl"
-            />
-
-            <div class="space-y-8">
-                <section
-                    class="wm-surface-hero overflow-hidden rounded-[30px] to-amber-50/20 dark:to-amber-950/18"
-                >
-                    <div
-                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:p-6"
-                    >
-                        <div class="space-y-5">
+        <div class="relative min-w-0 overflow-x-hidden p-4">
+            <div class="space-y-4">
+                <section class="space-y-4">
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+                        <div class="space-y-4">
                             <div class="space-y-3">
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.16em] text-amber-700/70 uppercase"
-                                >
-                                    Operational Catalog
-                                </p>
-                                <Heading
-                                    title="Jenis Limbah"
-                                    description="Kelola jenis limbah lengkap dengan kategori, karakteristik, masa simpan, dan biaya standar."
-                                />
+                                <Heading title="Jenis Limbah" />
                             </div>
 
-                            <div class="grid gap-3 sm:grid-cols-3">
+                            <div class="grid gap-3 sm:grid-cols-2">
                                 <div
                                     class="wm-hero-stat-card wm-hero-stat-neutral"
                                 >
@@ -226,20 +209,6 @@ const { scopedUrl } = useOrganizationContext();
                                         {{ props.categories.length }}
                                     </p>
                                 </div>
-                                <div
-                                    class="wm-hero-stat-card wm-hero-stat-rose"
-                                >
-                                    <p
-                                        class="text-[11px] font-semibold tracking-[0.14em] text-rose-700/80 uppercase"
-                                    >
-                                        Karakteristik
-                                    </p>
-                                    <p
-                                        class="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100"
-                                    >
-                                        {{ props.characteristics.length }}
-                                    </p>
-                                </div>
                             </div>
                         </div>
                         <div
@@ -255,8 +224,8 @@ const { scopedUrl } = useOrganizationContext();
                             <div
                                 class="wm-surface-subtle rounded-[22px] p-4 text-sm leading-6 text-slate-600 dark:text-slate-300"
                             >
-                                Master ini mengikat kategori, karakteristik,
-                                storage period, dan biaya angkut standar.
+                                Master ini mengikat kategori, storage period,
+                                dan biaya angkut standar.
                             </div>
                         </div>
                     </div>
@@ -309,6 +278,18 @@ const { scopedUrl } = useOrganizationContext();
                                 </DialogDescription>
                             </DialogHeader>
                             <form @submit.prevent="submit" class="space-y-4">
+                                <ul
+                                    v-if="Object.keys(errors).length"
+                                    role="alert"
+                                    class="space-y-1 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+                                >
+                                    <li
+                                        v-for="(message, field) in errors"
+                                        :key="field"
+                                    >
+                                        {{ message }}
+                                    </li>
+                                </ul>
                                 <div class="grid gap-2">
                                     <Label for="name">Nama *</Label>
                                     <Input
@@ -330,7 +311,7 @@ const { scopedUrl } = useOrganizationContext();
                                     />
                                 </div>
 
-                                <div class="grid grid-cols-2 gap-4">
+                                <div class="grid gap-4">
                                     <div class="grid gap-2">
                                         <Label for="category_id"
                                             >Kategori *</Label
@@ -353,32 +334,6 @@ const { scopedUrl } = useOrganizationContext();
                                                     {{ category.name }} ({{
                                                         category.code
                                                     }})
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div class="grid gap-2">
-                                        <Label for="characteristic_id"
-                                            >Karakteristik *</Label
-                                        >
-                                        <Select
-                                            v-model="formData.characteristic_id"
-                                            required
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue
-                                                    placeholder="Pilih karakteristik"
-                                                />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem
-                                                    v-for="characteristic in characteristics"
-                                                    :key="characteristic.id"
-                                                    :value="characteristic.id"
-                                                >
-                                                    {{ characteristic.name }}
-                                                    ({{ characteristic.code }})
                                                 </SelectItem>
                                             </SelectContent>
                                         </Select>
@@ -472,7 +427,7 @@ const { scopedUrl } = useOrganizationContext();
                                 <TableHead>Nama</TableHead>
                                 <TableHead>Kode</TableHead>
                                 <TableHead>Kategori</TableHead>
-                                <TableHead>Karakteristik</TableHead>
+
                                 <TableHead>Simpan</TableHead>
                                 <TableHead>Biaya</TableHead>
                                 <TableHead>Status</TableHead>
@@ -482,7 +437,7 @@ const { scopedUrl } = useOrganizationContext();
                         <TableBody>
                             <TableRow v-if="wasteTypes.length === 0">
                                 <TableCell
-                                    :colspan="8"
+                                    :colspan="7"
                                     class="text-center text-muted-foreground"
                                 >
                                     Belum ada jenis limbah.
@@ -502,22 +457,7 @@ const { scopedUrl } = useOrganizationContext();
                                 <TableCell>{{
                                     wasteType.category?.name || '-'
                                 }}</TableCell>
-                                <TableCell>
-                                    <Badge
-                                        v-if="wasteType.characteristic"
-                                        :class="
-                                            getHazardousBadgeClass(
-                                                wasteType.characteristic
-                                                    .is_hazardous,
-                                            )
-                                        "
-                                    >
-                                        {{ wasteType.characteristic.name }}
-                                    </Badge>
-                                    <span v-else class="text-muted-foreground"
-                                        >-</span
-                                    >
-                                </TableCell>
+
                                 <TableCell
                                     >{{
                                         wasteType.storage_period_days

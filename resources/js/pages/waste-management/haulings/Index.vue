@@ -8,11 +8,9 @@ import {
     Plus,
     RotateCcw,
     Search,
-    Truck,
 } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { index as plansIndex } from '@/actions/App/Http/Controllers/WasteManagement/WasteHaulingPlansController';
-import Heading from '@/components/Heading.vue';
 import Link from '@/components/OrganizationLink.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -37,8 +35,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import CreateWasteHaulingForm from '@/components/waste-management/CreateWasteHaulingForm.vue';
 import ExpiryBadge from '@/components/waste-management/ExpiryBadge.vue';
+import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
     compareWasteQuantities,
@@ -84,6 +84,21 @@ interface RecordItem {
 
 const props = defineProps<{
     records: RecordItem[];
+    backlogContract?: number;
+    backlogContracts?: number[];
+    initialPage?: number;
+    filters?: {
+        search: string;
+        urgency: 'all' | 'expired' | 'expiring_soon' | 'fresh';
+        sort: 'priority' | 'latest' | 'remaining_high';
+    };
+    pagination?: {
+        current_page: number;
+        last_page: number;
+        total: number;
+        from: number | null;
+        to: number | null;
+    };
     metadataAvailable?: boolean;
     plansEnabled?: boolean;
     actualDateLimit?: string;
@@ -94,14 +109,131 @@ const props = defineProps<{
         total_records: number;
         remaining_quantities: { unit: string; quantity: number }[];
         pending_requests: number;
+        expired?: number;
+        expiring_soon?: number;
+        fresh?: number;
+        attention_quantities?: { unit: string; quantity: number }[];
     };
 }>();
 
-const search = ref('');
-const urgencyFilter = ref<'all' | 'expired' | 'expiring_soon' | 'fresh'>('all');
-const sortKey = ref<'priority' | 'latest' | 'remaining_high'>('priority');
-const currentPage = ref(1);
+const { scopedUrl } = useOrganizationContext();
+
+const search = ref(props.filters?.search ?? '');
+const urgencyFilter = ref<'all' | 'expired' | 'expiring_soon' | 'fresh'>(
+    props.filters?.urgency ?? 'all',
+);
+const sortKey = ref<'priority' | 'latest' | 'remaining_high'>(
+    props.filters?.sort ?? 'priority',
+);
+const clientPage = ref(props.initialPage ?? 1);
+const serverPaginated = computed(
+    () => props.backlogContract === 2 && !!props.pagination,
+);
+const supportsPagination = computed(
+    () => props.backlogContracts?.includes(2) ?? false,
+);
+const currentPage = computed(() =>
+    serverPaginated.value ? props.pagination!.current_page : clientPage.value,
+);
 const perPage = 10;
+const loading = ref(false);
+let filterTimer: ReturnType<typeof setTimeout> | undefined;
+let cancelVisit: (() => void) | undefined;
+let visitSequence = 0;
+let ownVisit = false;
+
+function cancelPending(): void {
+    clearTimeout(filterTimer);
+    filterTimer = undefined;
+    visitSequence++;
+    const cancel = cancelVisit;
+    cancelVisit = undefined;
+    cancel?.();
+    loading.value = false;
+}
+
+const removeBeforeListener = router.on('before', () => {
+    if (!ownVisit) cancelPending();
+});
+const removeNavigateListener = router.on('navigate', () => {
+    cancelVisit = undefined;
+    cancelPending();
+});
+
+watch(
+    () => props.filters,
+    (filters) => {
+        if (!filters) return;
+        search.value = filters.search;
+        urgencyFilter.value = filters.urgency;
+        sortKey.value = filters.sort;
+    },
+);
+watch([search, urgencyFilter, sortKey], () => {
+    cancelPending();
+    clientPage.value = 1;
+    if (
+        !supportsPagination.value ||
+        (search.value === props.filters?.search &&
+            urgencyFilter.value === props.filters?.urgency &&
+            sortKey.value === props.filters?.sort)
+    )
+        return;
+    filterTimer = setTimeout(() => visitPage(1, true), 300);
+});
+onMounted(() => {
+    window.addEventListener('popstate', cancelPending);
+    if (supportsPagination.value && !serverPaginated.value)
+        visitPage(props.initialPage ?? 1, true);
+});
+onBeforeUnmount(() => {
+    cancelPending();
+    removeBeforeListener();
+    removeNavigateListener();
+    window.removeEventListener('popstate', cancelPending);
+});
+
+function visitPage(page: number, replace = false): void {
+    clearTimeout(filterTimer);
+    clientPage.value = page;
+    const sequence = ++visitSequence;
+    ownVisit = true;
+    try {
+        router.get(
+            scopedUrl(
+                wasteManagementRoutes.haulings.index.url({
+                    mergeQuery: {
+                        search: search.value || null,
+                        urgency: urgencyFilter.value,
+                        sort: sortKey.value,
+                        page,
+                    },
+                }),
+            ),
+            {},
+            {
+                headers: { 'X-Waspro-Backlog-Contract': '2' },
+                preserveState: true,
+                preserveScroll: true,
+                replace,
+                onCancelToken: (token) => {
+                    cancelVisit = () => token.cancel();
+                },
+                onStart: () => {
+                    loading.value = true;
+                },
+                onFinish: () => {
+                    if (sequence === visitSequence) {
+                        loading.value = false;
+                        cancelVisit = undefined;
+                    }
+                },
+            },
+        );
+    } finally {
+        ownVisit = false;
+    }
+}
 
 const isCreateDialogOpen = ref(false);
 const selectedRecord = ref<RecordItem | null>(null);
@@ -122,11 +254,14 @@ function handleCreateSuccess(): void {
     isCreateDialogOpen.value = false;
     selectedRecord.value = null;
     router.reload({
-        only: ['records', 'stats', 'approvedPlans', 'plansEnabled'],
+        headers: supportsPagination.value
+            ? { 'X-Waspro-Backlog-Contract': '2' }
+            : {},
     });
 }
 
 const filteredRecords = computed(() => {
+    if (serverPaginated.value) return props.records;
     const query = search.value.trim().toLowerCase();
 
     return [...props.records]
@@ -195,54 +330,60 @@ const freshRecords = computed(() =>
     ),
 );
 
-const attentionQuantityLabel = computed(
-    () =>
-        summarizeWasteQuantities([
-            ...expiredRecords.value,
-            ...expiringSoonRecords.value,
-        ])
-            .map(({ unit, quantity }) => `${formatNumber(quantity)} ${unit}`)
-            .join(', ') || 'Tidak ada sisa material',
+const expiredCount = computed(() =>
+    serverPaginated.value
+        ? (props.stats.expired ?? 0)
+        : expiredRecords.value.length,
 );
-const highestPriorityRecord = computed(() => {
-    const prioritized = [...props.records].sort((left, right) => {
-        const leftRank = expiryRank(left.expiry_date);
-        const rightRank = expiryRank(right.expiry_date);
-
-        if (leftRank !== rightRank) {
-            return leftRank - rightRank;
-        }
-
-        return (
-            new Date(left.expiry_date ?? left.date).getTime() -
-            new Date(right.expiry_date ?? right.date).getTime()
-        );
-    });
-
-    return prioritized[0] ?? null;
+const expiringSoonCount = computed(() =>
+    serverPaginated.value
+        ? (props.stats.expiring_soon ?? 0)
+        : expiringSoonRecords.value.length,
+);
+const freshCount = computed(() =>
+    serverPaginated.value
+        ? (props.stats.fresh ?? 0)
+        : freshRecords.value.length,
+);
+const attentionQuantityLabel = computed(() => {
+    const quantities = serverPaginated.value
+        ? (props.stats.attention_quantities ?? [])
+        : summarizeWasteQuantities([
+              ...expiredRecords.value,
+              ...expiringSoonRecords.value,
+          ]);
+    return (
+        quantities
+            .map(({ unit, quantity }) => `${formatNumber(quantity)} ${unit}`)
+            .join(', ') || 'Tidak ada sisa material'
+    );
 });
-
-const hasAnyRecords = computed(() => props.records.length > 0);
+const hasAnyRecords = computed(() => props.stats.total_records > 0);
 const hasActiveFilters = computed(
     () => search.value.trim().length > 0 || urgencyFilter.value !== 'all',
 );
 const totalPages = computed(() =>
-    Math.max(1, Math.ceil(filteredRecords.value.length / perPage)),
+    serverPaginated.value
+        ? props.pagination!.last_page
+        : Math.max(1, Math.ceil(filteredRecords.value.length / perPage)),
 );
 const paginatedRecords = computed(() => {
+    if (serverPaginated.value) return props.records;
     const start = (currentPage.value - 1) * perPage;
-
     return filteredRecords.value.slice(start, start + perPage);
 });
 const pageRangeLabel = computed(() => {
-    if (filteredRecords.value.length === 0) {
-        return '0 dari 0 backlog';
-    }
-
-    const start = (currentPage.value - 1) * perPage + 1;
-    const end = Math.min(start + perPage - 1, filteredRecords.value.length);
-
-    return `${start}-${end} dari ${filteredRecords.value.length} backlog`;
+    const total = serverPaginated.value
+        ? props.pagination!.total
+        : filteredRecords.value.length;
+    if (total === 0) return '0 dari 0 limbah belum terkelola';
+    const start = serverPaginated.value
+        ? props.pagination!.from
+        : (currentPage.value - 1) * perPage + 1;
+    const end = serverPaginated.value
+        ? props.pagination!.to
+        : Math.min(start! + perPage - 1, total);
+    return `${start}-${end} dari ${total} limbah belum terkelola`;
 });
 
 function formatDate(value: string): string {
@@ -321,7 +462,7 @@ function operationalStatusClass(
 }
 
 function resetPage(): void {
-    currentPage.value = 1;
+    clientPage.value = 1;
 }
 
 function resetFilters(): void {
@@ -332,7 +473,9 @@ function resetFilters(): void {
 }
 
 function changePage(page: number): void {
-    currentPage.value = Math.min(Math.max(page, 1), totalPages.value);
+    const target = Math.min(Math.max(page, 1), totalPages.value);
+    if (supportsPagination.value) visitPage(target);
+    else clientPage.value = target;
 }
 </script>
 
@@ -343,44 +486,21 @@ function changePage(page: number): void {
     >
         <Head title="Pengangkutan Limbah" />
 
-        <div
-            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
-        >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[340px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-10 left-1/3 -z-10 h-56 w-56 rounded-full bg-teal-200/15 blur-3xl"
-            />
-            <div
-                class="pointer-events-none absolute top-28 right-0 -z-10 h-56 w-56 rounded-full bg-orange-200/15 blur-3xl"
-            />
-
-            <div class="space-y-8">
-                <section
-                    class="wm-surface-hero overflow-hidden rounded-[30px] via-slate-50/80 to-teal-50/20 dark:via-slate-900 dark:to-teal-950/18"
-                >
-                    <div
-                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:p-6"
-                    >
-                        <div class="space-y-5">
+        <div class="relative min-w-0 overflow-x-hidden p-4">
+            <div class="space-y-4">
+                <section class="space-y-4">
+                    <div class="min-w-0">
+                        <div class="space-y-4">
                             <div class="space-y-3">
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.16em] text-teal-700/70 uppercase"
-                                >
-                                    Waste Logistics
-                                </p>
-                                <Heading
-                                    title="Pengangkutan Limbah"
-                                    description="Pantau backlog limbah siap angkut, prioritas masa simpan, dan progres penyelesaian operasional dari satu halaman."
-                                />
+                                <Heading title="Pengangkutan Limbah" />
                             </div>
 
                             <div class="flex flex-wrap gap-3">
                                 <div
                                     class="wm-chip px-3 py-1.5 text-xs font-medium"
                                 >
-                                    Backlog: {{ stats.total_records }}
+                                    Limbah Belum Terkelola:
+                                    {{ stats.total_records }}
                                 </div>
                                 <div
                                     class="wm-chip-amber px-3 py-1.5 text-xs font-medium"
@@ -392,10 +512,7 @@ function changePage(page: number): void {
                                     class="wm-chip-rose px-3 py-1.5 text-xs font-medium"
                                 >
                                     Perlu atensi:
-                                    {{
-                                        expiredRecords.length +
-                                        expiringSoonRecords.length
-                                    }}
+                                    {{ expiredCount + expiringSoonCount }}
                                 </div>
                             </div>
 
@@ -420,7 +537,7 @@ function changePage(page: number): void {
                                     <p
                                         class="text-sm font-semibold tracking-tight text-slate-800 dark:text-slate-100"
                                     >
-                                        Backlog siap angkut
+                                        Limbah Belum Terkelola siap angkut
                                     </p>
                                     <p
                                         class="mt-2 text-3xl font-black tracking-tight text-slate-950 dark:text-slate-100"
@@ -430,9 +547,9 @@ function changePage(page: number): void {
                                     <p
                                         class="mt-2 text-[12px] leading-5 text-slate-600 dark:text-slate-300"
                                     >
-                                        {{ freshRecords.length }} backlog masih
-                                        aman, sisanya butuh perhatian lebih
-                                        dekat.
+                                        {{ freshCount }} limbah belum terkelola
+                                        masih aman, sisanya butuh perhatian
+                                        lebih dekat.
                                     </p>
                                 </div>
 
@@ -496,10 +613,7 @@ function changePage(page: number): void {
                                     <p
                                         class="mt-2 text-3xl font-black tracking-tight text-slate-950 dark:text-slate-100"
                                     >
-                                        {{
-                                            expiredRecords.length +
-                                            expiringSoonRecords.length
-                                        }}
+                                        {{ expiredCount + expiringSoonCount }}
                                     </p>
                                     <p
                                         class="mt-2 text-[12px] leading-5 text-slate-600 dark:text-slate-300"
@@ -509,119 +623,6 @@ function changePage(page: number): void {
                                         expired.
                                     </p>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div
-                            class="wm-surface-panel space-y-4 rounded-[28px] p-5"
-                        >
-                            <div class="space-y-2">
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400"
-                                >
-                                    Fokus Operasional
-                                </p>
-                                <p
-                                    class="text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
-                                >
-                                    Prioritas pengangkutan
-                                </p>
-                            </div>
-
-                            <Button
-                                as-child
-                                variant="outline"
-                                class="w-full justify-start border-white/90 bg-white/85 shadow-sm hover:bg-white dark:border-slate-800/80 dark:bg-slate-950/80 dark:hover:bg-slate-950"
-                            >
-                                <Link
-                                    :href="
-                                        wasteManagementRoutes.haulings.pendingApproval.url()
-                                    "
-                                >
-                                    Review approval pengangkutan
-                                </Link>
-                            </Button>
-
-                            <div
-                                v-if="highestPriorityRecord"
-                                class="wm-surface-subtle rounded-[22px] p-4"
-                            >
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
-                                >
-                                    Prioritas utama
-                                </p>
-                                <p
-                                    class="mt-3 text-sm font-semibold text-slate-900 dark:text-slate-100"
-                                >
-                                    {{ highestPriorityRecord.record_number }}
-                                </p>
-                                <p
-                                    class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300"
-                                >
-                                    {{
-                                        highestPriorityRecord.waste_type.name ||
-                                        '-'
-                                    }}
-                                    • Sisa
-                                    {{
-                                        formatNumber(
-                                            highestPriorityRecord.remaining_quantity,
-                                        )
-                                    }}
-                                    {{ highestPriorityRecord.unit }}
-                                </p>
-                                <div class="mt-3">
-                                    <ExpiryBadge
-                                        :expiry-date="
-                                            highestPriorityRecord.expiry_date
-                                        "
-                                        :remaining-quantity="
-                                            highestPriorityRecord.remaining_quantity
-                                        "
-                                        :simulated="
-                                            highestPriorityRecord.hauling_history.some(
-                                                (entry) =>
-                                                    entry.status ===
-                                                        'approved' &&
-                                                    entry.hauling_number.startsWith(
-                                                        'SIMULASI-',
-                                                    ),
-                                            )
-                                        "
-                                    />
-                                </div>
-                                <Button
-                                    size="sm"
-                                    class="mt-4 w-full"
-                                    @click="
-                                        openCreateDialog(highestPriorityRecord)
-                                    "
-                                >
-                                    <Truck class="mr-2 h-3.5 w-3.5" />
-                                    {{
-                                        plansEnabled
-                                            ? 'Rencana / realisasi prioritas'
-                                            : 'Catat realisasi prioritas'
-                                    }}
-                                </Button>
-                            </div>
-
-                            <div
-                                v-else
-                                class="wm-surface-subtle rounded-[22px] p-4"
-                            >
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
-                                >
-                                    Status backlog
-                                </p>
-                                <p
-                                    class="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300"
-                                >
-                                    Belum ada backlog pengangkutan yang perlu
-                                    ditindaklanjuti saat ini.
-                                </p>
                             </div>
                         </div>
                     </div>
@@ -639,7 +640,7 @@ function changePage(page: number): void {
                                 class="mt-2 flex items-center gap-3 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
                             >
                                 <span class="h-px w-8 bg-slate-300" />
-                                Cari dan saring backlog
+                                Cari dan saring limbah belum terkelola
                             </h3>
                         </div>
                     </div>
@@ -655,14 +656,10 @@ function changePage(page: number): void {
                                 v-model="search"
                                 class="pl-9"
                                 placeholder="Cari nomor catatan, jenis limbah, kategori, atau sumber"
-                                @update:model-value="resetPage"
                             />
                         </div>
 
-                        <Select
-                            v-model="urgencyFilter"
-                            @update:model-value="resetPage"
-                        >
+                        <Select v-model="urgencyFilter">
                             <SelectTrigger>
                                 <SelectValue placeholder="Filter urgensi" />
                             </SelectTrigger>
@@ -682,12 +679,11 @@ function changePage(page: number): void {
                             </SelectContent>
                         </Select>
 
-                        <Select
-                            v-model="sortKey"
-                            @update:model-value="resetPage"
-                        >
+                        <Select v-model="sortKey">
                             <SelectTrigger>
-                                <SelectValue placeholder="Urutkan backlog" />
+                                <SelectValue
+                                    placeholder="Urutkan limbah belum terkelola"
+                                />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="priority"
@@ -761,14 +757,14 @@ function changePage(page: number): void {
                                             >
                                                 {{
                                                     hasAnyRecords
-                                                        ? 'Tidak ada backlog yang cocok'
-                                                        : 'Belum ada backlog pengangkutan'
+                                                        ? 'Tidak ada limbah belum terkelola yang cocok'
+                                                        : 'Belum ada limbah belum terkelola'
                                                 }}
                                             </p>
                                             <p class="max-w-md text-xs">
                                                 {{
                                                     hasAnyRecords
-                                                        ? 'Ubah pencarian atau filter urgensi untuk melihat backlog lain.'
+                                                        ? 'Ubah pencarian atau filter urgensi untuk melihat limbah lain.'
                                                         : 'Limbah yang sudah disetujui dan masih tersisa akan muncul di sini.'
                                                 }}
                                             </p>
@@ -965,7 +961,7 @@ function changePage(page: number): void {
                         <Button
                             variant="outline"
                             size="sm"
-                            :disabled="currentPage === 1"
+                            :disabled="loading || currentPage === 1"
                             @click="changePage(currentPage - 1)"
                         >
                             Sebelumnya
@@ -977,7 +973,7 @@ function changePage(page: number): void {
                         <Button
                             variant="outline"
                             size="sm"
-                            :disabled="currentPage === totalPages"
+                            :disabled="loading || currentPage === totalPages"
                             @click="changePage(currentPage + 1)"
                         >
                             Berikutnya

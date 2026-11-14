@@ -44,7 +44,7 @@ defineProps<{
                 >
                     <Link
                         :href="home()"
-                        class="inline-flex w-fit items-center rounded-full border border-slate-200/80 bg-white/88 px-4 py-2 shadow-[0_20px_45px_-32px_rgba(15,23,42,0.22)] backdrop-blur transition-colors hover:border-slate-300 dark:border-slate-800/80 dark:bg-slate-950/82 dark:hover:border-slate-700"
+                        class="inline-flex w-fit items-center rounded-2xl border border-transparent px-4 py-3"
                     >
                         <AppLogoAuth />
                     </Link>
@@ -83,6 +83,13 @@ defineProps<{
                 </section>
 
                 <section class="mx-auto w-full max-w-[460px] lg:max-w-none">
+                    <Link
+                        :href="home()"
+                        class="mx-auto mb-5 flex w-fit items-center lg:hidden"
+                        aria-label="WASPRO"
+                    >
+                        <AppLogoAuth />
+                    </Link>
                     <div
                         class="overflow-hidden rounded-[32px] border border-slate-200/85 bg-white/95 shadow-[0_34px_90px_-42px_rgba(15,23,42,0.42)] backdrop-blur-xl dark:border-slate-800/85 dark:bg-slate-950/90 dark:shadow-[0_34px_90px_-42px_rgba(2,6,23,0.92)]"
                     >
@@ -90,33 +97,14 @@ defineProps<{
                             class="border-b border-slate-200/80 px-6 py-5 sm:px-8 dark:border-slate-800/80"
                         >
                             <div
-                                class="flex flex-wrap items-center justify-between gap-4"
+                                class="flex items-center justify-center"
+                                data-testid="auth-pln-brand"
                             >
-                                <Link
-                                    :href="home()"
-                                    class="inline-flex items-center gap-1 lg:hidden"
-                                >
-                                    <AppLogoAuth />
-                                </Link>
-                                <div class="hidden min-w-0 lg:block">
-                                    <p
-                                        class="text-xs font-semibold tracking-[0.18em] text-cyan-700/80 uppercase dark:text-cyan-300/80"
-                                    >
-                                        Account Access
-                                    </p>
-                                    <p
-                                        class="mt-1 text-sm text-slate-600 dark:text-slate-300"
-                                    >
-                                        {{ appName }}
-                                    </p>
-                                </div>
-                                <div
-                                    class="flex shrink-0 items-center justify-center rounded-xl bg-white px-3 py-2"
-                                >
+                                <div class="rounded-xl bg-white px-3 py-2">
                                     <img
                                         src="/logo_ip.png"
                                         alt="PLN Indonesia Power"
-                                        class="h-auto w-28 object-contain sm:w-32"
+                                        class="h-auto w-36 object-contain sm:w-40"
                                     />
                                 </div>
                             </div>

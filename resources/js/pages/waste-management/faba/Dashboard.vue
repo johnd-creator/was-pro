@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import { ArrowRight, AlertTriangle } from 'lucide-vue-next';
+import { ArrowRight } from 'lucide-vue-next';
 import { computed, reactive, ref, watch } from 'vue';
 import Link from '@/components/OrganizationLink.vue';
 import { Badge } from '@/components/ui/badge';
@@ -90,9 +90,10 @@ const latestOperationalMovements = computed(() =>
     props.latestMovements.slice(0, 6),
 );
 const trendRows = computed(() =>
-    props.trend
-        .slice(-6)
-        .map((item) => ({ ...item, gap: item.production - item.utilization })),
+    props.trend.map((item) => ({
+        ...item,
+        gap: item.production - item.utilization,
+    })),
 );
 const trendMax = computed(() =>
     Math.max(
@@ -180,31 +181,13 @@ const { scopedUrl } = useOrganizationContext();
     >
         <Head title="Dashboard FABA" />
         <div
-            class="mx-auto w-full max-w-[1600px] space-y-7 px-4 py-6 sm:px-6 lg:px-8"
+            class="mx-auto w-full max-w-[1600px] space-y-4 p-4"
             :aria-busy="loading"
         >
-            <header
-                class="flex flex-wrap items-start justify-between gap-5 border-b border-slate-200 pb-6 dark:border-slate-800"
-            >
-                <div class="max-w-2xl">
-                    <p
-                        class="text-xs font-semibold tracking-widest text-blue-700 uppercase dark:text-blue-300"
-                    >
-                        Fly Ash &amp; Bottom Ash
-                    </p>
-                    <h1
-                        class="mt-2 text-3xl font-semibold tracking-tight text-slate-950 dark:text-white"
-                    >
-                        Dashboard FABA
-                    </h1>
-                    <p
-                        class="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400"
-                    >
-                        Lihat material yang dihasilkan, sudah dimanfaatkan, dan
-                        masih tersimpan. Pilih tahun untuk meninjau data
-                        organisasi ini.
-                    </p>
-                </div>
+            <header class="flex flex-wrap items-center justify-between gap-3">
+                <h1 class="text-lg leading-6 font-semibold tracking-tight">
+                    Dashboard FABA
+                </h1>
                 <form
                     class="flex items-end gap-2"
                     @submit.prevent="applyFilters"
@@ -368,61 +351,36 @@ const { scopedUrl } = useOrganizationContext();
                     </article>
                 </div>
             </section>
-            <section
-                aria-labelledby="integrity-heading"
-                class="rounded-2xl border px-5 py-4"
-                :class="
-                    warnings.length || stats.negative_periods
-                        ? 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30'
-                        : 'border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900'
-                "
+            <div
+                v-if="warnings.length || stats.negative_periods"
+                role="alert"
+                class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
             >
-                <h2
-                    id="integrity-heading"
-                    class="flex items-center gap-2 text-sm font-semibold text-slate-950 dark:text-white"
-                >
-                    <AlertTriangle
-                        v-if="warnings.length || stats.negative_periods"
-                        class="size-4 text-amber-700"
-                    />Konsistensi data
-                </h2>
-                <p
-                    v-if="stats.negative_periods"
-                    class="mt-2 text-sm text-amber-900 dark:text-amber-200"
-                >
+                <p v-if="stats.negative_periods" class="font-semibold">
                     {{ stats.negative_periods }} periode memiliki saldo negatif.
-                    Periksa transaksi dan lakukan rekonsiliasi.
                 </p>
-                <ul
-                    v-if="warnings.length"
-                    class="mt-2 space-y-2 text-sm text-amber-900 dark:text-amber-200"
-                >
+                <ul v-if="warnings.length" class="space-y-1">
                     <li
                         v-for="item in warnings"
                         :key="`${item.month}-${item.message}`"
                     >
                         <strong>{{ item.period_label }}:</strong>
-                        {{ item.message }} · saldo
-                        {{ formatNumber(item.closing_balance) }} ton
+                        {{ item.message }} (saldo
+                        {{ formatNumber(item.closing_balance) }} ton).
                     </li>
                 </ul>
-                <p
-                    v-if="!warnings.length && !stats.negative_periods"
-                    class="mt-1 text-sm text-slate-600 dark:text-slate-300"
-                >
-                    Tidak ada peringatan integritas data pada tahun {{ year }}.
-                </p>
-                <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                    Pemeriksaan saldo ini terpisah dari peringatan kapasitas
-                    penyimpanan di atas.
-                </p>
-            </section>
+                <Link
+                    :href="wasteManagementRoutes.faba.recaps.monthly.url()"
+                    class="mt-2 inline-flex min-h-11 items-center gap-2 font-semibold underline underline-offset-2"
+                    >Periksa rekap dan rekonsiliasi<ArrowRight class="size-4"
+                /></Link>
+            </div>
             <section
                 aria-labelledby="trend-heading"
                 class="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
             >
                 <div
-                    class="flex flex-wrap items-start justify-between gap-4 px-5 py-5"
+                    class="flex flex-wrap items-start justify-between gap-4 px-4 py-3"
                 >
                     <div>
                         <h2
@@ -432,8 +390,8 @@ const { scopedUrl } = useOrganizationContext();
                             Produksi dan pemanfaatan per bulan
                         </h2>
                         <p class="mt-1 text-sm text-slate-500">
-                            Enam periode terakhir pada tahun {{ year }} ·
-                            seluruh nilai dalam ton.
+                            Seluruh periode pada tahun {{ year }} · seluruh
+                            nilai dalam ton.
                         </p>
                     </div>
                     <div v-if="latestApprovedPeriod" class="text-sm">
@@ -460,7 +418,7 @@ const { scopedUrl } = useOrganizationContext();
                 </div>
                 <p
                     v-if="!trendRows.length"
-                    class="px-5 pb-5 text-sm text-slate-500"
+                    class="px-4 pb-4 text-sm text-slate-500"
                 >
                     Belum ada data produksi atau pemanfaatan pada tahun ini.
                 </p>
@@ -492,11 +450,11 @@ const { scopedUrl } = useOrganizationContext();
                             <tr v-for="item in trendRows" :key="item.month">
                                 <th
                                     scope="row"
-                                    class="px-5 py-4 font-medium text-slate-900 dark:text-white"
+                                    class="px-4 py-3 font-medium text-slate-900 dark:text-white"
                                 >
                                     {{ item.label }}
                                 </th>
-                                <td class="px-5 py-4">
+                                <td class="px-4 py-3">
                                     <span
                                         class="font-semibold text-blue-700 tabular-nums dark:text-blue-300"
                                         >{{
@@ -515,7 +473,7 @@ const { scopedUrl } = useOrganizationContext();
                                         />
                                     </div>
                                 </td>
-                                <td class="px-5 py-4">
+                                <td class="px-4 py-3">
                                     <span
                                         class="font-semibold text-emerald-700 tabular-nums dark:text-emerald-300"
                                         >{{
@@ -535,7 +493,7 @@ const { scopedUrl } = useOrganizationContext();
                                     </div>
                                 </td>
                                 <td
-                                    class="px-5 py-4 text-right font-semibold tabular-nums"
+                                    class="px-4 py-3 text-right font-semibold tabular-nums"
                                     :class="
                                         item.closing_balance < 0
                                             ? 'text-red-700 dark:text-red-300'
@@ -566,7 +524,7 @@ const { scopedUrl } = useOrganizationContext();
                     <Card
                         class="min-w-0 gap-0 rounded-2xl border-slate-200 bg-white py-0 dark:border-slate-800 dark:bg-slate-900"
                     >
-                        <CardHeader class="px-5 py-4">
+                        <CardHeader class="px-4 py-3">
                             <p
                                 class="text-[11px] font-semibold tracking-[0.16em] text-sky-700/70 uppercase"
                             >
@@ -576,7 +534,7 @@ const { scopedUrl } = useOrganizationContext();
                                 Transaksi perlu diperiksa
                             </CardTitle>
                         </CardHeader>
-                        <CardContent class="px-5 pb-5">
+                        <CardContent class="px-4 pb-4">
                             <div
                                 v-if="pendingTransactionApprovals.length === 0"
                                 class="rounded-xl bg-slate-50 px-4 py-4 text-sm text-slate-500 dark:bg-slate-950 dark:text-slate-400"
@@ -659,7 +617,7 @@ const { scopedUrl } = useOrganizationContext();
                     ><Card
                         class="min-w-0 gap-0 rounded-2xl border-slate-200 bg-white py-0 dark:border-slate-800 dark:bg-slate-900"
                     >
-                        <CardHeader class="px-5 py-4">
+                        <CardHeader class="px-4 py-3">
                             <p
                                 class="text-[11px] font-semibold tracking-[0.16em] text-emerald-700/70 uppercase"
                             >
@@ -669,7 +627,7 @@ const { scopedUrl } = useOrganizationContext();
                                 Periode siap diajukan
                             </CardTitle>
                         </CardHeader>
-                        <CardContent class="px-5 pb-5">
+                        <CardContent class="px-4 pb-4">
                             <div
                                 v-if="readyClosingPeriods.length === 0"
                                 class="rounded-xl bg-slate-50 px-4 py-4 text-sm text-slate-500 dark:bg-slate-950 dark:text-slate-400"
@@ -728,7 +686,7 @@ const { scopedUrl } = useOrganizationContext();
                     ><Card
                         class="min-w-0 gap-0 rounded-2xl border-slate-200 bg-white py-0 dark:border-slate-800 dark:bg-slate-900"
                     >
-                        <CardHeader class="px-5 py-4">
+                        <CardHeader class="px-4 py-3">
                             <p
                                 class="text-[11px] font-semibold tracking-[0.16em] text-orange-700/70 uppercase"
                             >
@@ -738,7 +696,7 @@ const { scopedUrl } = useOrganizationContext();
                                 Rekap menunggu pemeriksaan
                             </CardTitle>
                         </CardHeader>
-                        <CardContent class="px-5 pb-5">
+                        <CardContent class="px-4 pb-4">
                             <div
                                 v-if="pendingApprovals.length === 0"
                                 class="rounded-xl bg-slate-50 px-4 py-4 text-sm text-slate-500 dark:bg-slate-950 dark:text-slate-400"
@@ -791,7 +749,7 @@ const { scopedUrl } = useOrganizationContext();
                 <Card
                     class="min-w-0 gap-0 rounded-2xl border-slate-200 bg-white py-0 shadow-none dark:border-slate-800 dark:bg-slate-900"
                 >
-                    <CardHeader class="px-5 py-4"
+                    <CardHeader class="px-4 py-3"
                         ><CardTitle class="text-base"
                             >Transaksi terbaru</CardTitle
                         >
@@ -799,7 +757,7 @@ const { scopedUrl } = useOrganizationContext();
                             Enam transaksi terakhir yang tersedia.
                         </p></CardHeader
                     >
-                    <CardContent class="px-5 pb-5">
+                    <CardContent class="px-4 pb-4">
                         <p
                             v-if="!latestOperationalMovements.length"
                             class="rounded-xl bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-950"
@@ -862,7 +820,7 @@ const { scopedUrl } = useOrganizationContext();
                 <Card
                     class="min-w-0 gap-0 rounded-2xl border-slate-200 bg-white py-0 shadow-none dark:border-slate-800 dark:bg-slate-900"
                 >
-                    <CardHeader class="px-5 py-4"
+                    <CardHeader class="px-4 py-3"
                         ><CardTitle class="text-base"
                             >Penerima pemanfaatan</CardTitle
                         >
@@ -871,7 +829,7 @@ const { scopedUrl } = useOrganizationContext();
                             tahun {{ year }}.
                         </p></CardHeader
                     >
-                    <CardContent class="px-5 pb-5"
+                    <CardContent class="px-4 pb-4"
                         ><p
                             v-if="!topVendors.length"
                             class="rounded-xl bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-950"

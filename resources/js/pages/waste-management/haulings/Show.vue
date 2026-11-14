@@ -4,7 +4,6 @@ import { AlertCircle, CircleCheck } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { show as showPlan } from '@/actions/App/Http/Controllers/WasteManagement/WasteHaulingPlansController';
 import WasteHaulingsController from '@/actions/App/Http/Controllers/WasteManagement/WasteHaulingsController';
-import Heading from '@/components/Heading.vue';
 import Link from '@/components/OrganizationLink.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -17,6 +16,7 @@ import {
 } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import ExpiryBadge from '@/components/waste-management/ExpiryBadge.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
@@ -200,30 +200,10 @@ const { scopedUrl } = useOrganizationContext();
         :breadcrumbs="breadcrumbItems"
         title="Detail Pengangkutan"
     >
-        <div
-            v-if="hauling.metadata_available"
-            class="space-y-2 px-6 py-4 text-sm"
-        >
-            <p>Vendor: {{ hauling.vendor_name || '-' }}</p>
-            <p>Kendaraan: {{ hauling.vehicle_number || '-' }}</p>
-            <p>Pengemudi: {{ hauling.driver_name || '-' }}</p>
-            <p>Manifest / dokumen: {{ hauling.document_number || '-' }}</p>
-            <p>Tujuan: {{ hauling.destination || '-' }}</p>
-            <p>Penerima: {{ hauling.receiver || '-' }}</p>
-            <a
-                v-if="hauling.has_attachment"
-                :href="
-                    scopedUrl(
-                        WasteHaulingsController.attachment(hauling.id).url,
-                    )
-                "
-                class="underline"
-                >Unduh bukti pengangkutan</a
-            >
-        </div>
         <Head :title="`${hauling.hauling_number} - Pengangkutan Limbah`" />
 
-        <div class="space-y-6 px-4 py-5 sm:px-6 lg:px-8">
+        <div class="min-w-0 space-y-4 p-4">
+            <Heading title="Detail Pengangkutan" />
             <div class="space-y-2 rounded-lg border bg-muted/40 p-4 text-sm">
                 <p v-if="hauling.record_kind === 'legacy_actual'">
                     Catatan tanpa tautan rencana (alur lama). Persetujuan
@@ -245,31 +225,6 @@ const { scopedUrl } = useOrganizationContext();
                     >Buka rencana angkut terkait</Link
                 >
             </div>
-            <div
-                v-if="hauling.metadata_available"
-                class="space-y-2 px-6 py-4 text-sm"
-            >
-                <p>Vendor: {{ hauling.vendor_name || '-' }}</p>
-                <p>Kendaraan: {{ hauling.vehicle_number || '-' }}</p>
-                <p>Pengemudi: {{ hauling.driver_name || '-' }}</p>
-                <p>Manifest / dokumen: {{ hauling.document_number || '-' }}</p>
-                <p>Tujuan: {{ hauling.destination || '-' }}</p>
-                <p>Penerima: {{ hauling.receiver || '-' }}</p>
-                <a
-                    v-if="hauling.has_attachment"
-                    :href="
-                        scopedUrl(
-                            WasteHaulingsController.attachment(hauling.id).url,
-                        )
-                    "
-                    class="underline"
-                    >Unduh bukti pengangkutan</a
-                >
-            </div>
-            <Heading
-                title="Detail Pengangkutan"
-                description="Tinjau pengajuan, status approval, dan dampaknya terhadap sisa limbah."
-            />
 
             <Alert
                 v-if="statusMessage || flash?.success"
@@ -339,7 +294,77 @@ const { scopedUrl } = useOrganizationContext();
                             >
                             {{ hauling.rejection_reason }}
                         </div>
-                    </CardContent>
+
+                        <section
+                            v-if="hauling.metadata_available"
+                            aria-label="Dokumen dan pelaksana pengangkutan"
+                            class="space-y-3 border-t pt-3"
+                            data-testid="hauling-operational-metadata"
+                        >
+                            <dl class="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+                                <div>
+                                    <dt class="text-muted-foreground">
+                                        Vendor
+                                    </dt>
+                                    <dd class="font-medium break-words">
+                                        {{ hauling.vendor_name || '-' }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="text-muted-foreground">
+                                        Kendaraan
+                                    </dt>
+                                    <dd class="font-medium break-words">
+                                        {{ hauling.vehicle_number || '-' }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="text-muted-foreground">
+                                        Pengemudi
+                                    </dt>
+                                    <dd class="font-medium break-words">
+                                        {{ hauling.driver_name || '-' }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="text-muted-foreground">
+                                        Manifest / dokumen
+                                    </dt>
+                                    <dd class="font-medium break-words">
+                                        {{ hauling.document_number || '-' }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="text-muted-foreground">
+                                        Tujuan
+                                    </dt>
+                                    <dd class="font-medium break-words">
+                                        {{ hauling.destination || '-' }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="text-muted-foreground">
+                                        Penerima
+                                    </dt>
+                                    <dd class="font-medium break-words">
+                                        {{ hauling.receiver || '-' }}
+                                    </dd>
+                                </div>
+                            </dl>
+                            <a
+                                v-if="hauling.has_attachment"
+                                :href="
+                                    scopedUrl(
+                                        WasteHaulingsController.attachment(
+                                            hauling.id,
+                                        ).url,
+                                    )
+                                "
+                                class="inline-flex min-h-11 items-center py-2 text-primary underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
+                                >Unduh bukti pengangkutan</a
+                            >
+                        </section></CardContent
+                    >
                 </Card>
 
                 <Card>
@@ -527,7 +552,7 @@ const { scopedUrl } = useOrganizationContext();
                         </div>
                         <div class="mt-1 text-muted-foreground">
                             {{ history.hauling_date }}
-                            ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢
+                            &bull;
                             {{ history.quantity }}
                             {{ history.unit }}
                         </div>

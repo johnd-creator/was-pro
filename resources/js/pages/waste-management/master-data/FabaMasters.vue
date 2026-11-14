@@ -6,10 +6,10 @@ import {
     store,
     update,
 } from '@/actions/App/Http/Controllers/WasteManagement/MasterData/FabaMastersController';
-import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 interface Master {
@@ -60,11 +60,8 @@ function save(): void {
         :breadcrumbs="[{ title, href: index.url(kind) }]"
     >
         <Head :title="title" />
-        <div class="space-y-6 p-4">
-            <Heading
-                :title="title"
-                description="Nonaktifkan data yang tidak dipakai. Kode tetap untuk menjaga perhitungan dan riwayat transaksi."
-            />
+        <div class="space-y-4 p-4">
+            <Heading :title="title" />
             <form
                 v-if="canCreate || (selected && canEdit)"
                 class="grid max-w-2xl gap-3 rounded border p-4"

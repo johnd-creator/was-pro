@@ -10,7 +10,6 @@ import {
 import { computed } from 'vue';
 import WasteRecordsController from '@/actions/App/Http/Controllers/WasteManagement/WasteRecordsController';
 import AlertError from '@/components/AlertError.vue';
-import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -26,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import { formatLocalDate } from '@/lib/date';
@@ -48,6 +48,7 @@ interface WasteType {
 
 type Props = {
     wasteTypes: WasteType[];
+    wasteSources?: { id: string; name: string; is_active: boolean }[];
 };
 
 const props = defineProps<Props>();
@@ -68,8 +69,7 @@ const form = useForm({
     waste_type_id: '',
     quantity: '',
     unit: 'kg',
-    source: '',
-    description: '',
+    source_id: '',
     notes: '',
 });
 
@@ -164,11 +164,6 @@ function submit(): void {
     });
 }
 
-function getHazardousClass(isHazardous: boolean): string {
-    return isHazardous
-        ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-        : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-}
 const { scopedUrl } = useOrganizationContext();
 </script>
 
@@ -180,23 +175,10 @@ const { scopedUrl } = useOrganizationContext();
         <Head title="Tambah Catatan Limbah - Manajemen Limbah" />
 
         <div
-            class="relative mx-auto w-full max-w-2xl overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 md:max-w-3xl lg:max-w-5xl lg:px-8 lg:py-8"
+            class="relative mx-auto w-full max-w-2xl overflow-x-hidden p-4 md:max-w-3xl lg:max-w-5xl"
         >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[340px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-10 left-1/3 -z-10 h-56 w-56 rounded-full bg-sky-200/15 blur-3xl"
-            />
-            <div
-                class="pointer-events-none absolute top-28 right-0 -z-10 h-56 w-56 rounded-full bg-emerald-200/15 blur-3xl"
-            />
-
-            <div class="space-y-8">
-                <Heading
-                    title="Tambah Catatan Limbah"
-                    description="Catat limbah baru dengan detail yang dibutuhkan untuk proses operasional dan pemantauan masa simpan. Dicatat oleh akan terisi otomatis dengan akun yang menyimpan catatan ini."
-                />
+            <div class="space-y-4">
+                <Heading title="Tambah Catatan Limbah" />
 
                 <Alert v-if="form.hasErrors" variant="destructive">
                     <TriangleAlert class="h-4 w-4" />
@@ -206,7 +188,7 @@ const { scopedUrl } = useOrganizationContext();
                     </AlertDescription>
                 </Alert>
 
-                <form @submit.prevent="submit" class="space-y-8">
+                <form @submit.prevent="submit" class="space-y-4">
                     <AlertError
                         v-if="form.hasErrors"
                         :errors="Object.values(form.errors)"
@@ -217,7 +199,7 @@ const { scopedUrl } = useOrganizationContext();
                     <Card
                         class="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] transition-shadow duration-300 hover:shadow-[0_28px_70px_-36px_rgba(15,23,42,0.38)] dark:bg-slate-950"
                     >
-                        <CardContent class="space-y-6 p-8">
+                        <CardContent class="space-y-4 px-4 py-0">
                             <div class="grid gap-4">
                                 <Label for="date">Tanggal pencatatan *</Label>
                                 <Input
@@ -258,26 +240,13 @@ const { scopedUrl } = useOrganizationContext();
                                                         type.code
                                                     }})</span
                                                 >
-                                                <span
-                                                    v-if="type.characteristic"
-                                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                                    :class="
-                                                        getHazardousClass(
-                                                            type.characteristic
-                                                                .is_hazardous,
-                                                        )
-                                                    "
-                                                >
-                                                    {{ type.category?.name }}
-                                                </span>
                                             </div>
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <p class="text-xs text-muted-foreground">
                                     Pilih jenis limbah yang paling sesuai agar
-                                    kategori dan masa simpan dihitung dengan
-                                    benar.
+                                    masa simpan dihitung dengan benar.
                                 </p>
                                 <InputError
                                     :message="form.errors.waste_type_id"
@@ -301,7 +270,7 @@ const { scopedUrl } = useOrganizationContext();
                                 expiryInfo.variant === 'neutral',
                         }"
                     >
-                        <CardContent class="space-y-6 p-8">
+                        <CardContent class="space-y-4 px-4 py-0">
                             <div class="flex items-start gap-3">
                                 <component
                                     :is="
@@ -392,7 +361,7 @@ const { scopedUrl } = useOrganizationContext();
                     <Card
                         class="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] transition-shadow duration-300 hover:shadow-[0_28px_70px_-36px_rgba(15,23,42,0.38)] dark:bg-slate-950"
                     >
-                        <CardContent class="space-y-6 p-8">
+                        <CardContent class="space-y-4 px-4 py-0">
                             <div class="grid gap-6 md:grid-cols-2">
                                 <div class="space-y-2">
                                     <Label
@@ -464,53 +433,47 @@ const { scopedUrl } = useOrganizationContext();
                     <Card
                         class="border border-slate-200 bg-white shadow-sm transition-shadow duration-300 hover:shadow-md dark:bg-slate-950"
                     >
-                        <CardContent class="space-y-6 p-8">
+                        <CardContent class="space-y-4 px-4 py-0">
                             <div class="space-y-2">
-                                <Label
-                                    for="source"
-                                    class="text-sm font-medium text-slate-700 dark:text-slate-200"
-                                    >Sumber / lokasi</Label
-                                >
-                                <Input
-                                    id="source"
-                                    v-model="form.source"
-                                    placeholder="Contoh: Gudang A, Jalur Produksi 2"
-                                    class="h-11"
-                                />
-                                <p
-                                    class="text-sm text-slate-500 dark:text-slate-400"
-                                >
-                                    Isi asal limbah atau lokasi penemuan agar
-                                    proses pelacakan lebih mudah.
+                                <p class="text-sm text-muted-foreground">
+                                    Dicatat oleh akan terisi otomatis dengan
+                                    akun yang menyimpan catatan ini.
                                 </p>
-                                <InputError :message="form.errors.source" />
-                            </div>
-
-                            <div class="space-y-2">
-                                <Label
-                                    for="description"
-                                    class="text-sm font-medium text-slate-700 dark:text-slate-200"
-                                    >Deskripsi</Label
+                                <Label for="source_id">Sumber limbah</Label>
+                                <select
+                                    id="source_id"
+                                    v-model="form.source_id"
+                                    class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                    :disabled="!props.wasteSources?.length"
                                 >
-                                <Textarea
-                                    id="description"
-                                    v-model="form.description"
-                                    placeholder="Tambahkan deskripsi singkat tentang kondisi atau jenis limbah"
-                                    rows="3"
-                                    class="min-h-[80px]"
-                                />
+                                    <option value="">Belum tercatat</option>
+                                    <option
+                                        v-for="source in props.wasteSources"
+                                        :key="source.id"
+                                        :value="source.id"
+                                    >
+                                        {{ source.name
+                                        }}{{
+                                            source.is_active
+                                                ? ''
+                                                : ' (nonaktif)'
+                                        }}
+                                    </option>
+                                </select>
                                 <p
-                                    class="text-sm text-slate-500 dark:text-slate-400"
+                                    v-if="!props.wasteSources?.length"
+                                    class="text-xs text-muted-foreground"
                                 >
-                                    Gunakan deskripsi singkat bila ada informasi
-                                    penting yang tidak tercakup pada jenis
-                                    limbah.
+                                    Master sumber belum tersedia. Pengelola
+                                    dapat menambahkannya di Master Data.
                                 </p>
-                                <InputError
-                                    :message="form.errors.description"
-                                />
+                                <p
+                                    v-if="form.errors.source_id"
+                                    class="text-sm text-destructive"
+                                >
+                                    {{ form.errors.source_id }}
+                                </p>
                             </div>
-
                             <div class="space-y-2">
                                 <Label
                                     for="notes"
@@ -540,7 +503,7 @@ const { scopedUrl } = useOrganizationContext();
                     <Card
                         class="border border-slate-200 bg-white shadow-sm transition-shadow duration-300 hover:shadow-md dark:bg-slate-950"
                     >
-                        <CardContent class="p-8">
+                        <CardContent class="space-y-4 px-4 py-0">
                             <div
                                 class="rounded-lg border border-dashed bg-muted/30 p-6 text-base text-slate-600 dark:text-slate-300"
                             >

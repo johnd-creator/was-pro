@@ -38,12 +38,100 @@ class WasteHaulingsController extends Controller
 
     public function index(): Response
     {
+        if (! request()->header('X-Inertia') || request()->header('X-Waspro-Backlog-Contract') !== '2') {
+            return $this->legacyIndex();
+        }
+        $plansService = app(\App\Services\HaulingPlans::class);
+        $plansEnabled = $plansService->enabled();
+        $viewAll = $this->canViewAllHaulings();
+        $today = today($plansService->timezone())->toDateString();
+        $soon = today($plansService->timezone())->addDays(7)->toDateString();
+        $search = is_string(request()->query('search')) ? mb_substr(trim(request()->query('search')), 0, 200) : '';
+        $urgency = in_array(request()->query('urgency'), ['expired', 'expiring_soon', 'fresh'], true) ? request()->query('urgency') : 'all';
+        $sort = in_array(request()->query('sort'), ['latest', 'remaining_high'], true) ? request()->query('sort') : 'priority';
+        $approved = WasteHauling::query()->approved()->selectRaw('waste_record_id, SUM(quantity) AS approved_quantity')->groupBy('waste_record_id');
+        $remaining = '(waste_records.quantity - COALESCE(hauling_totals.approved_quantity, 0))';
+        $base = WasteRecord::query()->approved()
+            ->leftJoinSub($approved, 'hauling_totals', 'hauling_totals.waste_record_id', '=', 'waste_records.id')
+            ->whereRaw($remaining.' > 0');
+        if (! $viewAll) {
+            $base->where(fn ($own) => $own->where('waste_records.created_by', Auth::id())
+                ->when($plansEnabled, fn ($shared) => $shared->orWhereIn('waste_records.id', $plansService->operatorPlans()->select('waste_record_id'))));
+        }
+
+        $totals = (clone $base)->selectRaw("unit, COUNT(*) AS total_records, SUM($remaining) AS remaining_quantity,
+            SUM(CASE WHEN expiry_date < ? THEN 1 ELSE 0 END) AS expired,
+            SUM(CASE WHEN expiry_date >= ? AND expiry_date <= ? THEN 1 ELSE 0 END) AS expiring_soon,
+            SUM(CASE WHEN expiry_date > ? THEN 1 ELSE 0 END) AS fresh,
+            SUM(CASE WHEN expiry_date <= ? THEN $remaining ELSE 0 END) AS attention_quantity", [$today, $today, $soon, $soon, $soon])
+            ->groupBy('unit')->orderBy('unit')->get();
+        $query = (clone $base)->select('waste_records.*')->selectRaw('COALESCE(hauling_totals.approved_quantity, 0) AS approved_hauled_quantity')
+            ->with(['wasteType.category', 'wasteType.characteristic', 'haulings' => fn ($history) => $history
+                ->select(['id', 'waste_record_id', 'hauling_number', 'hauling_date', 'quantity', 'unit', 'status', 'created_by'])
+                ->when(! $viewAll && ! $this->canApproveHaulings() && ! $this->canRejectHaulings(), fn ($own) => $own->where('created_by', Auth::id()))
+                ->orderByDesc('hauling_date')->orderByDesc('created_at')]);
+        if ($search !== '') {
+            $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
+            $query->where(fn ($match) => $match->where('record_number', 'ilike', $like)
+                ->orWhereHas('wasteType', fn ($type) => $type->where('name', 'ilike', $like)->orWhere('code', 'ilike', $like)
+                    ->orWhereHas('category', fn ($category) => $category->where('name', 'ilike', $like)))
+                ->orWhere(fn ($source) => $source->where('source', 'ilike', $like)->when(! $viewAll, fn ($own) => $own->where('waste_records.created_by', Auth::id()))));
+        }
+        match ($urgency) {
+            'expired' => $query->where('expiry_date', '<', $today),
+            'expiring_soon' => $query->whereBetween('expiry_date', [$today, $soon]),
+            'fresh' => $query->where('expiry_date', '>', $soon),
+            default => null,
+        };
+        match ($sort) {
+            'latest' => $query->orderByDesc('date'),
+            'remaining_high' => $query->orderBy('unit')->orderByRaw($remaining.' DESC'),
+            default => $query->orderByRaw('CASE WHEN expiry_date < ? THEN 0 WHEN expiry_date <= ? THEN 1 WHEN expiry_date IS NOT NULL THEN 2 ELSE 3 END', [$today, $soon])->orderByRaw('COALESCE(expiry_date, date)'),
+        };
+        $page = $query->orderBy('waste_records.id')->paginate(10)->withQueryString();
+        if ($page->currentPage() > $page->lastPage()) {
+            $page = $query->paginate(10, ['*'], 'page', $page->lastPage())->withQueryString();
+        }
+        $summaries = $plansService->summaries($page->getCollection());
+        $records = $page->getCollection()->map(fn (WasteRecord $record): array => $this->serializeBacklogRecord($record, $summaries[$record->id], true))->all();
+        $plans = $plansEnabled ? \App\Models\WasteHaulingPlan::query()->where('status', 'approved')
+            ->whereIn('waste_record_id', $page->getCollection()->modelKeys())
+            ->with(['wasteRecord', 'createdBy', 'approvedByUser', 'closedByUser', 'haulings'])
+            ->when(! $viewAll, fn ($query) => $query->where(fn ($own) => $own->where('created_by', Auth::id())->orWhereIn('id', $plansService->operatorPlans()->select('id'))))->get() : collect();
+        $metadataAvailable = app(\App\Services\HaulingMetadata::class)->available();
+
+        return Inertia::render('waste-management/haulings/Index', [
+            'backlogContract' => 2,
+            'backlogContracts' => [1, 2],
+            'approvedPlans' => $plans->map(fn ($plan) => app(WasteHaulingPlansController::class)->serialize($plan, true)),
+            'actualDateLimit' => $plansService->actualDateLimit(),
+            'actualDateTimezone' => $plansService->timezone(),
+            'plansEnabled' => $plansEnabled,
+            'metadataAvailable' => $metadataAvailable,
+            'vendors' => $metadataAvailable ? \App\Models\Vendor::query()->active()->orderBy('name')->get(['id', 'name', 'license_number', 'license_expiry_date'])->map(fn ($vendor) => [...$vendor->toArray(), 'license_expiry_date' => $vendor->license_expiry_date?->format('Y-m-d')]) : [],
+            'records' => $records,
+            'filters' => ['search' => $search, 'urgency' => $urgency, 'sort' => $sort],
+            'pagination' => ['current_page' => $page->currentPage(), 'last_page' => $page->lastPage(), 'total' => $page->total(), 'from' => $page->firstItem(), 'to' => $page->lastItem()],
+            'stats' => [
+                'total_records' => (int) $totals->sum('total_records'),
+                'remaining_quantities' => $totals->map(fn ($row): array => ['unit' => $row->unit, 'quantity' => round((float) $row->remaining_quantity, 2)])->all(),
+                'expired' => (int) $totals->sum('expired'),
+                'expiring_soon' => (int) $totals->sum('expiring_soon'),
+                'fresh' => (int) $totals->sum('fresh'),
+                'attention_quantities' => $totals->filter(fn ($row): bool => (int) $row->expired + (int) $row->expiring_soon > 0)->map(fn ($row): array => ['unit' => $row->unit, 'quantity' => round((float) $row->attention_quantity, 2)])->values()->all(),
+                'pending_requests' => WasteHauling::query()->pendingApproval()->when(! $viewAll, fn ($query) => $query->where('created_by', Auth::id()))->count(),
+            ],
+        ]);
+    }
+
+    private function legacyIndex(): Response
+    {
         $query = WasteRecord::query()
             ->with([
                 'wasteType.category',
                 'wasteType.characteristic',
                 'haulings' => fn ($query) => $query
-                    ->with(['vendor', 'createdBy', 'approvedByUser'])
+                    ->with(['vendor', 'createdBy', 'submittedByUser', 'approvedByUser'])
                     ->orderByDesc('hauling_date')
                     ->orderByDesc('created_at'),
             ])
@@ -51,22 +139,40 @@ class WasteHaulingsController extends Controller
             ->orderBy('date');
 
         if (! $this->canViewAllHaulings()) {
-            $query->where('created_by', Auth::id());
+            $query->where(fn ($own) => $own->where('created_by', Auth::id())->when(app(\App\Services\HaulingPlans::class)->enabled(), fn ($shared) => $shared->orWhereIn('id', app(\App\Services\HaulingPlans::class)->operatorPlans()->select('waste_record_id'))));
         }
 
-        $records = $query
-            ->get()
-            ->filter(fn (WasteRecord $record): bool => $record->getRemainingQuantity() > 0)
-            ->values()
-            ->map(fn (WasteRecord $record): array => $this->serializeBacklogRecord($record))
-            ->all();
+        $backlog = $query->get()->filter(fn (WasteRecord $record): bool => $record->getRemainingQuantity() > 0)->values();
+        $summaries = app(\App\Services\HaulingPlans::class)->summaries($backlog);
+        $backlog->each(function (WasteRecord $record): void {
+            $record->haulings->each(fn (WasteHauling $hauling) => $hauling->setRelation('wasteRecord', $record));
+        });
+        $visiblePlans = [];
+        if (app(\App\Services\HaulingPlans::class)->enabled()) {
+            $planIds = $backlog->flatMap(fn (WasteRecord $record) => $record->haulings->pluck('waste_hauling_plan_id'))->filter()->unique()->values();
+            $visiblePlans = $this->canViewAllHaulings() || $this->canApproveHaulings() || $this->canRejectHaulings()
+                ? $planIds->flip()->all()
+                : \App\Models\WasteHaulingPlan::query()->whereIn('id', $planIds)
+                    ->where(fn ($own) => $own->when(Auth::user()->hasPermission('waste_hauling.view_own'), fn ($owned) => $owned->where('created_by', Auth::id()), fn ($none) => $none->whereRaw('1 = 0'))
+                        ->orWhereIn('id', app(\App\Services\HaulingPlans::class)->operatorPlans()->select('id')))
+                    ->pluck('id')->flip()->all();
+        }
+        $records = $backlog->map(fn (WasteRecord $record): array => $this->serializeBacklogRecord($record, $summaries[$record->id], false, $visiblePlans))->all();
 
         $metadataAvailable = app(\App\Services\HaulingMetadata::class)->available();
 
-        $plans = app(\App\Services\HaulingPlans::class)->enabled() ? \App\Models\WasteHaulingPlan::query()->where('status', 'approved')->when(! $this->canViewAllHaulings(), fn ($query) => $query->where('created_by', Auth::id()))->get() : collect();
+        $plans = app(\App\Services\HaulingPlans::class)->enabled() ? \App\Models\WasteHaulingPlan::query()->with(['wasteRecord', 'createdBy', 'approvedByUser', 'closedByUser', 'haulings'])->where('status', 'approved')->when(! $this->canViewAllHaulings(), fn ($query) => $query->where(fn ($own) => $own->where('created_by', Auth::id())->orWhereIn('id', app(\App\Services\HaulingPlans::class)->operatorPlans()->select('id'))))->get() : collect();
 
         return Inertia::render('waste-management/haulings/Index', [
-            'approvedPlans' => $plans->map(fn ($plan) => app(WasteHaulingPlansController::class)->serialize($plan)),
+            'initialPage' => max(1, filter_var(request()->query('page', 1), FILTER_VALIDATE_INT) ?: 1),
+            'filters' => [
+                'search' => is_string(request()->query('search')) ? mb_substr(trim(request()->query('search')), 0, 200) : '',
+                'urgency' => in_array(request()->query('urgency'), ['expired', 'expiring_soon', 'fresh'], true) ? request()->query('urgency') : 'all',
+                'sort' => in_array(request()->query('sort'), ['latest', 'remaining_high'], true) ? request()->query('sort') : 'priority',
+            ],
+            'backlogContract' => 1,
+            'backlogContracts' => [1, 2],
+            'approvedPlans' => $plans->map(fn ($plan) => app(WasteHaulingPlansController::class)->serialize($plan, true)),
             'actualDateLimit' => app(\App\Services\HaulingPlans::class)->actualDateLimit(),
             'actualDateTimezone' => app(\App\Services\HaulingPlans::class)->timezone(),
             'plansEnabled' => app(\App\Services\HaulingPlans::class)->enabled(),
@@ -82,8 +188,7 @@ class WasteHaulingsController extends Controller
                         'quantity' => round((float) $group->sum('remaining_quantity'), 2),
                     ])->values()->all(),
                 'pending_requests' => WasteHauling::query()->pendingApproval()
-                    ->when(! $this->canViewAllHaulings(), fn ($query) => $query
-                        ->whereHas('wasteRecord', fn ($records) => $records->where('created_by', Auth::id())))
+                    ->when(! $this->canViewAllHaulings(), fn ($query) => $query->where('created_by', Auth::id()))
                     ->count(),
             ],
         ]);
@@ -96,11 +201,11 @@ class WasteHaulingsController extends Controller
             ->findOrFail((string) request()->query('waste_record'));
 
         abort_unless($record->isApproved(), 404);
-        abort_unless($this->canViewAllHaulings() || $record->created_by === Auth::id(), 403);
+        abort_unless($this->canViewAllHaulings() || $record->created_by === Auth::id() || app(\App\Services\HaulingPlans::class)->canOperatePlan(request()->query('waste_hauling_plan_id'), $record->id), 403);
 
         $metadataAvailable = app(\App\Services\HaulingMetadata::class)->available();
 
-        $plans = app(\App\Services\HaulingPlans::class)->enabled() ? \App\Models\WasteHaulingPlan::query()->where('waste_record_id', $record->id)->where('status', 'approved')->when(! $this->canViewAllHaulings(), fn ($query) => $query->where('created_by', Auth::id()))->get() : collect();
+        $plans = app(\App\Services\HaulingPlans::class)->enabled() ? \App\Models\WasteHaulingPlan::query()->where('waste_record_id', $record->id)->where('status', 'approved')->when(! $this->canViewAllHaulings(), fn ($query) => $query->where(fn ($own) => $own->where('created_by', Auth::id())->orWhereIn('id', app(\App\Services\HaulingPlans::class)->operatorPlans()->select('id'))))->get() : collect();
 
         return Inertia::render('waste-management/haulings/Create', [
             'selectedPlanId' => $plans->contains('id', request()->query('waste_hauling_plan_id')) ? request()->query('waste_hauling_plan_id') : null,
@@ -124,7 +229,7 @@ class WasteHaulingsController extends Controller
             return Redirect::back()->with('error', 'Hanya limbah yang sudah disetujui yang dapat diajukan angkut.');
         }
 
-        if (! $this->canViewAllHaulings() && $record->created_by !== Auth::id()) {
+        if (! $this->canViewAllHaulings() && $record->created_by !== Auth::id() && ! app(\App\Services\HaulingPlans::class)->canOperatePlan($request->validated('waste_hauling_plan_id'), $record->id)) {
             abort(403);
         }
 
@@ -217,6 +322,8 @@ class WasteHaulingsController extends Controller
             ->all();
 
         return Inertia::render('waste-management/haulings/PendingApproval', [
+            'plansAvailable' => app(\App\Services\HaulingPlans::class)->enabled(),
+            'pendingPlans' => collect(app(\App\Services\OperationalAlerts::class)->forRequest(request())['alerts'])->filter(fn (array $alert): bool => str_starts_with($alert['id'], 'hauling_plan_'))->values()->all(),
             'haulings' => $haulings,
         ]);
     }
@@ -273,16 +380,19 @@ class WasteHaulingsController extends Controller
             ->with('success', 'Pengajuan pengangkutan dibatalkan.');
     }
 
-    protected function serializeBacklogRecord(WasteRecord $record): array
+    protected function serializeBacklogRecord(WasteRecord $record, ?array $summary = null, bool $compactHistory = false, ?array $visiblePlans = null): array
     {
-        $record->loadMissing([
-            'wasteType.category',
-            'wasteType.characteristic',
-            'haulings' => fn ($query) => $query
-                ->with(['vendor', 'createdBy', 'approvedByUser'])
-                ->orderByDesc('hauling_date')
-                ->orderByDesc('created_at'),
-        ]);
+        if (! $compactHistory) {
+            $record->loadMissing([
+                'wasteType.category',
+                'wasteType.characteristic',
+                'haulings' => fn ($query) => $query
+                    ->with(['vendor', 'createdBy', 'approvedByUser'])
+                    ->orderByDesc('hauling_date')
+                    ->orderByDesc('created_at'),
+            ]);
+        }
+        $summary ??= app(\App\Services\HaulingPlans::class)->summary($record);
 
         return [
             'id' => $record->id,
@@ -291,7 +401,8 @@ class WasteHaulingsController extends Controller
             'expiry_date' => $record->expiry_date?->format('Y-m-d'),
             'quantity' => (float) $record->quantity,
             'unit' => $record->unit,
-            'source' => $record->source,
+            'source' => $record->created_by === Auth::id() || $this->canViewAllHaulings() ? $record->source : null,
+            'requires_plan' => ! $this->canViewAllHaulings() && $record->created_by !== Auth::id(),
             'status' => $record->status,
             'waste_type' => [
                 'name' => $record->wasteType?->name,
@@ -305,11 +416,12 @@ class WasteHaulingsController extends Controller
             ],
             'approved_hauled_quantity' => $record->getApprovedHauledQuantity(),
             'remaining_quantity' => $record->getRemainingQuantity(),
-            'reserved_quantity' => $record->getReservedHaulingQuantity(),
-            ...app(\App\Services\HaulingPlans::class)->summary($record),
+            'reserved_quantity' => $summary['reserved_quantity'] ?? $record->getReservedHaulingQuantity(),
+            ...$summary,
+            ...(! $this->canViewAllHaulings() && $record->created_by !== Auth::id() ? ['available_quantity' => 0] : []),
             'operational_status' => $record->getOperationalStatus(),
             'operational_status_label' => $record->getOperationalStatusLabel(),
-            'hauling_history' => $record->haulings->map(fn (WasteHauling $hauling): array => $this->serializeHauling($hauling))->all(),
+            'hauling_history' => $record->haulings->filter(fn ($row) => $this->canViewAllHaulings() || $this->canApproveHaulings() || $this->canRejectHaulings() || $row->created_by === Auth::id())->values()->map(fn (WasteHauling $hauling): array => $compactHistory ? ['id' => $hauling->id, 'hauling_number' => $hauling->hauling_number, 'hauling_date' => $hauling->hauling_date?->format('Y-m-d'), 'quantity' => (float) $hauling->quantity, 'unit' => $hauling->unit, 'status' => $hauling->status, 'status_label' => $hauling->getStatusLabel()] : $this->serializeHauling($hauling, $visiblePlans === null ? null : array_key_exists((string) $hauling->waste_hauling_plan_id, $visiblePlans)))->all(),
         ];
     }
 
@@ -323,7 +435,7 @@ class WasteHaulingsController extends Controller
         return $this->normalizeQuantity($quantity - $availableQuantity) > 0;
     }
 
-    protected function serializeHauling(WasteHauling $hauling): array
+    protected function serializeHauling(WasteHauling $hauling, ?bool $canViewPlan = null): array
     {
         $hauling->loadMissing(['wasteRecord.wasteType.category', 'createdBy', 'submittedByUser', 'approvedByUser']);
 
@@ -331,7 +443,7 @@ class WasteHaulingsController extends Controller
             'id' => $hauling->id,
             ...app(\App\Services\HaulingMetadata::class)->serialize($hauling),
             'waste_hauling_plan_id' => $hauling->waste_hauling_plan_id,
-            'can_view_plan' => app(\App\Services\HaulingPlans::class)->canViewPlan($hauling),
+            'can_view_plan' => $canViewPlan ?? app(\App\Services\HaulingPlans::class)->canViewPlan($hauling),
             'record_kind' => $hauling->waste_hauling_plan_id ? 'planned_actual' : 'legacy_actual',
             'hauling_number' => $hauling->hauling_number,
             'hauling_date' => $hauling->hauling_date?->format('Y-m-d'),

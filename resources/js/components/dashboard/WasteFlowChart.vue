@@ -339,7 +339,7 @@ function formatQuantity(value: number): string {
         class="min-w-0 gap-0 overflow-hidden rounded-2xl border border-slate-200 bg-white py-0 shadow-none dark:border-slate-800 dark:bg-slate-900"
     >
         <CardHeader
-            class="border-b border-slate-100 px-5 py-5 dark:border-slate-800"
+            class="border-b border-slate-100 px-4 py-3 dark:border-slate-800"
         >
             <div
                 class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
@@ -425,7 +425,7 @@ function formatQuantity(value: number): string {
             </div>
         </CardHeader>
 
-        <CardContent class="space-y-5 px-5 py-5">
+        <CardContent class="space-y-4 px-4 py-4">
             <div
                 class="wm-text-secondary flex flex-wrap items-center gap-3 text-sm"
             >

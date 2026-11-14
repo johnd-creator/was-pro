@@ -8,7 +8,6 @@ import {
     Save,
 } from 'lucide-vue-next';
 import { computed, watch } from 'vue';
-import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,6 +21,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import wasteManagementRoutes from '@/routes/waste-management';
@@ -91,36 +91,12 @@ const { scopedUrl } = useOrganizationContext();
         title="Edit Produksi FABA"
     >
         <Head title="Edit Produksi FABA" />
-        <div
-            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
-        >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[340px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-10 left-1/3 -z-10 h-56 w-56 rounded-full bg-blue-200/15 blur-3xl"
-            />
-            <div
-                class="pointer-events-none absolute top-24 right-0 -z-10 h-56 w-56 rounded-full bg-orange-200/15 blur-3xl"
-            />
-
-            <div class="mx-auto max-w-5xl space-y-8">
-                <section
-                    class="wm-surface-hero overflow-hidden rounded-[30px] via-slate-50/80 to-blue-50/20 dark:via-slate-900 dark:to-blue-950/20"
-                >
-                    <div
-                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6"
-                    >
+        <div class="relative min-w-0 overflow-x-hidden p-4">
+            <div class="mx-auto max-w-5xl space-y-4">
+                <section class="space-y-4">
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
                         <div class="space-y-4">
-                            <p
-                                class="text-[11px] font-semibold tracking-[0.16em] text-blue-700/70 uppercase"
-                            >
-                                Production Revision
-                            </p>
-                            <Heading
-                                title="Edit Produksi FABA"
-                                description="Perbarui transaksi produksi dengan konteks yang tetap jelas sebelum kembali masuk ke workflow bulanan."
-                            />
+                            <Heading title="Edit Produksi FABA" />
 
                             <div class="grid gap-3 sm:grid-cols-3">
                                 <div
@@ -217,11 +193,11 @@ const { scopedUrl } = useOrganizationContext();
                     </div>
                 </section>
 
-                <form class="space-y-6" @submit.prevent="submit">
+                <form class="space-y-4" @submit.prevent="submit">
                     <Card
                         class="rounded-[28px] border-slate-200/80 bg-white/90 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.28)] dark:bg-slate-950/85"
                     >
-                        <CardContent class="space-y-6 p-6">
+                        <CardContent class="space-y-4 px-4 py-0">
                             <div
                                 class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]"
                             >

@@ -203,20 +203,8 @@ const { scopedUrl } = useOrganizationContext();
     >
         <Head title="Menunggu Persetujuan - Catatan Limbah" />
 
-        <div
-            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
-        >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[340px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-10 left-1/3 -z-10 h-56 w-56 rounded-full bg-amber-200/15 blur-3xl"
-            />
-            <div
-                class="pointer-events-none absolute top-28 right-0 -z-10 h-56 w-56 rounded-full bg-blue-200/15 blur-3xl"
-            />
-
-            <div class="space-y-8">
+        <div class="relative min-w-0 overflow-x-hidden p-4">
+            <div class="space-y-4">
                 <Alert
                     v-if="statusMessage"
                     class="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-100"
@@ -234,23 +222,11 @@ const { scopedUrl } = useOrganizationContext();
                     <AlertDescription>{{ errorMessage }}</AlertDescription>
                 </Alert>
 
-                <section
-                    class="wm-surface-hero overflow-hidden rounded-[30px] via-slate-50/80 to-amber-50/20 dark:via-slate-900 dark:to-amber-950/18"
-                >
-                    <div
-                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6"
-                    >
-                        <div class="space-y-5">
+                <section class="space-y-4">
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                        <div class="space-y-4">
                             <div class="space-y-3">
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.16em] text-amber-700/70 uppercase"
-                                >
-                                    Meja Persetujuan
-                                </p>
-                                <Heading
-                                    title="Menunggu Persetujuan"
-                                    description="Tinjau catatan limbah yang membutuhkan keputusan. Anda dapat menyetujui cepat, membuka detail, atau menolak dengan alasan yang jelas."
-                                />
+                                <Heading title="Menunggu Persetujuan" />
                             </div>
 
                             <div class="flex flex-wrap gap-3">

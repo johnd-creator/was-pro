@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Models\WasteRecord;
+use App\Models\WasteSource;
 
 class WasteBalanceService
 {
@@ -11,7 +12,9 @@ class WasteBalanceService
 
     public function report(User $user, string $start, string $end): array
     {
+        $structuredSources = WasteSource::available();
         $records = WasteRecord::query()->approved()
+            ->when($structuredSources, fn ($query) => $query->with('wasteSource'))
             ->when(! $user->hasPermission('waste_records.view_all'), fn ($query) => $query->byUser($user->id))
             ->where(fn ($query) => $query->whereDate('date', '<=', $end)
                 ->orWhereHas('haulings', fn ($haulings) => $haulings->approved()->whereDate('hauling_date', '<=', $end)))
@@ -56,7 +59,7 @@ class WasteBalanceService
                     'id' => $record->id,
                     'record_number' => $record->record_number,
                     'date' => $date,
-                    'source' => $record->source,
+                    'source' => $structuredSources ? ($record->source_name ?? $record->source) : $record->source,
                     ...$this->decimalAmounts($reference),
                     'anomalies' => $reference['anomalies'],
                 ];

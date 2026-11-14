@@ -32,6 +32,14 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
 
     Route::get('/audit', [\App\Http\Controllers\WasteManagement\OperationalAuditController::class, 'index'])->middleware('permission:operational_audit.view')->name('audit.index');
 
+    Route::middleware(['permission:waste_records.view_all|waste_records.view_own'])->group(function () {
+        Route::get('/b3/dashboard', [\App\Http\Controllers\WasteManagement\B3DashboardController::class, 'index'])->name('b3.dashboard');
+        Route::get('/reports', [\App\Http\Controllers\WasteManagement\WasteReportsController::class, 'index'])->name('reports.index');
+        Route::get('/reports/balance.xlsx', [\App\Http\Controllers\WasteManagement\WasteReportsController::class, 'balanceXlsx'])->name('reports.balance.xlsx');
+        Route::get('/reports/balance.pdf', [\App\Http\Controllers\WasteManagement\WasteReportsController::class, 'balancePdf'])->name('reports.balance.pdf');
+        Route::get('/reports/storage.xlsx', [\App\Http\Controllers\WasteManagement\WasteReportsController::class, 'storageXlsx'])->name('reports.storage.xlsx');
+        Route::get('/reports/storage.pdf', [\App\Http\Controllers\WasteManagement\WasteReportsController::class, 'storagePdf'])->name('reports.storage.pdf');
+    });
     // Dashboard
     Route::middleware(['permission:dashboard.view'])
         ->get('/dashboard', [DashboardController::class, 'index'])
@@ -234,6 +242,9 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
 
     // Master Data Routes
     Route::prefix('master-data')->name('master-data.')->group(function () {
+        Route::middleware(['permission:waste_categories.view'])->get('/sources', [\App\Http\Controllers\WasteManagement\MasterData\SourcesController::class, 'index'])->name('sources.index');
+        Route::middleware(['permission:waste_categories.create'])->post('/sources', [\App\Http\Controllers\WasteManagement\MasterData\SourcesController::class, 'store'])->name('sources.store');
+        Route::middleware(['permission:waste_categories.edit'])->put('/sources/{source}', [\App\Http\Controllers\WasteManagement\MasterData\SourcesController::class, 'update'])->name('sources.update');
         // Categories
         Route::middleware(['permission:waste_categories.view'])
             ->get('/categories', [CategoriesController::class, 'index'])
@@ -284,6 +295,9 @@ Route::middleware(['auth', 'verified'])->prefix('waste-management')->name('waste
         Route::middleware(['permission:waste_types.delete'])
             ->delete('/types/{wasteType}', [TypesController::class, 'destroy'])
             ->name('types.destroy');
+
+        Route::post('/vendor-agreements', [\App\Http\Controllers\WasteManagement\MasterData\VendorAgreementsController::class, 'store'])->middleware('permission:vendors.create')->name('vendor-agreements.store');
+        Route::put('/vendor-agreements/{agreement}', [\App\Http\Controllers\WasteManagement\MasterData\VendorAgreementsController::class, 'update'])->middleware('permission:vendors.edit')->name('vendor-agreements.update');
 
         // Vendors
         Route::middleware(['permission:vendors.view'])

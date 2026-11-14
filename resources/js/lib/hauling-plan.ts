@@ -49,6 +49,30 @@ export function availablePlanRecords<T extends { available_quantity: number }>(
     return records.filter((record) => record.available_quantity > 0);
 }
 
+export function planRecordsForPeriod<T extends { date: string | null }>(
+    records: T[],
+    period: string,
+): T[] {
+    return period
+        ? records.filter((record) => record.date?.slice(0, 7) === period)
+        : records;
+}
+
+export function planRecordsForDateRange<T extends { date?: string | null }>(
+    records: T[],
+    start: string,
+    end: string,
+): T[] {
+    if (start && end && start > end) return [];
+    if (!start && !end) return records;
+    return records.filter(
+        (record) =>
+            !!record.date &&
+            (!start || record.date >= start) &&
+            (!end || record.date <= end),
+    );
+}
+
 export function planRecordsForType<
     T extends { available_quantity: number; waste_type_id: string },
 >(records: T[], wasteTypeId: string): T[] {

@@ -47,7 +47,7 @@ trait WasteValidationRules
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:50', 'unique:waste_types,code'],
             'category_id' => ['required', 'uuid', 'exists:waste_categories,id'],
-            'characteristic_id' => ['required', 'uuid', 'exists:waste_characteristics,id'],
+            'characteristic_id' => ['nullable', 'uuid', 'exists:waste_characteristics,id'],
             'description' => ['nullable', 'string'],
             'storage_period_days' => ['required', 'integer', 'min:0', 'max:36500'],
             'transport_cost' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],

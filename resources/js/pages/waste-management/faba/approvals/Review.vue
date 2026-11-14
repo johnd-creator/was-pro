@@ -8,11 +8,11 @@ import {
     ShieldCheck,
     ShieldX,
 } from 'lucide-vue-next';
-import Heading from '@/components/Heading.vue';
 import Link from '@/components/OrganizationLink.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
@@ -145,36 +145,14 @@ const { scopedUrl } = useOrganizationContext();
         title="Review Approval FABA"
     >
         <Head title="Review Approval FABA" />
-        <div
-            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
-        >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[360px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-10 left-1/3 -z-10 h-56 w-56 rounded-full bg-amber-200/15 blur-3xl"
-            />
-            <div
-                class="pointer-events-none absolute top-24 right-0 -z-10 h-64 w-64 rounded-full bg-emerald-200/15 blur-3xl"
-            />
-
-            <div class="space-y-8">
-                <section
-                    class="wm-surface-hero overflow-hidden rounded-[30px] via-slate-50/80 to-amber-50/25 dark:via-slate-900 dark:to-amber-950/20"
-                >
-                    <div
-                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6"
-                    >
-                        <div class="space-y-5">
+        <div class="relative min-w-0 overflow-x-hidden p-4">
+            <div class="space-y-4">
+                <section class="space-y-4">
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                        <div class="space-y-4">
                             <div class="space-y-3">
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.16em] text-amber-700/70 uppercase"
-                                >
-                                    Period Review
-                                </p>
                                 <Heading
                                     :title="`Review ${approval.period_label ?? `${approval.month}/${approval.year}`}`"
-                                    description="Tinjau angka periode, warning aktif, ledger movement, dan jejak audit dalam satu meja review sebelum keputusan dibuat."
                                 />
                             </div>
 

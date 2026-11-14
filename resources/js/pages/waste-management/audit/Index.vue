@@ -2,9 +2,9 @@
 import { Head, router } from '@inertiajs/vue3';
 import { reactive } from 'vue';
 import { index } from '@/actions/App/Http/Controllers/WasteManagement/OperationalAuditController';
-import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 interface Entry {
@@ -52,11 +52,8 @@ function fields(entry: Entry): string[] {
         :breadcrumbs="[{ title: 'Riwayat Audit B3', href: index.url() }]"
     >
         <Head title="Riwayat Audit B3" />
-        <div class="space-y-5 p-4">
-            <Heading
-                title="Riwayat Audit B3"
-                description="Riwayat baca-saja untuk catatan yang masih dapat Anda akses. Catatan terhapus atau tidak tersedia tidak ditampilkan. Kolom yang belum direkam pada riwayat lama tidak dapat dipulihkan."
-            />
+        <div class="space-y-4 p-4">
+            <Heading title="Riwayat Audit B3" />
             <form
                 class="grid gap-3 rounded border p-4 sm:grid-cols-2"
                 @submit.prevent="load()"

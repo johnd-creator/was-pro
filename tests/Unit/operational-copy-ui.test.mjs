@@ -38,7 +38,7 @@ test('balance explains all anomaly causes as findings rather than waste categori
         'lebih dari satu temuan',
     ])
         assert.ok(balance.includes(phrase), phrase);
-    assert.match(balance, /TableHead>Perlu diperiksa/);
+    assert.match(balance, /TableHead\s*>\s*Perlu diperiksa/);
     assert.match(balance, /v-for="anomaly in reference.anomalies"/);
 });
 
@@ -95,4 +95,22 @@ test('FABA opening, closing and approval headings use Indonesian display labels'
             /Opening Balance|Closing Snapshot|Approved at|Approved By|Draft \/ Data Langsung/,
         );
     }
+});
+
+test('hauling and vendor headers are compact while operational records remain available', () => {
+    const hauling = source('haulings/Index.vue');
+    const vendors = source('master-data/Vendors.vue');
+    assert.doesNotMatch(
+        hauling,
+        /Waste Logistics|Fokus Operasional|Prioritas pengangkutan/i,
+    );
+    assert.match(hauling, /stats.total_records/);
+    assert.match(hauling, /stats.pending_requests/);
+    assert.match(hauling, /v-for="record in paginatedRecords"/);
+    assert.doesNotMatch(
+        vendors,
+        /Vendor Registry|<p[^>]*>\s*Transportasi\s*<\/p>/i,
+    );
+    assert.match(vendors, /props.vendors.length/);
+    assert.match(vendors, /openCreateDialog/);
 });

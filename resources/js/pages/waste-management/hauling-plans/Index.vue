@@ -7,7 +7,6 @@ import {
     store,
 } from '@/actions/App/Http/Controllers/WasteManagement/WasteHaulingPlansController';
 import { index as haulingsIndex } from '@/actions/App/Http/Controllers/WasteManagement/WasteHaulingsController';
-import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import Link from '@/components/OrganizationLink.vue';
 import { Button } from '@/components/ui/button';
@@ -21,6 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import { usePermissions } from '@/composables/usePermissions';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
@@ -30,6 +30,7 @@ import {
     availablePlanWasteTypes,
     haulingPlanStatus,
     planRecordsForType,
+    planRecordsForDateRange,
     planQuantityError,
 } from '@/lib/hauling-plan';
 import type { HaulingPlan, HaulingPlanRecord } from '@/types/hauling-plan';
@@ -50,13 +51,30 @@ const preselectedRecordId = new URL(
 const preselectedRecord = selectableRecords.value.find(
     (record) => record.id === preselectedRecordId,
 );
+const startDate = ref('');
+const endDate = ref('');
+const invalidDateRange = computed(
+    () =>
+        !!startDate.value && !!endDate.value && startDate.value > endDate.value,
+);
 const selectedWasteTypeId = ref(preselectedRecord?.waste_type_id ?? '');
-const wasteTypes = computed(() =>
-    availablePlanWasteTypes(selectableRecords.value),
+const periodRecords = computed(() =>
+    planRecordsForDateRange(
+        selectableRecords.value,
+        startDate.value,
+        endDate.value,
+    ),
 );
+const wasteTypes = computed(() => availablePlanWasteTypes(periodRecords.value));
 const filteredRecords = computed(() =>
-    planRecordsForType(selectableRecords.value, selectedWasteTypeId.value),
+    planRecordsForType(periodRecords.value, selectedWasteTypeId.value),
 );
+watch([startDate, endDate], () => {
+    selectedWasteTypeId.value = '';
+    form.waste_record_id = '';
+    form.quantity = '';
+    form.clearErrors('waste_record_id', 'quantity');
+});
 const form = useForm({
     waste_record_id: preselectedRecord?.id ?? '',
     planned_date: formatLocalDate(),
@@ -121,12 +139,9 @@ function submit(): void {
         :breadcrumbs="[{ title: 'Rencana Angkut', href: index.url() }]"
     >
         <Head title="Rencana Angkut" />
-        <div class="space-y-6 px-4 py-5 sm:px-6 lg:px-8">
+        <div class="min-w-0 space-y-4 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
-                <Heading
-                    title="Rencana angkut"
-                    description="Rencanakan alokasi, minta persetujuan supervisor, lalu catat realisasi setelah limbah keluar."
-                />
+                <Heading title="Rencana angkut" />
                 <Button
                     v-if="
                         hasPermission('waste_hauling.view_all') ||
@@ -172,6 +187,41 @@ function submit(): void {
                         class="grid gap-5 md:grid-cols-2"
                         @submit.prevent="submit"
                     >
+                        <div class="space-y-2">
+                            <Label for="plan-start">Limbah masuk sejak</Label>
+                            <Input
+                                id="plan-start"
+                                v-model="startDate"
+                                type="date"
+                                :disabled="form.processing"
+                                class="h-11"
+                            />
+                        </div>
+                        <div class="space-y-2">
+                            <Label for="plan-end">Limbah masuk sampai</Label>
+                            <Input
+                                id="plan-end"
+                                v-model="endDate"
+                                type="date"
+                                :disabled="form.processing"
+                                class="h-11"
+                                :min="startDate || undefined"
+                            />
+                        </div>
+                        <p
+                            v-if="invalidDateRange"
+                            class="text-sm text-destructive md:col-span-2"
+                            role="alert"
+                        >
+                            Tanggal akhir tidak boleh sebelum tanggal awal.
+                        </p>
+                        <p
+                            v-else
+                            class="text-sm text-muted-foreground md:col-span-2"
+                        >
+                            Rentang tanggal menyaring catatan masuk yang masih
+                            tersedia. Kosongkan untuk melihat semua tanggal.
+                        </p>
                         <div class="space-y-2">
                             <Label for="plan-waste-type">Jenis limbah</Label>
                             <select
@@ -221,7 +271,8 @@ function submit(): void {
                                     :key="record.id"
                                     :value="record.id"
                                 >
-                                    {{ record.record_number }} · tersedia
+                                    {{ record.record_number }} · masuk
+                                    {{ record.date || '-' }} · tersedia
                                     {{ quantity(record.available_quantity) }}
                                     {{ record.unit }}
                                 </option></select

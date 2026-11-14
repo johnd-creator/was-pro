@@ -15,6 +15,9 @@ class WasteRecordIndexRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'search' => ['nullable', 'string', 'max:200'],
+            'sort' => ['nullable', Rule::in(['latest', 'oldest', 'quantity_high', 'quantity_low'])],
+            'page' => ['nullable', 'integer', 'min:1'],
             'month' => ['nullable', 'date_format:Y-m'],
             'attention' => ['nullable', Rule::in(['all', 'expired', 'expiring_soon', 'critical', 'backlog', 'pending', 'fresh', 'completed'])],
             'expiry' => ['nullable', Rule::in(['expired'])],

@@ -310,13 +310,11 @@ function toggleAppearance(): void {
 
 <template>
     <header
-        class="flex min-h-16 shrink-0 items-center justify-between gap-4 border-b border-sidebar-border/70 bg-white px-6 py-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-5 dark:bg-slate-950"
+        class="flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-sidebar-border/70 bg-white px-4 py-2 md:px-5 lg:gap-x-4 dark:bg-slate-950"
     >
-        <div
-            class="flex min-w-0 flex-1 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between"
-        >
+        <div class="contents">
             <div
-                class="flex min-w-0 flex-1 items-center gap-2 text-slate-500 dark:text-slate-300"
+                class="order-1 flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-slate-500 dark:text-slate-300"
             >
                 <SidebarTrigger class="-ml-1" />
                 <template v-if="breadcrumbs && breadcrumbs.length > 0">
@@ -326,14 +324,14 @@ function toggleAppearance(): void {
 
             <div
                 v-if="isDashboardPage"
-                class="flex min-w-0 flex-wrap items-center gap-2 lg:ml-6 lg:justify-end"
+                class="order-3 flex w-full min-w-0 flex-wrap items-center gap-2 lg:order-2 lg:ml-2 lg:w-auto lg:justify-end"
             >
                 <DropdownMenu v-model:open="monthPickerOpen">
                     <DropdownMenuTrigger as-child>
                         <Button
                             variant="outline"
                             size="sm"
-                            class="h-9 min-w-[170px] justify-between"
+                            class="h-11 min-w-0 flex-1 justify-between sm:w-[170px] sm:flex-none"
                         >
                             <span class="truncate">
                                 {{
@@ -408,7 +406,7 @@ function toggleAppearance(): void {
                     :model-value="snapshotForm.organization_id"
                     @update:model-value="selectOrganization"
                 >
-                    <SelectTrigger class="h-9 w-[220px]">
+                    <SelectTrigger class="h-11 w-full min-w-0 sm:w-[220px]">
                         <SelectValue placeholder="Pilih organisasi" />
                     </SelectTrigger>
                     <SelectContent>
@@ -424,8 +422,10 @@ function toggleAppearance(): void {
             </div>
         </div>
 
-        <div class="flex items-center gap-3">
-            <div class="hidden flex-col items-end text-xs md:flex">
+        <div
+            class="order-2 flex shrink-0 items-center gap-1 sm:gap-3 lg:order-3"
+        >
+            <div class="hidden flex-col items-end text-xs xl:flex">
                 <div
                     class="font-semibold text-slate-900 tabular-nums dark:text-slate-100"
                 >
@@ -439,7 +439,7 @@ function toggleAppearance(): void {
             <Button
                 variant="ghost"
                 size="icon"
-                class="wm-trigger-ghost rounded-full"
+                class="wm-trigger-ghost size-11 shrink-0 rounded-full"
                 :aria-label="appearanceToggleLabel"
                 :title="appearanceToggleLabel"
                 @click="toggleAppearance"
@@ -453,7 +453,7 @@ function toggleAppearance(): void {
                 as-child
                 variant="ghost"
                 size="icon"
-                class="wm-trigger-ghost relative rounded-full"
+                class="wm-trigger-ghost relative size-11 shrink-0 rounded-full"
             >
                 <Link
                     :href="
@@ -488,7 +488,7 @@ function toggleAppearance(): void {
                         class="wm-trigger-ghost flex items-center gap-3 rounded-full px-2"
                     >
                         <div
-                            class="hidden flex-col items-end text-left text-xs md:flex"
+                            class="hidden flex-col items-end text-left text-xs xl:flex"
                         >
                             <span
                                 class="font-semibold text-slate-900 dark:text-slate-100"

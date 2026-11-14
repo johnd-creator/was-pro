@@ -10,10 +10,14 @@ import type { LucideIcon } from 'lucide-vue-next';
 import { computed } from 'vue';
 import Link from '@/components/OrganizationLink.vue';
 import { Button } from '@/components/ui/button';
+import { operationalIndicatorCount } from '@/lib/operational-indicator-count';
 
 interface Props {
     actionHref?: string;
     inboxHref?: string;
+    totalIndicators?: number;
+    pendingHaulingPlans?: number;
+    pendingHaulingApprovals?: number;
     expiredWaste: number;
     expiringSoonWaste: number;
     pendingWasteApprovals: number;
@@ -48,6 +52,8 @@ interface MetricCard {
 
 const props = withDefaults(defineProps<Props>(), {
     showMetricCards: false,
+    pendingHaulingPlans: 0,
+    pendingHaulingApprovals: 0,
 });
 
 const primaryMessage = computed(() => {
@@ -59,8 +65,14 @@ const primaryMessage = computed(() => {
         return `${props.fabaWarnings} indikator FABA memerlukan perhatian pada saldo, kapasitas TPS, atau konsistensi data.`;
     }
 
-    if (props.pendingWasteApprovals + props.pendingFabaApprovals > 0) {
-        return `Terdapat ${props.pendingWasteApprovals + props.pendingFabaApprovals} antrian approval yang perlu diputuskan untuk menjaga ritme operasional tetap aman.`;
+    if (
+        props.pendingWasteApprovals +
+            props.pendingFabaApprovals +
+            props.pendingHaulingPlans +
+            props.pendingHaulingApprovals >
+        0
+    ) {
+        return `Terdapat ${props.pendingWasteApprovals + props.pendingFabaApprovals + props.pendingHaulingPlans + props.pendingHaulingApprovals} antrian approval yang perlu diputuskan untuk menjaga ritme operasional tetap aman.`;
     }
 
     if (props.expiringSoonWaste > 0) {
@@ -70,17 +82,24 @@ const primaryMessage = computed(() => {
     return 'Kepatuhan operasional berada dalam kondisi terkendali dan tidak ada anomali utama yang perlu ditindaklanjuti saat ini.';
 });
 
-const totalRiskCount = computed(
-    () =>
-        props.expiredWaste +
-        props.expiringSoonWaste +
-        props.pendingWasteApprovals +
-        props.pendingFabaApprovals +
+const totalRiskCount = computed(() =>
+    operationalIndicatorCount(props.totalIndicators, [
+        props.expiredWaste,
+        props.expiringSoonWaste,
+        props.pendingWasteApprovals,
+        props.pendingFabaApprovals,
         props.fabaWarnings,
+        props.pendingHaulingPlans,
+        props.pendingHaulingApprovals,
+    ]),
 );
 
 const totalApprovalCount = computed(
-    () => props.pendingWasteApprovals + props.pendingFabaApprovals,
+    () =>
+        props.pendingWasteApprovals +
+        props.pendingFabaApprovals +
+        props.pendingHaulingPlans +
+        props.pendingHaulingApprovals,
 );
 
 const bannerBadgeLabel = computed(() => `Kepatuhan ${props.riskLabel}`);
@@ -173,7 +192,7 @@ const metricCards = computed<MetricCard[]>(() => [
     {
         title: 'Pending Approval',
         value: totalApprovalCount.value,
-        description: `${props.pendingWasteApprovals} limbah, ${props.pendingFabaApprovals} FABA`,
+        description: `${props.pendingWasteApprovals} catatan, ${props.pendingHaulingPlans} rencana, ${props.pendingHaulingApprovals} realisasi, ${props.pendingFabaApprovals} FABA`,
         icon: AlertTriangle,
         shellClass:
             totalApprovalCount.value > 0

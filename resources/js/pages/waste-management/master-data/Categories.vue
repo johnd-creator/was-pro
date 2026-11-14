@@ -3,7 +3,6 @@ import { Head, router } from '@inertiajs/vue3';
 import { Plus } from 'lucide-vue-next';
 import { ref } from 'vue';
 import CategoriesController from '@/actions/App/Http/Controllers/WasteManagement/MasterData/CategoriesController';
-import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -26,6 +25,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import type { BreadcrumbItem } from '@/types';
@@ -121,34 +121,13 @@ const { scopedUrl } = useOrganizationContext();
     <WasteManagementLayout :breadcrumbs="breadcrumbItems" title="Categories">
         <Head title="Categories - Waste Management" />
 
-        <div
-            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
-        >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-10 left-1/4 -z-10 h-56 w-56 rounded-full bg-blue-200/18 blur-3xl"
-            />
-
-            <div class="space-y-8">
-                <section
-                    class="wm-surface-hero overflow-hidden rounded-[30px] to-blue-50/20 dark:to-blue-950/20"
-                >
-                    <div
-                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:p-6"
-                    >
-                        <div class="space-y-5">
+        <div class="relative min-w-0 overflow-x-hidden p-4">
+            <div class="space-y-4">
+                <section class="space-y-4">
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+                        <div class="space-y-4">
                             <div class="space-y-3">
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.16em] text-blue-700/70 uppercase"
-                                >
-                                    Reference Layer
-                                </p>
-                                <Heading
-                                    title="Kategori Limbah"
-                                    description="Kelola kategori utama limbah sebagai fondasi klasifikasi dan pelaporan operasional."
-                                />
+                                <Heading title="Kategori Limbah" />
                             </div>
 
                             <div class="grid gap-3 sm:grid-cols-2">

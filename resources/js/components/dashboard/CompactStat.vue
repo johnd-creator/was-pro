@@ -56,7 +56,7 @@ const formattedValue = computed(() =>
                 ? 'group transition-colors hover:border-blue-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600'
                 : undefined
         "
-        class="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 dark:border-slate-800 dark:bg-slate-900"
+        class="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 dark:border-slate-800 dark:bg-slate-900"
     >
         <div class="flex items-start justify-between gap-3">
             <p
@@ -71,7 +71,7 @@ const formattedValue = computed(() =>
             /></span>
         </div>
         <p
-            class="mt-3 text-3xl font-semibold tracking-tight break-words text-slate-950 tabular-nums dark:text-white"
+            class="mt-2 text-3xl font-semibold tracking-tight break-words text-slate-950 tabular-nums dark:text-white"
         >
             {{ formattedValue
             }}<span
@@ -94,7 +94,7 @@ const formattedValue = computed(() =>
         </p>
         <span
             v-if="href"
-            class="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-blue-700 dark:text-blue-300"
+            class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-700 dark:text-blue-300"
             >Lihat catatan <ArrowUpRight class="size-3.5" aria-hidden="true"
         /></span>
     </component>

@@ -12,7 +12,6 @@ import {
     create as createActual,
     show as showActual,
 } from '@/actions/App/Http/Controllers/WasteManagement/WasteHaulingsController';
-import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import Link from '@/components/OrganizationLink.vue';
 import { Button } from '@/components/ui/button';
@@ -25,6 +24,7 @@ import {
 } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import { usePermissions } from '@/composables/usePermissions';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
@@ -71,7 +71,7 @@ function closePlan(): void {
         ]"
     >
         <Head title="Detail Rencana Angkut" />
-        <div class="space-y-6 px-4 py-5 sm:px-6 lg:px-8">
+        <div class="min-w-0 space-y-4 p-4">
             <Heading
                 title="Detail rencana angkut"
                 :description="`${plan.record_number} · ${haulingPlanStatus(plan.status)}`"
@@ -92,8 +92,9 @@ function closePlan(): void {
             </p>
             <p class="rounded-lg border bg-muted/40 p-4 text-sm leading-6">
                 Rencana disetujui tidak mengurangi saldo tercatat. Catat jumlah
-                dan tanggal aktual setelah limbah keluar; setiap realisasi
-                memerlukan persetujuan supervisor.
+                dan tanggal aktual setelah limbah keluar. Satu batch dapat
+                diangkut beberapa kali sampai sisa alokasi habis; setiap
+                realisasi tetap memerlukan persetujuan supervisor.
             </p>
             <div class="grid gap-6 lg:grid-cols-2">
                 <Card
@@ -166,9 +167,10 @@ function closePlan(): void {
                             {{ record.unit }}
                         </p>
                         <p class="text-muted-foreground">
-                            Sisa alokasi belum termasuk realisasi yang sedang
-                            menunggu persetujuan. Rencana ditutup melepaskan
-                            sisa alokasi tanpa menghapus realisasi sebelumnya.
+                            Sisa alokasi sudah dikurangi realisasi yang
+                            disetujui dan yang menunggu persetujuan. Rencana
+                            ditutup melepaskan sisa alokasi tanpa menghapus
+                            realisasi sebelumnya.
                         </p>
                         <Button
                             v-if="

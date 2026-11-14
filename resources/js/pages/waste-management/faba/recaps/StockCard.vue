@@ -2,7 +2,6 @@
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowRight, BookMarked, Layers3, Scale } from 'lucide-vue-next';
 import { computed, reactive } from 'vue';
-import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +20,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
@@ -113,37 +113,13 @@ const { scopedUrl } = useOrganizationContext();
     >
         <Head title="Stock Card FABA" />
 
-        <div
-            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
-        >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[340px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-12 left-1/4 -z-10 h-56 w-56 rounded-full bg-violet-200/18 blur-3xl"
-            />
-            <div
-                class="pointer-events-none absolute top-20 right-0 -z-10 h-64 w-64 rounded-full bg-cyan-200/15 blur-3xl"
-            />
-
-            <div class="space-y-8">
-                <section
-                    class="wm-surface-hero overflow-hidden rounded-[30px] via-slate-50/80 to-violet-50/20 dark:via-slate-900 dark:to-violet-950/18"
-                >
-                    <div
-                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6"
-                    >
-                        <div class="space-y-5">
+        <div class="relative min-w-0 overflow-x-hidden p-4">
+            <div class="space-y-4">
+                <section class="space-y-4">
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                        <div class="space-y-4">
                             <div class="space-y-3">
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.16em] text-violet-700/70 uppercase"
-                                >
-                                    Stock Ledger
-                                </p>
-                                <Heading
-                                    title="Stock Card FABA"
-                                    description="Pantau movement per material beserta saldo berjalan dengan layout audit yang lebih mudah discan."
-                                />
+                                <Heading title="Stock Card FABA" />
                             </div>
 
                             <div class="grid gap-3 sm:grid-cols-3">

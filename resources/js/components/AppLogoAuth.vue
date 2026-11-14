@@ -3,14 +3,10 @@ import AppLogoIcon from '@/components/AppLogoIcon.vue';
 </script>
 
 <template>
-    <div
-        class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-lg shadow-emerald-950/20"
-    >
-        <AppLogoIcon class="size-5 fill-current text-white" />
-    </div>
-    <div class="ml-1 grid flex-1 text-left text-sm">
+    <div class="flex shrink-0 items-center gap-3">
+        <AppLogoIcon class="size-16 shrink-0 object-contain sm:size-20" />
         <span
-            class="mb-0.5 truncate leading-tight font-semibold text-slate-950 dark:text-slate-100"
+            class="text-3xl leading-none font-semibold tracking-tight text-slate-950 sm:text-4xl dark:text-slate-100"
             >WASPRO</span
         >
     </div>

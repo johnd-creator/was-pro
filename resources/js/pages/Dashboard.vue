@@ -245,84 +245,9 @@ function refreshDashboard(): void {
     <Head title="Dashboard" />
     <AppLayout :breadcrumbs="breadcrumbs">
         <div
-            class="mx-auto w-full max-w-[1680px] space-y-8 px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
+            class="mx-auto w-full max-w-[1680px] space-y-4 p-4"
             :aria-busy="isRefreshing"
         >
-            <header
-                class="flex flex-col justify-between gap-5 sm:flex-row sm:items-start"
-            >
-                <div class="min-w-0 space-y-2">
-                    <p
-                        class="text-xs font-semibold tracking-[0.16em] text-blue-700 uppercase dark:text-blue-300"
-                    >
-                        Pusat kendali operasional
-                    </p>
-                    <h1
-                        class="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl dark:text-white"
-                    >
-                        Ikhtisar operasional
-                    </h1>
-                    <p
-                        class="text-sm leading-6 text-slate-600 dark:text-slate-300"
-                    >
-                        {{ organizationName }}
-                        <span aria-hidden="true" class="mx-1 text-slate-400"
-                            >/</span
-                        >
-                        Limbah B3 &amp; FABA
-                    </p>
-                </div>
-                <div class="flex flex-wrap items-center gap-3">
-                    <div class="space-y-1">
-                        <label
-                            for="dashboard-period"
-                            class="text-xs font-medium text-slate-600 dark:text-slate-300"
-                            >Periode ringkasan</label
-                        >
-                        <div
-                            class="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                        >
-                            <CalendarDays
-                                class="size-4 shrink-0 text-slate-400"
-                                aria-hidden="true"
-                            />
-                            <select
-                                id="dashboard-period"
-                                v-model="selectedMonth"
-                                :disabled="
-                                    isRefreshing || !availableMonths.length
-                                "
-                                class="min-h-11 min-w-40 bg-transparent font-semibold focus-visible:outline-2 focus-visible:outline-blue-600 disabled:cursor-wait"
-                                @change="changePeriod"
-                            >
-                                <option
-                                    v-for="month in availableMonths"
-                                    :key="month.value"
-                                    :value="month.value"
-                                >
-                                    {{ month.label }}
-                                </option>
-                            </select>
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                        :disabled="isRefreshing"
-                        @click="refreshDashboard"
-                    >
-                        <RefreshCw
-                            class="size-4"
-                            :class="{
-                                'animate-spin motion-reduce:animate-none':
-                                    isRefreshing,
-                            }"
-                            aria-hidden="true"
-                        />
-                        {{ isRefreshing ? 'Memperbarui…' : 'Perbarui' }}
-                    </button>
-                </div>
-            </header>
             <p
                 v-if="refreshError"
                 role="alert"
@@ -338,31 +263,83 @@ function refreshDashboard(): void {
                         : 'Ringkasan operasional siap.'
                 }}
             </p>
-            <nav
-                aria-label="Bagian dashboard"
-                class="flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-800"
+            <div
+                class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800"
             >
-                <a
-                    v-for="section in [
-                        { id: 'ringkasan', label: 'Ringkasan' },
-                        { id: 'limbah', label: 'Limbah B3' },
-                        { id: 'faba', label: 'FABA' },
-                    ]"
-                    :key="section.id"
-                    :href="`#${section.id}`"
-                    class="inline-flex min-h-11 items-center gap-2 rounded-t-lg px-4 text-sm font-medium text-slate-600 hover:bg-white hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-blue-300"
-                    >{{ section.label
-                    }}<ArrowUpRight
-                        class="size-3.5 text-slate-400"
-                        aria-hidden="true"
-                /></a>
-            </nav>
+                <nav aria-label="Bagian dashboard" class="flex flex-wrap gap-1">
+                    <a
+                        v-for="section in [
+                            { id: 'ringkasan', label: 'Ringkasan' },
+                            { id: 'limbah', label: 'Limbah B3' },
+                            { id: 'faba', label: 'FABA' },
+                        ]"
+                        :key="section.id"
+                        :href="`#${section.id}`"
+                        class="inline-flex min-h-11 items-center gap-2 rounded-t-lg px-4 text-sm font-medium text-slate-600 hover:bg-white hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-blue-300"
+                        >{{ section.label
+                        }}<ArrowUpRight
+                            class="size-3.5 text-slate-400"
+                            aria-hidden="true"
+                    /></a>
+                </nav>
+                <div class="flex flex-wrap items-center gap-2 pb-1">
+                    <label for="dashboard-period" class="sr-only"
+                        >Periode ringkasan</label
+                    >
+                    <div
+                        class="flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                    >
+                        <CalendarDays
+                            class="size-4 shrink-0 text-slate-400"
+                            aria-hidden="true"
+                        />
+                        <select
+                            id="dashboard-period"
+                            v-model="selectedMonth"
+                            :disabled="isRefreshing || !availableMonths.length"
+                            class="min-h-10 bg-transparent font-semibold focus-visible:outline-2 focus-visible:outline-blue-600 disabled:cursor-wait"
+                            @change="changePeriod"
+                        >
+                            <option
+                                v-for="month in availableMonths"
+                                :key="month.value"
+                                :value="month.value"
+                            >
+                                {{ month.label }}
+                            </option>
+                        </select>
+                    </div>
+                    <button
+                        type="button"
+                        class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                        :disabled="isRefreshing"
+                        @click="refreshDashboard"
+                    >
+                        <RefreshCw
+                            class="size-4"
+                            :class="{
+                                'animate-spin motion-reduce:animate-none':
+                                    isRefreshing,
+                            }"
+                            aria-hidden="true"
+                        />
+                        {{ isRefreshing ? 'Memperbarui.' : 'Perbarui' }}
+                    </button>
+                </div>
+            </div>
             <section
                 id="ringkasan"
                 aria-label="Ringkasan periode terpilih"
                 class="scroll-mt-24 space-y-4"
             >
                 <ComplianceHero
+                    :total-indicators="notificationSummary.total_count"
+                    :pending-hauling-approvals="
+                        notificationSummary.pending_hauling_approvals_count ?? 0
+                    "
+                    :pending-hauling-plans="
+                        notificationSummary.pending_hauling_plans_count ?? 0
+                    "
                     :expired-waste="stats.expired_waste"
                     :expiring-soon-waste="stats.expiring_soon_waste"
                     :pending-waste-approvals="
@@ -428,7 +405,7 @@ function refreshDashboard(): void {
                             id="limbah-title"
                             class="mt-1 text-xl font-semibold tracking-tight text-slate-950 dark:text-white"
                         >
-                            Arus limbah &amp; tindak lanjut
+                            Rekapitulasi Limbah dan Tindak Lanjut
                         </h2>
                     </div>
                     <p
@@ -439,7 +416,7 @@ function refreshDashboard(): void {
                     </p>
                 </div>
                 <div
-                    class="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px]"
+                    class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]"
                 >
                     <WasteFlowChart
                         :data="wasteChart"
@@ -462,7 +439,7 @@ function refreshDashboard(): void {
                     <Card
                         class="min-w-0 gap-0 rounded-2xl border-slate-200 bg-white py-0 shadow-none dark:border-slate-800 dark:bg-slate-900"
                     >
-                        <CardHeader class="px-5 py-4"
+                        <CardHeader class="px-4 py-3"
                             ><CardTitle class="text-base"
                                 >Pengangkutan limbah</CardTitle
                             >
@@ -470,7 +447,7 @@ function refreshDashboard(): void {
                                 Jumlah catatan, mencakup semua satuan.
                             </p></CardHeader
                         >
-                        <CardContent class="px-5 pb-5"
+                        <CardContent class="px-4 pb-4"
                             ><DistributionSummary
                                 :data="wasteHaulingStatusDistribution"
                                 unit="catatan"
@@ -479,7 +456,7 @@ function refreshDashboard(): void {
                     <Card
                         class="min-w-0 gap-0 rounded-2xl border-slate-200 bg-white py-0 shadow-none dark:border-slate-800 dark:bg-slate-900"
                     >
-                        <CardHeader class="px-5 py-4"
+                        <CardHeader class="px-4 py-3"
                             ><CardTitle class="text-base"
                                 >Batas penyimpanan</CardTitle
                             >
@@ -487,7 +464,7 @@ function refreshDashboard(): void {
                                 Sisa limbah pada periode yang dipilih.
                             </p></CardHeader
                         >
-                        <CardContent class="px-5 pb-5"
+                        <CardContent class="px-4 pb-4"
                             ><DistributionSummary
                                 :data="wasteBacklogUrgencyDistribution"
                                 unit="catatan"
@@ -496,7 +473,7 @@ function refreshDashboard(): void {
                     <Card
                         class="min-w-0 gap-0 rounded-2xl border-blue-200 bg-blue-50/50 py-0 shadow-none dark:border-blue-900 dark:bg-blue-950/20"
                     >
-                        <CardHeader class="px-5 py-4"
+                        <CardHeader class="px-4 py-3"
                             ><CardTitle class="text-base"
                                 >Belum selesai diangkut</CardTitle
                             >
@@ -504,7 +481,7 @@ function refreshDashboard(): void {
                                 {{ wasteStatsContext.label }}
                             </p></CardHeader
                         >
-                        <CardContent class="px-5 pb-5"
+                        <CardContent class="px-4 pb-4"
                             ><p
                                 class="text-4xl font-semibold tracking-tight text-slate-950 tabular-nums dark:text-white"
                             >
@@ -551,7 +528,7 @@ function refreshDashboard(): void {
                     </p>
                 </div>
                 <div
-                    class="rounded-2xl border border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900"
+                    class="rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900"
                 >
                     <p
                         class="mb-4 text-xs font-medium text-slate-500 dark:text-slate-400"
@@ -560,7 +537,7 @@ function refreshDashboard(): void {
                         Saldo Fly Ash memakai periode FABA terbaru, bukan
                         periode ringkasan yang dipilih.
                     </p>
-                    <dl class="grid gap-5 sm:grid-cols-3">
+                    <dl class="grid gap-4 sm:grid-cols-3">
                         <div v-for="stat in annualFabaStats" :key="stat.label">
                             <dt
                                 class="text-sm text-slate-500 dark:text-slate-400"
@@ -593,7 +570,7 @@ function refreshDashboard(): void {
                         :key="material"
                         class="min-w-0 gap-0 rounded-2xl border-slate-200 bg-white py-0 shadow-none dark:border-slate-800 dark:bg-slate-900"
                     >
-                        <CardHeader class="px-5 py-4"
+                        <CardHeader class="px-4 py-3"
                             ><CardTitle class="text-base"
                                 >Saldo {{ material }}</CardTitle
                             >
@@ -605,7 +582,7 @@ function refreshDashboard(): void {
                                 }}
                             </p></CardHeader
                         >
-                        <CardContent class="px-5 pb-5"
+                        <CardContent class="px-4 pb-4"
                             ><DistributionSummary
                                 :data="
                                     fabaMaterialBalanceDistribution.filter(
@@ -620,7 +597,7 @@ function refreshDashboard(): void {
                     <Card
                         class="min-w-0 gap-0 rounded-2xl border-slate-200 bg-white py-0 shadow-none dark:border-slate-800 dark:bg-slate-900"
                     >
-                        <CardHeader class="px-5 py-4"
+                        <CardHeader class="px-4 py-3"
                             ><CardTitle class="text-base"
                                 >Pemanfaatan material</CardTitle
                             >
@@ -628,7 +605,7 @@ function refreshDashboard(): void {
                                 Material yang disalurkan untuk digunakan.
                             </p></CardHeader
                         >
-                        <CardContent class="px-5 pb-5"
+                        <CardContent class="px-4 pb-4"
                             ><DistributionSummary
                                 :data="fabaUtilizationDistribution"
                                 unit="ton"

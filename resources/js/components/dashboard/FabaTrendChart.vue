@@ -39,23 +39,28 @@ const rows = computed(() =>
                 : selectedMaterial.value === 'fly_ash'
                   ? item.utilization_fly_ash
                   : item.utilization_bottom_ash,
-        capacity: item.capacity[selectedMaterial.value],
+        capacity: item.capacity?.[selectedMaterial.value] ?? null,
     })),
 );
-const latest = computed(() => rows.value.at(-1)?.capacity);
+const availableRows = computed(() =>
+    rows.value.filter((row) => row.capacity !== null),
+);
+const latestRow = computed(() => availableRows.value.at(-1));
+const latest = computed(() => latestRow.value?.capacity);
 const period = computed(
-    () => `${rows.value[0]?.label ?? '-'} - ${rows.value.at(-1)?.label ?? '-'}`,
+    () => `${rows.value[0]?.label ?? '-'} - ${latestRow.value?.label ?? '-'}`,
 );
 const production = computed(() =>
-    rows.value.reduce((sum, row) => sum + row.production, 0),
+    rows.value.reduce((sum, row) => sum + (row.production ?? 0), 0),
 );
 const utilization = computed(() =>
-    rows.value.reduce((sum, row) => sum + row.utilization, 0),
+    rows.value.reduce((sum, row) => sum + (row.utilization ?? 0), 0),
 );
 const capacityWarnings = computed(
     () =>
         rows.value.filter(
-            (row) => row.capacity.available && row.capacity.status !== 'normal',
+            (row) =>
+                row.capacity?.available && row.capacity?.status !== 'normal',
         ).length,
 );
 const integrityWarnings = computed(
@@ -99,7 +104,13 @@ function chart(
         xAxis: {
             type: 'category',
             data: rows.value.map((row) => row.label),
-            axisLabel: { color: palette.axisLabel, fontSize: 10 },
+            axisLabel: {
+                color: palette.axisLabel,
+                fontSize: 10,
+                interval: 0,
+                rotate: 45,
+                hideOverlap: false,
+            },
         },
         yAxis: {
             type: 'value',
@@ -142,7 +153,7 @@ const balanceOption = computed(() =>
             name: 'Saldo akhir',
             type: 'line',
             itemStyle: { color: palette.balance },
-            data: rows.value.map((row) => row.capacity.balance),
+            data: rows.value.map((row) => row.capacity?.balance ?? null),
         },
         {
             name: 'Kapasitas TPS',
@@ -150,7 +161,7 @@ const balanceOption = computed(() =>
             symbol: 'none',
             lineStyle: { type: 'dashed', color: palette.axisLabel },
             data: rows.value.map((row) =>
-                row.capacity.available ? row.capacity.capacity : null,
+                row.capacity?.available ? row.capacity.capacity : null,
             ),
         },
     ]),
@@ -162,12 +173,12 @@ const occupancyOption = computed(() =>
             type: 'bar',
             barMaxWidth: 24,
             data: rows.value.map((row) => ({
-                value: row.capacity.utilization_percentage,
+                value: row.capacity?.utilization_percentage ?? null,
                 itemStyle: {
                     color:
-                        row.capacity.status === 'critical'
+                        row.capacity?.status === 'critical'
                             ? palette.critical
-                            : row.capacity.status === 'warning'
+                            : row.capacity?.status === 'warning'
                               ? palette.warning
                               : palette.balance,
                 },
@@ -180,7 +191,7 @@ const occupancyOption = computed(() =>
             lineStyle: { type: 'dashed' as const },
             itemStyle: { color: palette[level] },
             data: rows.value.map((row) =>
-                row.capacity.available
+                row.capacity?.available
                     ? row.capacity[`${level}_threshold`]
                     : null,
             ),
@@ -194,13 +205,14 @@ const occupancyOption = computed(() =>
         class="min-w-0 gap-0 overflow-hidden rounded-2xl border border-slate-200 bg-white py-0 shadow-none dark:border-slate-800 dark:bg-slate-900"
     >
         <CardHeader
-            class="border-b border-slate-100 px-5 py-5 dark:border-slate-800"
+            class="border-b border-slate-100 px-4 py-3 dark:border-slate-800"
         >
             <CardTitle class="wm-text-primary text-base"
                 >Produksi, Pemanfaatan & Kapasitas FABA</CardTitle
             >
             <CardDescription
-                >{{ period }} · Tren enam bulan · ton</CardDescription
+                >{{ period }} · Januari–Desember; data s.d. bulan pilihan ·
+                ton</CardDescription
             >
             <div class="flex flex-wrap gap-2 pt-2" aria-label="Material FABA">
                 <button
@@ -220,11 +232,11 @@ const occupancyOption = computed(() =>
                 </button>
             </div>
         </CardHeader>
-        <CardContent class="space-y-5 px-5 py-5">
+        <CardContent class="space-y-4 px-4 py-4">
             <div class="grid gap-3 sm:grid-cols-3">
                 <div class="wm-surface-subtle rounded-xl border p-3">
                     <p class="wm-text-secondary text-xs">
-                        Produksi · enam bulan
+                        Produksi · s.d. bulan pilihan
                     </p>
                     <p class="wm-text-primary mt-1 text-xl font-semibold">
                         {{ number(production) }} ton
@@ -232,7 +244,7 @@ const occupancyOption = computed(() =>
                 </div>
                 <div class="wm-surface-subtle rounded-xl border p-3">
                     <p class="wm-text-secondary text-xs">
-                        Pemanfaatan · enam bulan
+                        Pemanfaatan · s.d. bulan pilihan
                     </p>
                     <p class="wm-text-primary mt-1 text-xl font-semibold">
                         {{ number(utilization) }} ton
@@ -242,9 +254,7 @@ const occupancyOption = computed(() =>
                     class="wm-surface-subtle rounded-xl border p-3"
                     :class="statusClass"
                 >
-                    <p class="text-xs">
-                        Okupansi TPS · {{ rows.at(-1)?.label }}
-                    </p>
+                    <p class="text-xs">Okupansi TPS · {{ latestRow?.label }}</p>
                     <p class="mt-1 text-xl font-semibold">
                         {{ number(latest?.utilization_percentage)
                         }}{{ latest?.available ? '%' : '' }}
@@ -270,13 +280,17 @@ const occupancyOption = computed(() =>
                 </p>
                 <p class="wm-text-secondary">
                     Peringatan kapasitas: {{ capacityWarnings }} dari
-                    {{ rows.length }} bulan (mencapai ambang peringatan/kritis).
-                    Integritas data seluruh material:
+                    {{ availableRows.length }} bulan dalam cakupan (mencapai
+                    ambang peringatan/kritis). Integritas data seluruh material:
                     {{ integrityWarnings }} bulan.
                 </p>
                 <p class="wm-text-secondary">
                     Kapasitas dan ambang mengikuti konfigurasi TPS saat ini;
-                    saldo mengikuti posisi akhir periode.
+                    saldo mengikuti posisi akhir periode. Nol pada
+                    produksi/pemanfaatan berarti tidak ada volume transaksi
+                    disetujui. Bulan setelah
+                    {{ latestRow?.label }} belum ditampilkan nilainya, bukan
+                    nol.
                 </p>
             </div>
             <p
@@ -285,7 +299,7 @@ const occupancyOption = computed(() =>
                         (row) =>
                             row.production ||
                             row.utilization ||
-                            row.capacity.balance,
+                            row.capacity?.balance,
                     )
                 "
                 class="wm-text-muted text-sm"
@@ -293,28 +307,69 @@ const occupancyOption = computed(() =>
                 Belum ada aktivitas atau saldo FABA pada periode ini.
             </p>
             <div class="grid min-w-0 gap-4 xl:grid-cols-2">
-                <section class="wm-panel rounded-xl border p-3">
+                <section class="wm-panel min-w-0 rounded-xl border p-3">
                     <h3 class="wm-text-primary mb-3 text-sm font-semibold">
                         Produksi vs Pemanfaatan
                     </h3>
-                    <BaseEChart
-                        :option="flowOption"
-                        height-class="h-[280px] xl:h-[540px]"
-                    />
+                    <div
+                        class="overflow-x-auto"
+                        tabindex="0"
+                        role="region"
+                        aria-label="Grafik bulanan FABA, geser untuk melihat semua bulan"
+                    >
+                        <div
+                            :style="{
+                                minWidth: `${Math.max(420, rows.length * 66)}px`,
+                            }"
+                        >
+                            <BaseEChart
+                                :option="flowOption"
+                                height-class="h-[280px] xl:h-[540px]"
+                            />
+                        </div>
+                    </div>
                 </section>
-                <section class="wm-panel space-y-4 rounded-xl border p-3">
+                <section
+                    class="wm-panel min-w-0 space-y-4 rounded-xl border p-3"
+                >
                     <h3 class="wm-text-primary text-sm font-semibold">
                         Saldo Akhir & Kapasitas TPS
                     </h3>
                     <div class="grid min-w-0 gap-4">
-                        <BaseEChart
-                            :option="balanceOption"
-                            height-class="h-[260px]"
-                        />
-                        <BaseEChart
-                            :option="occupancyOption"
-                            height-class="h-[260px]"
-                        />
+                        <div
+                            class="overflow-x-auto"
+                            tabindex="0"
+                            role="region"
+                            aria-label="Grafik bulanan FABA, geser untuk melihat semua bulan"
+                        >
+                            <div
+                                :style="{
+                                    minWidth: `${Math.max(420, rows.length * 66)}px`,
+                                }"
+                            >
+                                <BaseEChart
+                                    :option="balanceOption"
+                                    height-class="h-[260px]"
+                                />
+                            </div>
+                        </div>
+                        <div
+                            class="overflow-x-auto"
+                            tabindex="0"
+                            role="region"
+                            aria-label="Grafik bulanan FABA, geser untuk melihat semua bulan"
+                        >
+                            <div
+                                :style="{
+                                    minWidth: `${Math.max(420, rows.length * 66)}px`,
+                                }"
+                            >
+                                <BaseEChart
+                                    :option="occupancyOption"
+                                    height-class="h-[260px]"
+                                />
+                            </div>
+                        </div>
                     </div>
                 </section>
             </div>

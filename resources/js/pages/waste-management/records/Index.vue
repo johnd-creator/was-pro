@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, router } from '@inertiajs/vue3';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     Clock3,
@@ -10,8 +10,7 @@ import {
     RotateCcw,
     Search,
 } from 'lucide-vue-next';
-import { ref, computed } from 'vue';
-import Heading from '@/components/Heading.vue';
+import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import Link from '@/components/OrganizationLink.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,11 +35,20 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import CreateWasteRecordForm from '@/components/waste-management/CreateWasteRecordForm.vue';
 import ExpiryBadge from '@/components/waste-management/ExpiryBadge.vue';
 import StatusBadge from '@/components/waste-management/StatusBadge.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import {
+    changeRecordListState,
+    parseRecordListState,
+    recordContractHeaders,
+    recordListPage,
+    recordListUrl,
+} from '@/lib/record-list';
+import type { RecordPaginator } from '@/lib/record-list';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 
@@ -68,6 +76,7 @@ interface WasteRecord {
     quantity: number;
     unit: string;
     source: string | null;
+    source_name?: string | null;
     status: 'draft' | 'pending_review' | 'approved' | 'rejected';
     approved_hauled_quantity: number;
     remaining_quantity: number;
@@ -83,12 +92,19 @@ interface WasteRecord {
     approved_by_user?: {
         name: string;
     };
+    created_by?: { name: string } | null;
     created_at: string;
     updated_at: string;
 }
 
 type Props = {
-    filters: { month: string; attention: string | null; as_of: string };
+    filters: {
+        month: string;
+        attention: string | null;
+        as_of: string;
+        search?: string;
+        sort?: 'latest' | 'oldest' | 'quantity_high' | 'quantity_low';
+    };
     recordSummary: {
         total: number;
         draft: number;
@@ -96,8 +112,9 @@ type Props = {
         expired: number;
         expiring_soon: number;
     };
-    wasteRecords: WasteRecord[];
+    wasteRecords: WasteRecord[] | RecordPaginator<WasteRecord>;
     wasteTypes?: WasteType[];
+    wasteSources?: { id: string; name: string; is_active: boolean }[];
 };
 
 const { download, scopedUrl } = useOrganizationContext();
@@ -106,13 +123,18 @@ const props = defineProps<Props>();
 
 const isCreateDialogOpen = ref(false);
 
-const expiryFilter = computed(() => props.filters.attention || 'all');
-const searchQuery = ref('');
-const sortKey = ref<'latest' | 'oldest' | 'quantity_high' | 'quantity_low'>(
-    'latest',
+const page = usePage();
+const committedState = computed(() =>
+    parseRecordListState(page.url, props.filters),
 );
-const currentPage = ref(1);
-const perPage = 10;
+const expiryFilter = computed(() => committedState.value.attention);
+const searchQuery = ref(committedState.value.search);
+const sortKey = ref(committedState.value.sort);
+const recordsPage = computed(() =>
+    recordListPage(props.wasteRecords, committedState.value),
+);
+const currentPage = computed(() => recordsPage.value.current_page);
+const isLoading = ref(false);
 const hasAnyRecords = computed(() => props.recordSummary.total > 0);
 const hasActiveFilters = computed(
     () => searchQuery.value.trim().length > 0 || expiryFilter.value !== 'all',
@@ -133,82 +155,88 @@ const attentionLabels: Record<string, string> = {
     fresh: 'Masih aman',
     completed: 'Selesai diangkut',
 };
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+let cancelVisit: (() => void) | undefined;
+let visitGeneration = 0;
+let ownVisit = false;
+function cancelPending(): void {
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = undefined;
+    visitGeneration++;
+    const cancel = cancelVisit;
+    cancelVisit = undefined;
+    cancel?.();
+    isLoading.value = false;
+}
+function syncControls(): void {
+    searchQuery.value = committedState.value.search;
+    sortKey.value = committedState.value.sort;
+}
+watch(() => [page.url, props.filters, props.wasteRecords], syncControls);
+const removeBeforeListener = router.on('before', () => {
+    if (!ownVisit) cancelPending();
+});
+const removeNavigateListener = router.on('navigate', () => {
+    cancelVisit = undefined;
+    cancelPending();
+    syncControls();
+});
+onMounted(() => window.addEventListener('popstate', cancelPending));
+function navigate(targetPage = 1, attention = expiryFilter.value): void {
+    cancelPending();
+    const generation = visitGeneration;
+    const state = changeRecordListState(committedState.value, {
+        search: searchQuery.value,
+        sort: sortKey.value,
+        attention,
+        page: targetPage,
+    });
+    isLoading.value = true;
+    ownVisit = true;
+    router.get(
+        scopedUrl(
+            recordListUrl(wasteManagementRoutes.records.index.url(), state),
+        ),
+        {},
+        {
+            headers: recordContractHeaders,
+            preserveScroll: true,
+            preserveState: true,
+            onCancelToken: (token) => {
+                cancelVisit = () => token.cancel();
+            },
+            onFinish: () => {
+                if (generation === visitGeneration) {
+                    cancelVisit = undefined;
+                    isLoading.value = false;
+                }
+            },
+        },
+    );
+    ownVisit = false;
+}
 function changeAttention(value: unknown): void {
     if (typeof value !== 'string' || !(value in attentionLabels)) return;
-    router.get(
-        scopedUrl(wasteManagementRoutes.records.index.url()),
-        {
-            month: props.filters.month,
-            ...(value !== 'all' ? { attention: value } : {}),
-        },
-        { preserveScroll: true, preserveState: false },
-    );
+    navigate(1, value);
 }
-
-const filteredRecords = computed(() => {
-    const query = searchQuery.value.trim().toLowerCase();
-
-    return [...props.wasteRecords]
-        .filter((record) => {
-            const matchesQuery =
-                query.length === 0 ||
-                record.record_number.toLowerCase().includes(query) ||
-                record.waste_type?.name?.toLowerCase().includes(query) ||
-                record.waste_type?.code?.toLowerCase().includes(query) ||
-                record.waste_type?.category?.name
-                    ?.toLowerCase()
-                    .includes(query) ||
-                record.source?.toLowerCase().includes(query);
-
-            if (!matchesQuery) {
-                return false;
-            }
-
-            return true;
-        })
-        .sort((left, right) => {
-            if (sortKey.value === 'oldest') {
-                return (
-                    new Date(left.date).getTime() -
-                    new Date(right.date).getTime()
-                );
-            }
-
-            if (sortKey.value === 'quantity_high') {
-                return right.quantity - left.quantity;
-            }
-
-            if (sortKey.value === 'quantity_low') {
-                return left.quantity - right.quantity;
-            }
-
-            return (
-                new Date(right.date).getTime() - new Date(left.date).getTime()
-            );
-        });
+function scheduleSearch(): void {
+    cancelPending();
+    isLoading.value = true;
+    searchTimer = setTimeout(() => navigate(), 300);
+}
+onBeforeUnmount(() => {
+    cancelPending();
+    removeBeforeListener();
+    removeNavigateListener();
+    window.removeEventListener('popstate', cancelPending);
 });
-
-const totalPages = computed(() =>
-    Math.max(1, Math.ceil(filteredRecords.value.length / perPage)),
+const paginatedRecords = computed(() => recordsPage.value.data);
+const totalPages = computed(() => Math.max(1, recordsPage.value.last_page));
+const pageRangeLabel = computed(() =>
+    recordsPage.value.total === 0
+        ? '0 dari 0 catatan'
+        : `${recordsPage.value.from}-${recordsPage.value.to} dari ${recordsPage.value.total} catatan`,
 );
-
-const paginatedRecords = computed(() => {
-    const start = (currentPage.value - 1) * perPage;
-
-    return filteredRecords.value.slice(start, start + perPage);
-});
-
-const pageRangeLabel = computed(() => {
-    if (filteredRecords.value.length === 0) {
-        return '0 dari 0 catatan';
-    }
-
-    const start = (currentPage.value - 1) * perPage + 1;
-    const end = Math.min(start + perPage - 1, filteredRecords.value.length);
-
-    return `${start}-${end} dari ${filteredRecords.value.length} catatan`;
-});
-
 const breadcrumbItems: BreadcrumbItem[] = [
     {
         title: 'Catatan Limbah',
@@ -222,12 +250,6 @@ function formatDate(dateString: string) {
         month: 'short',
         day: 'numeric',
     });
-}
-
-function getHazardousClass(isHazardous: boolean) {
-    return isHazardous
-        ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-        : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
 }
 
 function getOperationalStatusClass(status: WasteRecord['operational_status']) {
@@ -247,32 +269,27 @@ function exportCsv(): void {
         wasteManagementRoutes.records.export.csv.url({
             query: {
                 search: searchQuery.value.trim(),
-                month: props.filters.month,
-                attention: props.filters.attention,
+                month: committedState.value.month,
+                attention:
+                    expiryFilter.value === 'all' ? null : expiryFilter.value,
                 sort: sortKey.value,
             },
         }),
     );
 }
 
-function resetPage(): void {
-    currentPage.value = 1;
-}
-
 function resetFilters(): void {
+    if (searchTimer) clearTimeout(searchTimer);
     searchQuery.value = '';
-    if (expiryFilter.value !== 'all') changeAttention('all');
     sortKey.value = 'latest';
-    resetPage();
+    navigate(1, 'all');
 }
-
 function changePage(page: number): void {
-    currentPage.value = Math.min(Math.max(page, 1), totalPages.value);
+    navigate(Math.min(Math.max(page, 1), totalPages.value));
 }
-
 function handleCreateSuccess(): void {
     isCreateDialogOpen.value = false;
-    router.reload();
+    navigate(currentPage.value);
 }
 </script>
 
@@ -283,54 +300,41 @@ function handleCreateSuccess(): void {
     >
         <Head title="Catatan Limbah - Manajemen Limbah" />
 
-        <div
-            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
-        >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[340px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-10 left-1/3 -z-10 h-56 w-56 rounded-full bg-teal-200/15 blur-3xl"
-            />
-            <div
-                class="pointer-events-none absolute top-28 right-0 -z-10 h-56 w-56 rounded-full bg-orange-200/15 blur-3xl"
-            />
-
-            <div class="space-y-8">
-                <div
-                    class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm"
-                >
-                    <p>
-                        <strong>Snapshot {{ filters.as_of }}</strong> ·
-                        {{ attentionLabels[expiryFilter] }}. Indikator masa
-                        simpan hanya menghitung catatan disetujui yang masih
-                        memiliki sisa limbah.
-                    </p>
-                    <Button
-                        v-if="expiryFilter !== 'all'"
-                        variant="outline"
-                        size="sm"
-                        @click="changeAttention('all')"
-                        >Lihat semua catatan</Button
-                    >
-                </div>
-                <section
-                    class="wm-surface-hero overflow-hidden rounded-[30px] via-slate-50/80 to-teal-50/20 dark:via-slate-900 dark:to-teal-950/18"
-                >
-                    <div
-                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:p-6"
-                    >
-                        <div class="space-y-5">
+        <div class="relative min-w-0 overflow-x-hidden p-4">
+            <div class="space-y-4">
+                <section class="space-y-4">
+                    <div class="min-w-0">
+                        <div class="space-y-4">
                             <div class="space-y-3">
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.16em] text-teal-700/70 uppercase"
+                                <Heading title="Catatan Limbah" />
+                            </div>
+
+                            <div
+                                class="flex flex-wrap items-center gap-2"
+                                aria-label="Tindakan catatan limbah"
+                            >
+                                <Button
+                                    v-if="props.wasteTypes"
+                                    size="sm"
+                                    @click="isCreateDialogOpen = true"
                                 >
-                                    Waste Operations
-                                </p>
-                                <Heading
-                                    title="Catatan Limbah"
-                                    description="Pantau, cari, dan kelola seluruh catatan limbah dari satu halaman operasional."
-                                />
+                                    <Plus class="mr-2 size-4" />Tambah catatan
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    @click="exportCsv"
+                                >
+                                    <DownloadIcon class="mr-2 size-4" />Ekspor
+                                    CSV
+                                </Button>
+                                <Button
+                                    v-if="expiryFilter !== 'all'"
+                                    variant="ghost"
+                                    size="sm"
+                                    @click="changeAttention('all')"
+                                    >Lihat semua catatan</Button
+                                >
                             </div>
 
                             <div class="flex flex-wrap gap-3">
@@ -360,10 +364,10 @@ function handleCreateSuccess(): void {
                                     class="wm-hero-record-card wm-hero-record-card-blue"
                                 >
                                     <div
-                                        class="mb-4 flex items-start justify-between gap-3"
+                                        class="mb-2 flex items-start justify-between gap-3"
                                     >
                                         <div
-                                            class="rounded-2xl bg-sky-600 p-3 text-white shadow-sm shadow-sky-500/20"
+                                            class="rounded-lg bg-sky-600 p-2 text-white shadow-sm shadow-sky-500/20"
                                         >
                                             <Layers3 class="size-4.5" />
                                         </div>
@@ -379,12 +383,12 @@ function handleCreateSuccess(): void {
                                         Total catatan
                                     </p>
                                     <p
-                                        class="mt-2 text-3xl font-black tracking-tight text-slate-950 dark:text-slate-100"
+                                        class="mt-1 text-3xl font-black tracking-tight text-slate-950 dark:text-slate-100"
                                     >
                                         {{ recordSummary.total }}
                                     </p>
                                     <p
-                                        class="mt-2 text-[12px] leading-5 text-slate-600 dark:text-slate-300"
+                                        class="mt-1 text-[12px] leading-5 text-slate-600 dark:text-slate-300"
                                     >
                                         Catatan tercatat sampai
                                         {{ filters.as_of }}.
@@ -395,10 +399,10 @@ function handleCreateSuccess(): void {
                                     class="wm-hero-record-card wm-hero-record-card-amber"
                                 >
                                     <div
-                                        class="mb-4 flex items-start justify-between gap-3"
+                                        class="mb-2 flex items-start justify-between gap-3"
                                     >
                                         <div
-                                            class="rounded-2xl bg-amber-600 p-3 text-white shadow-sm shadow-amber-500/20"
+                                            class="rounded-lg bg-amber-600 p-2 text-white shadow-sm shadow-amber-500/20"
                                         >
                                             <Clock3 class="size-4.5" />
                                         </div>
@@ -414,12 +418,12 @@ function handleCreateSuccess(): void {
                                         Menunggu ditinjau
                                     </p>
                                     <p
-                                        class="mt-2 text-3xl font-black tracking-tight text-slate-950 dark:text-slate-100"
+                                        class="mt-1 text-3xl font-black tracking-tight text-slate-950 dark:text-slate-100"
                                     >
                                         {{ totalPendingRecords }}
                                     </p>
                                     <p
-                                        class="mt-2 text-[12px] leading-5 text-slate-600 dark:text-slate-300"
+                                        class="mt-1 text-[12px] leading-5 text-slate-600 dark:text-slate-300"
                                     >
                                         {{ totalPendingRecords }} catatan sudah
                                         diajukan dan menunggu tinjauan. Draf
@@ -431,10 +435,10 @@ function handleCreateSuccess(): void {
                                     class="wm-hero-record-card wm-hero-record-card-rose"
                                 >
                                     <div
-                                        class="mb-4 flex items-start justify-between gap-3"
+                                        class="mb-2 flex items-start justify-between gap-3"
                                     >
                                         <div
-                                            class="rounded-2xl bg-rose-600 p-3 text-white shadow-sm shadow-rose-500/20"
+                                            class="rounded-lg bg-rose-600 p-2 text-white shadow-sm shadow-rose-500/20"
                                         >
                                             <AlertTriangle class="size-4.5" />
                                         </div>
@@ -450,12 +454,12 @@ function handleCreateSuccess(): void {
                                         Melewati batas simpan
                                     </p>
                                     <p
-                                        class="mt-2 text-3xl font-black tracking-tight text-slate-950 dark:text-slate-100"
+                                        class="mt-1 text-3xl font-black tracking-tight text-slate-950 dark:text-slate-100"
                                     >
                                         {{ totalExpiredRecords }}
                                     </p>
                                     <p
-                                        class="mt-2 text-[12px] leading-5 text-slate-600 dark:text-slate-300"
+                                        class="mt-1 text-[12px] leading-5 text-slate-600 dark:text-slate-300"
                                     >
                                         {{ totalExpiringSoonRecords }} catatan
                                         mendekati batas simpan dalam 7 hari.
@@ -475,55 +479,6 @@ function handleCreateSuccess(): void {
                                         meninjau catatan
                                     </p>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div
-                            class="wm-surface-panel space-y-4 rounded-[28px] p-5"
-                        >
-                            <div class="space-y-2">
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400"
-                                >
-                                    Aksi Cepat
-                                </p>
-                                <p
-                                    class="text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
-                                >
-                                    Aksi cepat operasional
-                                </p>
-                            </div>
-
-                            <Button
-                                variant="outline"
-                                class="w-full justify-start border-white/90 bg-white/85 shadow-sm hover:bg-white dark:border-slate-800/80 dark:bg-slate-950/80 dark:hover:bg-slate-950"
-                                @click="exportCsv"
-                            >
-                                <DownloadIcon class="mr-2 h-4 w-4" />
-                                Ekspor CSV
-                            </Button>
-
-                            <Button
-                                class="w-full justify-start"
-                                @click="isCreateDialogOpen = true"
-                            >
-                                <Plus class="mr-2 h-4 w-4" />
-                                Tambah catatan
-                            </Button>
-
-                            <div class="wm-surface-subtle rounded-[22px] p-4">
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase dark:text-slate-400"
-                                >
-                                    Fokus halaman
-                                </p>
-                                <p
-                                    class="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300"
-                                >
-                                    Gunakan pencarian, filter masa simpan, dan
-                                    urutan data untuk mempercepat review catatan
-                                    yang perlu tindakan.
-                                </p>
                             </div>
                         </div>
                     </div>
@@ -556,8 +511,8 @@ function handleCreateSuccess(): void {
                             <Input
                                 v-model="searchQuery"
                                 class="pl-9"
-                                placeholder="Cari nomor catatan, jenis limbah, kategori, atau sumber"
-                                @update:model-value="resetPage"
+                                placeholder="Cari nomor catatan, jenis limbah, atau sumber"
+                                @update:model-value="scheduleSearch"
                             />
                         </div>
 
@@ -600,7 +555,7 @@ function handleCreateSuccess(): void {
 
                         <Select
                             v-model="sortKey"
-                            @update:model-value="resetPage"
+                            @update:model-value="() => navigate()"
                         >
                             <SelectTrigger>
                                 <SelectValue placeholder="Urutkan catatan" />
@@ -648,15 +603,24 @@ function handleCreateSuccess(): void {
                     <div
                         class="overflow-hidden rounded-[30px] border border-slate-200/80 bg-white shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] dark:bg-slate-950/95"
                     >
-                        <Table>
+                        <p
+                            v-if="isLoading"
+                            role="status"
+                            aria-live="polite"
+                            class="p-4 text-sm text-muted-foreground"
+                        >
+                            Memuat catatan...
+                        </p>
+                        <Table :aria-busy="isLoading">
                             <TableHeader>
                                 <TableRow
                                     class="bg-slate-50/80 dark:bg-slate-900/70"
                                 >
                                     <TableHead>Nomor catatan</TableHead>
                                     <TableHead>Tanggal</TableHead>
+                                    <TableHead>Dicatat oleh</TableHead>
                                     <TableHead>Jenis limbah</TableHead>
-                                    <TableHead>Kategori</TableHead>
+                                    <TableHead>Sumber limbah</TableHead>
                                     <TableHead>Jumlah</TableHead>
                                     <TableHead>Pengangkutan</TableHead>
                                     <TableHead>Masa simpan</TableHead>
@@ -667,7 +631,7 @@ function handleCreateSuccess(): void {
                             <TableBody>
                                 <TableRow v-if="paginatedRecords.length === 0">
                                     <TableCell
-                                        :colspan="9"
+                                        :colspan="10"
                                         class="py-10 text-center"
                                     >
                                         <div
@@ -733,6 +697,10 @@ function handleCreateSuccess(): void {
                                     <TableCell>{{
                                         formatDate(record.date)
                                     }}</TableCell>
+                                    <TableCell>{{
+                                        record.created_by?.name ||
+                                        'Tidak tersedia'
+                                    }}</TableCell>
                                     <TableCell>
                                         <div class="text-sm">
                                             <div class="font-medium">
@@ -753,35 +721,10 @@ function handleCreateSuccess(): void {
                                     </TableCell>
                                     <TableCell>
                                         <div class="space-y-1">
-                                            <span
-                                                v-if="
-                                                    record.waste_type?.category
-                                                "
-                                                class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                                :class="
-                                                    getHazardousClass(
-                                                        !!record.waste_type
-                                                            ?.characteristic
-                                                            ?.is_hazardous,
-                                                    )
-                                                "
-                                            >
-                                                {{
-                                                    record.waste_type.category
-                                                        .name
-                                                }}
-                                            </span>
-                                            <p
-                                                class="text-xs text-muted-foreground"
-                                            >
-                                                {{
-                                                    record.waste_type
-                                                        ?.characteristic
-                                                        ?.is_hazardous
-                                                        ? 'Karakteristik berbahaya'
-                                                        : 'Karakteristik non-berbahaya'
-                                                }}
-                                            </p>
+                                            <span>{{
+                                                record.source_name ||
+                                                'Belum tercatat'
+                                            }}</span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
@@ -924,7 +867,7 @@ function handleCreateSuccess(): void {
                         <Button
                             variant="outline"
                             size="sm"
-                            :disabled="currentPage === 1"
+                            :disabled="isLoading || currentPage === 1"
                             @click="changePage(currentPage - 1)"
                         >
                             Sebelumnya
@@ -936,7 +879,7 @@ function handleCreateSuccess(): void {
                         <Button
                             variant="outline"
                             size="sm"
-                            :disabled="currentPage === totalPages"
+                            :disabled="isLoading || currentPage === totalPages"
                             @click="changePage(currentPage + 1)"
                         >
                             Berikutnya
@@ -958,6 +901,7 @@ function handleCreateSuccess(): void {
                 <CreateWasteRecordForm
                     v-if="props.wasteTypes"
                     :waste-types="props.wasteTypes"
+                    :waste-sources="props.wasteSources"
                     @success="handleCreateSuccess"
                 />
             </DialogContent>

@@ -36,7 +36,7 @@ class WasteHaulingPlansController extends Controller
     {
         $this->enabled();
         $plans = WasteHaulingPlan::query()->with(['wasteRecord', 'createdBy', 'approvedByUser', 'closedByUser', 'haulings'])
-            ->when(! $this->all() && ! $this->reviewer(), fn ($q) => $q->where('created_by', auth()->id()))->latest()->get();
+            ->when(! $this->all() && ! $this->reviewer(), fn ($q) => $q->where(fn ($own) => $own->where('created_by', auth()->id())->orWhereIn('id', app(HaulingPlans::class)->operatorPlans()->select('id'))))->latest()->get();
         $records = WasteRecord::query()->with('wasteType')->approved()->when(! $this->all(), fn ($q) => $q->where('created_by', auth()->id()))->orderBy('date')->get();
 
         return Inertia::render('waste-management/hauling-plans/Index', ['plansEnabled' => true,
@@ -60,7 +60,7 @@ class WasteHaulingPlansController extends Controller
     {
         $this->enabled();
         $plan = WasteHaulingPlan::query()->findOrFail($wasteHaulingPlan);
-        abort_unless($this->all() || $this->reviewer() || $plan->created_by === auth()->id(), 403);
+        abort_unless($this->all() || $this->reviewer() || $plan->created_by === auth()->id() || app(HaulingPlans::class)->canOperatePlan($plan->id), 403);
 
         return Inertia::render('waste-management/hauling-plans/Show', ['plan' => $this->serialize($plan), 'record' => $this->record($plan->wasteRecord)]);
     }
@@ -101,17 +101,17 @@ class WasteHaulingPlansController extends Controller
     public function record(WasteRecord $record): array
     {
         return ['waste_type_id' => $record->waste_type_id, 'waste_type' => $record->wasteType?->only(['name', 'code']),
-            'id' => $record->id, 'record_number' => $record->record_number, 'unit' => $record->unit, 'quantity' => (float) $record->quantity,
+            'id' => $record->id, 'record_number' => $record->record_number, 'date' => $record->date?->toDateString(), 'unit' => $record->unit, 'quantity' => (float) $record->quantity,
             'remaining_quantity' => $record->getRemainingQuantity(), 'available_quantity' => app(HaulingPlans::class)->availableFor($record)];
     }
 
-    public function serialize(WasteHaulingPlan $plan): array
+    public function serialize(WasteHaulingPlan $plan, ?bool $canAct = null): array
     {
         $plan->loadMissing(['wasteRecord', 'createdBy', 'approvedByUser', 'closedByUser', 'haulings']);
         $approved = (float) $plan->haulings->where('status', 'approved')->sum('quantity');
         $pending = (float) $plan->haulings->where('status', 'pending_approval')->sum('quantity');
         $separated = app(ApprovalSeparation::class)->canApprove(auth()->user(), $plan);
-        $canAct = $this->all() || $plan->created_by === auth()->id();
+        $canAct ??= $this->all() || $plan->created_by === auth()->id() || app(HaulingPlans::class)->canOperatePlan($plan->id);
 
         return ['id' => $plan->id, 'waste_record_id' => $plan->waste_record_id, 'record_number' => $plan->wasteRecord?->record_number,
             'planned_date' => $plan->planned_date?->toDateString(), 'quantity' => (float) $plan->quantity, 'unit' => $plan->unit,
@@ -125,6 +125,6 @@ class WasteHaulingPlansController extends Controller
                 'can_reject' => $separated && $plan->canBeApproved() && auth()->user()->hasPermission('waste_hauling.reject'),
                 'can_close' => $separated && $plan->canBeClosed() && $pending === 0.0 && auth()->user()->hasPermission('waste_hauling.approve'),
                 'can_realize' => $canAct && $plan->status === 'approved' && $approved + $pending < (float) $plan->quantity && auth()->user()->hasPermission('waste_hauling.submit') && auth()->user()->hasPermission('waste_hauling.create')],
-            'actuals' => $plan->haulings->map(fn ($row) => ['id' => $row->id, 'can_view' => $this->all() || $this->reviewer() || $row->created_by === auth()->id(), 'hauling_number' => $row->hauling_number, 'hauling_date' => $row->hauling_date?->toDateString(), 'quantity' => (float) $row->quantity, 'unit' => $row->unit, 'status' => $row->status])->all()];
+            'actuals' => $plan->haulings->filter(fn ($row) => $this->all() || $this->reviewer() || $plan->created_by === auth()->id() || $row->created_by === auth()->id())->values()->map(fn ($row) => ['id' => $row->id, 'can_view' => $this->all() || $this->reviewer() || $row->created_by === auth()->id(), 'hauling_number' => $row->hauling_number, 'hauling_date' => $row->hauling_date?->toDateString(), 'quantity' => (float) $row->quantity, 'unit' => $row->unit, 'status' => $row->status])->all()];
     }
 }

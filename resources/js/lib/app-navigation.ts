@@ -22,45 +22,85 @@ import type { NavItem } from '@/types';
 
 export const appNavigationItems: NavItem[] = [
     {
-        title: 'Riwayat Audit B3',
-        href: auditIndex.url(),
-        icon: FileText,
-        permission: 'operational_audit.view',
-    },
-    {
         title: 'Dashboard',
         href: dashboardRoute.url(),
         icon: LayoutGrid,
     },
     {
-        title: 'Catatan Limbah',
-        href: wasteManagementRoutes.records.index.url(),
+        title: 'Limbah B3',
         icon: FileText,
-        permissions: ['waste_records.view_all', 'waste_records.view_own'],
-    },
-    {
-        title: 'Neraca Operasional Limbah',
-        href: wasteManagementRoutes.balance.index.url(),
-        icon: Database,
-        permissions: ['waste_records.view_all', 'waste_records.view_own'],
-    },
-    {
-        title: 'Rencana Angkut',
-        href: haulingPlansIndex.url(),
-        icon: Truck,
-        capability: 'hauling_plans_available',
-        permissions: [
-            'waste_hauling.view_all',
-            'waste_hauling.view_own',
-            'waste_hauling.approve',
-            'waste_hauling.reject',
+        labelOnly: true,
+        items: [
+            {
+                title: 'Dashboard Limbah B3',
+                href: '/waste-management/b3/dashboard',
+                icon: LayoutGrid,
+                permissions: [
+                    'waste_records.view_all',
+                    'waste_records.view_own',
+                ],
+            },
+            {
+                title: 'Laporan Limbah B3',
+                href: '/waste-management/reports',
+                icon: FileText,
+                permissions: [
+                    'waste_records.view_all',
+                    'waste_records.view_own',
+                ],
+            },
+            {
+                title: 'Catatan Limbah B3',
+                href: wasteManagementRoutes.records.index.url(),
+                icon: FileText,
+                permissions: [
+                    'waste_records.view_all',
+                    'waste_records.view_own',
+                ],
+            },
+            {
+                title: 'Neraca Limbah B3',
+                href: wasteManagementRoutes.balance.index.url(),
+                icon: Database,
+                permissions: [
+                    'waste_records.view_all',
+                    'waste_records.view_own',
+                ],
+            },
+            {
+                title: 'Rencana Angkut',
+                href: haulingPlansIndex.url(),
+                icon: Truck,
+                capability: 'hauling_plans_available',
+                permissions: [
+                    'waste_hauling.view_all',
+                    'waste_hauling.view_own',
+                    'waste_hauling.approve',
+                    'waste_hauling.reject',
+                ],
+            },
+            {
+                title: 'Pengangkutan Limbah B3',
+                href: wasteManagementRoutes.haulings.index.url(),
+                icon: Truck,
+                permissions: [
+                    'waste_hauling.view_all',
+                    'waste_hauling.view_own',
+                ],
+            },
+            {
+                title: 'Persetujuan Pengangkutan',
+                href: wasteManagementRoutes.haulings.pendingApproval.url(),
+                icon: ShieldCheck,
+                permissions: ['waste_hauling.approve', 'waste_hauling.reject'],
+            },
+            {
+                title: 'Riwayat Audit B3',
+                href: auditIndex.url(),
+                icon: FileText,
+                permission: 'operational_audit.view',
+            },
         ],
-    },
-    {
-        title: 'Pengangkutan Limbah',
-        href: wasteManagementRoutes.haulings.index.url(),
-        icon: Truck,
-        permissions: ['waste_hauling.view_all', 'waste_hauling.view_own'],
     },
     {
         title: 'FABA',
@@ -123,16 +163,16 @@ export const appNavigationItems: NavItem[] = [
                 permission: 'waste_types.view',
             },
             {
-                title: 'Kategori Limbah',
-                href: wasteManagementRoutes.masterData.categories.index.url(),
+                title: 'Sumber Limbah',
+                href: '/waste-management/master-data/sources',
                 icon: Tag,
                 permission: 'waste_categories.view',
             },
             {
-                title: 'Karakteristik',
-                href: wasteManagementRoutes.masterData.characteristics.index.url(),
-                icon: Sparkles,
-                permission: 'waste_characteristics.view',
+                title: 'Kategori Limbah',
+                href: wasteManagementRoutes.masterData.categories.index.url(),
+                icon: Tag,
+                permission: 'waste_categories.view',
             },
             {
                 title: 'Tujuan Internal FABA',

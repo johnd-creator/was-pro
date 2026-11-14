@@ -8,6 +8,8 @@ export interface OperationalAlert {
 }
 
 export interface NotificationSummary {
+    pending_hauling_plans_count?: number;
+    pending_hauling_approvals_count?: number;
     total_count: number;
     expired_waste_count: number;
     expiring_soon_waste_count: number;

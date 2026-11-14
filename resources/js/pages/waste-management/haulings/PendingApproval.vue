@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import Heading from '@/components/Heading.vue';
 import Link from '@/components/OrganizationLink.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +17,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
@@ -36,7 +36,16 @@ interface HaulingItem {
     created_by: { name: string } | null;
 }
 
-defineProps<{ haulings: HaulingItem[] }>();
+defineProps<{
+    haulings: HaulingItem[];
+    plansAvailable: boolean;
+    pendingPlans: Array<{
+        id: string;
+        title: string;
+        description: string;
+        source_url: string;
+    }>;
+}>();
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
@@ -71,18 +80,51 @@ function formatDate(value: string | null): string {
     >
         <Head title="Approval Pengangkutan Limbah" />
 
-        <div class="space-y-6 px-4 py-5 sm:px-6 lg:px-8">
-            <Heading
-                title="Approval Pengangkutan"
-                description="Supervisor meninjau dan menyetujui pengajuan angkut dari operator."
-            />
+        <div class="min-w-0 space-y-4 p-4">
+            <Heading title="Approval Pengangkutan" />
+
+            <Card v-if="plansAvailable">
+                <CardHeader>
+                    <CardTitle>Rencana menunggu persetujuan</CardTitle>
+                    <CardDescription
+                        >Persetujuan rencana mengalokasikan limbah. Realisasi
+                        pengangkutan ditinjau terpisah setelah limbah
+                        keluar.</CardDescription
+                    >
+                </CardHeader>
+                <CardContent class="space-y-3">
+                    <p
+                        v-if="!pendingPlans.length"
+                        class="text-sm text-muted-foreground"
+                    >
+                        Tidak ada rencana yang menunggu keputusan Anda.
+                    </p>
+                    <div
+                        v-for="plan in pendingPlans"
+                        :key="plan.id"
+                        class="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+                    >
+                        <p class="text-sm">{{ plan.description }}</p>
+                        <Link
+                            :href="plan.source_url"
+                            class="inline-flex min-h-11 items-center rounded-md border px-3 text-sm font-medium hover:bg-muted"
+                            >Tinjau rencana</Link
+                        >
+                    </div>
+                    <Link
+                        href="/waste-management/hauling-plans"
+                        class="inline-flex min-h-11 items-center text-sm font-medium text-primary"
+                        >Buka semua rencana angkut</Link
+                    >
+                </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader>
                     <CardTitle>Antrean approval</CardTitle>
                     <CardDescription
                         >Pengajuan yang disetujui akan langsung mengurangi
-                        backlog limbah.</CardDescription
+                        limbah belum terkelola.</CardDescription
                     >
                 </CardHeader>
                 <CardContent>

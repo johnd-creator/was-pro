@@ -21,6 +21,30 @@ class HaulingPlans
         return config('hauling-plans.enabled', false) && $this->installed();
     }
 
+    /** Approved coordinator plans are shared only with operational users in the active tenant. */
+    public function operatorPlans(): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = WasteHaulingPlan::query()->where('status', 'approved');
+        $user = auth()->user();
+        $organization = app(OperationalInbox::class)->organization();
+        if (! $this->enabled() || ! $user || $user->isSuperAdmin() || ($user->role?->slug !== 'operator' || ! $user->role?->is_active)
+            || ! $organization || (string) $user->organization_id !== (string) $organization->id
+            || ! $user->hasPermission('waste_hauling.view_own') || ! $user->hasPermission('waste_hauling.create')
+            || ! $user->hasPermission('waste_hauling.submit')) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereHas('createdBy', fn ($creator) => $creator
+            ->where('organization_id', $organization->id)
+            ->whereHas('role', fn ($role) => $role->where('slug', 'coordinator')->where('is_active', true)));
+    }
+
+    public function canOperatePlan(mixed $planId, ?string $recordId = null): bool
+    {
+        return $this->enabled() && is_string($planId) && \Illuminate\Support\Str::isUuid($planId) && $this->operatorPlans()->whereKey($planId)
+            ->when($recordId, fn ($query) => $query->where('waste_record_id', $recordId))->exists();
+    }
+
     public function timezone(): string
     {
         return config('hauling-plans.timezone') ?: config('app.timezone');
@@ -65,7 +89,7 @@ class HaulingPlans
         $available = $this->cents($record->quantity) - $this->reserved($record, $ignoreHauling, $planId);
         if ($planId) {
             $plan = WasteHaulingPlan::query()->findOrFail($planId);
-            if (auth()->user() && ! auth()->user()->hasPermission('waste_hauling.view_all') && $plan->created_by !== auth()->id() && ! $ignoreHauling) {
+            if (auth()->user() && ! auth()->user()->hasPermission('waste_hauling.view_all') && $plan->created_by !== auth()->id() && ! $ignoreHauling && ! $this->canOperatePlan($planId, $record->id)) {
                 abort(403);
             }
             if ($plan->waste_record_id !== $record->id || $plan->status !== 'approved' || $plan->unit !== $record->unit) {
@@ -89,6 +113,51 @@ class HaulingPlans
             'available_quantity' => $this->availableFor($record)];
     }
 
+    /**
+     * Read-only allocation summaries for a set of records, without altering write-time locking.
+     *
+     * @param  \Illuminate\Support\Collection<int, WasteRecord>  $records
+     * @return array<string, array{reserved_quantity: float, pending_actual_quantity: float, plan_reserved_quantity: float, available_quantity: float}>
+     */
+    public function summaries(\Illuminate\Support\Collection $records): array
+    {
+        if ($records->isEmpty()) {
+            return [];
+        }
+
+        $ids = $records->map(fn (WasteRecord $record) => $record->getKey())->all();
+        $installed = $this->installed();
+        $actuals = WasteHauling::query()->whereIn('waste_record_id', $ids)
+            ->whereIn('status', ['pending_approval', 'approved'])
+            ->get($installed ? ['id', 'waste_record_id', 'waste_hauling_plan_id', 'quantity', 'status'] : ['id', 'waste_record_id', 'quantity', 'status'])
+            ->groupBy('waste_record_id');
+        $plans = $installed
+            ? WasteHaulingPlan::query()->whereIn('waste_record_id', $ids)
+                ->whereIn('status', ['pending_approval', 'approved'])
+                ->get(['id', 'waste_record_id', 'quantity'])->groupBy('waste_record_id')
+            : collect();
+        $result = [];
+        foreach ($records as $record) {
+            $rows = $actuals->get($record->id, collect());
+            $actualReserved = $rows->sum(fn ($row) => $this->cents($row->quantity));
+            $pending = $rows->where('status', 'pending_approval')->sum(fn ($row) => $this->cents($row->quantity));
+            $planReserved = 0;
+            foreach ($plans->get($record->id, collect()) as $plan) {
+                $used = $rows->where('waste_hauling_plan_id', $plan->id)->sum(fn ($row) => $this->cents($row->quantity));
+                $planReserved += max(0, $this->cents($plan->quantity) - $used);
+            }
+            $reserved = $actualReserved + $planReserved;
+            $result[(string) $record->id] = [
+                'reserved_quantity' => $reserved / 100,
+                'pending_actual_quantity' => $pending / 100,
+                'plan_reserved_quantity' => $planReserved / 100,
+                'available_quantity' => max(0, $this->cents($record->quantity) - $reserved) / 100,
+            ];
+        }
+
+        return $result;
+    }
+
     public function canViewPlan(WasteHauling $hauling): bool
     {
         if (! $hauling->waste_hauling_plan_id || ! $this->enabled()) {
@@ -96,7 +165,7 @@ class HaulingPlans
         }
         $user = auth()->user();
 
-        return $user && ($user->hasPermission('waste_hauling.view_all') || $user->hasPermission('waste_hauling.approve') || $user->hasPermission('waste_hauling.reject') || ($user->hasPermission('waste_hauling.view_own') && $hauling->haulingPlan?->created_by === $user->id));
+        return $user && ($user->hasPermission('waste_hauling.view_all') || $user->hasPermission('waste_hauling.approve') || $user->hasPermission('waste_hauling.reject') || ($user->hasPermission('waste_hauling.view_own') && $hauling->haulingPlan?->created_by === $user->id) || $this->canOperatePlan($hauling->waste_hauling_plan_id));
     }
 
     public function before(Model $model, ?Model $current): void

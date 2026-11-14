@@ -10,7 +10,6 @@ import {
 import type { LucideIcon } from 'lucide-vue-next';
 import { computed, reactive } from 'vue';
 import FabaBalanceReconciliation from '@/components/FabaBalanceReconciliation.vue';
-import Heading from '@/components/Heading.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +22,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
@@ -150,25 +150,6 @@ const utilizationBreakdown = computed(() => [
     },
 ]);
 
-const ledgerSummary = computed(() => [
-    {
-        label: 'Inflow Fly Ash',
-        value: props.detail.recap.movement_summary?.inflow_fly_ash ?? 0,
-    },
-    {
-        label: 'Outflow Fly Ash',
-        value: props.detail.recap.movement_summary?.outflow_fly_ash ?? 0,
-    },
-    {
-        label: 'Inflow Bottom Ash',
-        value: props.detail.recap.movement_summary?.inflow_bottom_ash ?? 0,
-    },
-    {
-        label: 'Outflow Bottom Ash',
-        value: props.detail.recap.movement_summary?.outflow_bottom_ash ?? 0,
-    },
-]);
-
 function applyFilters(): void {
     const [year, month] = form.selectedPeriod.split('-').map(Number);
 
@@ -214,36 +195,14 @@ const { scopedUrl } = useOrganizationContext();
     >
         <Head title="Rekap Bulanan FABA" />
 
-        <div
-            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
-        >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[360px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-8 left-1/3 -z-10 h-56 w-56 rounded-full bg-blue-200/15 blur-3xl"
-            />
-            <div
-                class="pointer-events-none absolute top-32 right-0 -z-10 h-56 w-56 rounded-full bg-orange-200/15 blur-3xl"
-            />
-
-            <div class="space-y-8 lg:space-y-10">
-                <section
-                    class="wm-surface-hero overflow-hidden rounded-[30px] via-slate-50/80 to-blue-50/20 dark:via-slate-900 dark:to-blue-950/20"
-                >
-                    <div
-                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6"
-                    >
-                        <div class="space-y-5">
+        <div class="relative min-w-0 overflow-x-hidden p-4">
+            <div class="space-y-4 lg:space-y-10">
+                <section class="space-y-4">
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                        <div class="space-y-4">
                             <div class="space-y-3">
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.16em] text-blue-700/70 uppercase"
-                                >
-                                    FABA Monthly Recap
-                                </p>
                                 <Heading
                                     :title="`Rekap ${detail.recap.period_label}`"
-                                    description="Baca produksi, pemanfaatan, saldo, dan histori pergerakan material dalam satu ringkasan bulanan."
                                 />
                             </div>
 
@@ -537,39 +496,6 @@ const { scopedUrl } = useOrganizationContext();
                                             class="ml-1 text-sm font-medium text-slate-400"
                                             >ton</span
                                         >
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card
-                            class="overflow-hidden rounded-[30px] border-slate-200/70 bg-linear-to-br from-white via-slate-50/60 to-slate-100/50 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800/80 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800/70 dark:shadow-[0_24px_60px_-36px_rgba(2,6,23,0.9)]"
-                        >
-                            <CardHeader class="space-y-2">
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400"
-                                >
-                                    Ledger Summary
-                                </p>
-                                <CardTitle class="text-lg tracking-tight">
-                                    Arus material
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent class="space-y-3">
-                                <div
-                                    v-for="item in ledgerSummary"
-                                    :key="item.label"
-                                    class="flex items-center justify-between rounded-[18px] border border-white/90 bg-white/85 px-4 py-3 shadow-sm shadow-slate-100/60 dark:bg-slate-950/80"
-                                >
-                                    <p
-                                        class="text-sm text-slate-600 dark:text-slate-300"
-                                    >
-                                        {{ item.label }}
-                                    </p>
-                                    <p
-                                        class="font-semibold text-slate-950 dark:text-slate-100"
-                                    >
-                                        {{ formatNumber(item.value) }} ton
                                     </p>
                                 </div>
                             </CardContent>

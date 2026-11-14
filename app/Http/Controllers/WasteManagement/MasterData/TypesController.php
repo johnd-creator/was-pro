@@ -9,6 +9,8 @@ use App\Models\WasteCharacteristic;
 use App\Models\WasteType;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -38,6 +40,13 @@ class TypesController extends Controller
      */
     public function store(WasteTypeRequest $request): RedirectResponse
     {
+        $characteristicColumn = collect(Schema::getColumns('waste_types'))->firstWhere('name', 'characteristic_id');
+        if (! $request->filled('characteristic_id') && ! ($characteristicColumn['nullable'] ?? false)) {
+            throw ValidationException::withMessages([
+                'name' => 'Pembaruan master jenis limbah untuk organisasi ini belum selesai. Hubungi administrator untuk mengaktifkannya.',
+            ]);
+        }
+
         $wasteType = WasteType::create([
             'name' => $request->validated('name'),
             'code' => $request->validated('code'),
@@ -64,7 +73,7 @@ class TypesController extends Controller
             'name' => $request->validated('name'),
             'code' => $request->validated('code'),
             'category_id' => $request->validated('category_id'),
-            'characteristic_id' => $request->validated('characteristic_id'),
+            ...$request->safe()->only(['characteristic_id']),
             'description' => $request->validated('description'),
             'storage_period_days' => $request->validated('storage_period_days'),
             'transport_cost' => $request->validated('transport_cost'),

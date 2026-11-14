@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import ts from 'typescript';
-import { computed, ref, watch, reactive, effectScope } from 'vue';
+import { computed, ref, watch, reactive, effectScope, nextTick } from 'vue';
 import {
     actualQuantityLimit,
     availablePlanRecords,
     availablePlanWasteTypes,
     planRecordsForType,
+    planRecordsForPeriod,
+    planRecordsForDateRange,
     planQuantityError,
     initialActualDate,
     haulingActualStatus,
@@ -85,7 +87,7 @@ test('linked defaults stay blank when the server business day is unavailable', (
     assert.equal(initialActualDate('2026-11-10', 'plan-id', ''), '');
 });
 
-test('hauling list uses readable bullet separators in priority and source labels', () => {
+test('hauling list uses readable bullet separators in source labels', () => {
     const source = readFileSync(
         new URL(
             '../../resources/js/pages/waste-management/haulings/Index.vue',
@@ -93,7 +95,6 @@ test('hauling list uses readable bullet separators in priority and source labels
         ),
         'utf8',
     );
-    assert.match(source, /\u2022 Sisa/);
     assert.match(source, /\u2022 \{\{ record\.source \}\}/);
     assert.doesNotMatch(source, /[\u00c2\u00c3\ufffd]/);
 });
@@ -246,6 +247,8 @@ function mountPicker(records, query = '') {
         availablePlanRecords,
         availablePlanWasteTypes,
         planRecordsForType,
+        planRecordsForDateRange,
+        planRecordsForDateRange,
         planQuantityError,
     };
     const scope = effectScope();
@@ -253,7 +256,7 @@ function mountPicker(records, query = '') {
         new Function(
             ...Object.keys(dependencies),
             compiled +
-                ';return { form, selectedWasteTypeId, filteredRecords, selectedRecord, quantityError, canSubmit, submit };',
+                ';return { form, startDate, endDate, selectedWasteTypeId, filteredRecords, selectedRecord, quantityError, canSubmit, submit };',
         )(...Object.values(dependencies)),
     );
     return { ...state, submissions, stop: () => scope.stop() };
@@ -417,4 +420,92 @@ test('plan submit blocks invalid entries, accepts exact headroom, and rechecks c
     } finally {
         picker.stop();
     }
+});
+
+test('incoming month filters hauling records without losing year or availability context', () => {
+    const records = [
+        { date: '2025-11-02', available_quantity: 5, waste_type_id: 'a' },
+        { date: '2026-11-02', available_quantity: 8, waste_type_id: 'b' },
+        { date: '2026-11-03', available_quantity: 0, waste_type_id: 'a' },
+        { date: null, available_quantity: 2, waste_type_id: 'c' },
+    ];
+    assert.equal(planRecordsForPeriod(records, '').length, 4);
+    const period = planRecordsForPeriod(records, '2026-11');
+    assert.equal(period.length, 2);
+    assert.deepEqual(planRecordsForType(period, 'b'), [records[1]]);
+    assert.deepEqual(planRecordsForType(period, 'a'), []);
+});
+
+test('date range filters inclusively and permits open bounds without mixing unrecorded dates', () => {
+    const records = [
+        { date: '2026-01-01' },
+        { date: '2026-02-05' },
+        { date: '2026-03-31' },
+        { date: null },
+    ];
+    assert.deepEqual(planRecordsForDateRange(records, '', ''), records);
+    assert.deepEqual(
+        planRecordsForDateRange(records, '2026-02-05', '2026-03-31'),
+        records.slice(1, 3),
+    );
+    assert.deepEqual(
+        planRecordsForDateRange(records, '', '2026-01-01'),
+        records.slice(0, 1),
+    );
+    assert.deepEqual(
+        planRecordsForDateRange(records, '2026-03-31', ''),
+        records.slice(2, 3),
+    );
+    assert.deepEqual(
+        planRecordsForDateRange(records, '2026-04-01', '2026-01-01'),
+        [],
+    );
+});
+
+test('changing entry date range clears stale batch and quantity', async () => {
+    const records = [
+        {
+            id: 'one',
+            waste_type_id: 'a',
+            date: '2026-02-05',
+            available_quantity: 10,
+            waste_type: null,
+        },
+        {
+            id: 'two',
+            waste_type_id: 'a',
+            date: '2026-03-01',
+            available_quantity: 10,
+            waste_type: null,
+        },
+    ];
+    const picker = mountPicker(records, '?waste_record=one');
+    try {
+        picker.form.quantity = 5;
+        picker.startDate.value = '2026-03-01';
+        await nextTick();
+        assert.equal(picker.selectedWasteTypeId.value, '');
+        assert.equal(picker.form.waste_record_id, '');
+        assert.equal(picker.form.quantity, '');
+        assert.equal(picker.canSubmit.value, false);
+        picker.selectedWasteTypeId.value = 'a';
+        assert.deepEqual(picker.filteredRecords.value, [records[1]]);
+    } finally {
+        picker.stop();
+    }
+});
+
+test('hauling detail timeline uses an encoding-safe separator without mojibake', () => {
+    const source = readFileSync(
+        new URL(
+            '../../resources/js/pages/waste-management/haulings/Show.vue',
+            import.meta.url,
+        ),
+        'utf8',
+    );
+    assert.match(
+        source,
+        /\{\{ history\.hauling_date \}\}\s*&bull;\s*\{\{ history\.quantity \}\}/,
+    );
+    assert.doesNotMatch(source, /[\u00c2\u00c3\ufffd]/);
 });

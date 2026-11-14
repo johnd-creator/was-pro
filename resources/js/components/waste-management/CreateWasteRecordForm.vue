@@ -38,6 +38,7 @@ interface WasteType {
 
 interface Props {
     wasteTypes: WasteType[];
+    wasteSources?: { id: string; name: string; is_active: boolean }[];
 }
 
 const props = defineProps<Props>();
@@ -51,8 +52,7 @@ const form = useForm({
     waste_type_id: '',
     quantity: '',
     unit: 'kg',
-    source: '',
-    description: '',
+    source_id: '',
     notes: '',
 });
 
@@ -150,11 +150,6 @@ function submit(): void {
     });
 }
 
-function getHazardousClass(isHazardous: boolean): string {
-    return isHazardous
-        ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-        : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-}
 const { scopedUrl } = useOrganizationContext();
 </script>
 
@@ -211,25 +206,13 @@ const { scopedUrl } = useOrganizationContext();
                                                 type.code
                                             }})</span
                                         >
-                                        <span
-                                            v-if="type.characteristic"
-                                            class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                            :class="
-                                                getHazardousClass(
-                                                    type.characteristic
-                                                        .is_hazardous,
-                                                )
-                                            "
-                                        >
-                                            {{ type.category?.name }}
-                                        </span>
                                     </div>
                                 </SelectItem>
                             </SelectContent>
                         </Select>
                         <p class="text-xs text-muted-foreground">
-                            Pilih jenis limbah yang paling sesuai agar kategori
-                            dan masa simpan dihitung dengan benar.
+                            Pilih jenis limbah yang paling sesuai agar masa
+                            simpan dihitung dengan benar.
                         </p>
                         <InputError :message="form.errors.waste_type_id" />
                     </div>
@@ -394,38 +377,37 @@ const { scopedUrl } = useOrganizationContext();
             <Card class="border-slate-200 dark:border-slate-800">
                 <CardContent class="space-y-4 p-6">
                     <div class="space-y-2">
-                        <Label for="source" class="text-sm"
-                            >Sumber / lokasi</Label
+                        <Label for="source_id">Sumber limbah</Label>
+                        <select
+                            id="source_id"
+                            v-model="form.source_id"
+                            class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            :disabled="!props.wasteSources?.length"
                         >
-                        <Input
-                            id="source"
-                            v-model="form.source"
-                            placeholder="Contoh: Gudang A, Jalur Produksi 2"
-                        />
-                        <p class="text-xs text-muted-foreground">
-                            Isi asal limbah atau lokasi penemuan agar proses
-                            pelacakan lebih mudah.
-                        </p>
-                        <InputError :message="form.errors.source" />
-                    </div>
-
-                    <div class="space-y-2">
-                        <Label for="description" class="text-sm"
-                            >Deskripsi</Label
+                            <option value="">Belum tercatat</option>
+                            <option
+                                v-for="source in props.wasteSources"
+                                :key="source.id"
+                                :value="source.id"
+                            >
+                                {{ source.name
+                                }}{{ source.is_active ? '' : ' (nonaktif)' }}
+                            </option>
+                        </select>
+                        <p
+                            v-if="!props.wasteSources?.length"
+                            class="text-xs text-muted-foreground"
                         >
-                        <Textarea
-                            id="description"
-                            v-model="form.description"
-                            placeholder="Tambahkan deskripsi singkat tentang kondisi atau jenis limbah"
-                            rows="2"
-                        />
-                        <p class="text-xs text-muted-foreground">
-                            Gunakan deskripsi singkat bila ada informasi
-                            penting.
+                            Master sumber belum tersedia. Pengelola dapat
+                            menambahkannya di Master Data.
                         </p>
-                        <InputError :message="form.errors.description" />
+                        <p
+                            v-if="form.errors.source_id"
+                            class="text-sm text-destructive"
+                        >
+                            {{ form.errors.source_id }}
+                        </p>
                     </div>
-
                     <div class="space-y-2">
                         <Label for="notes" class="text-sm"
                             >Catatan internal</Label

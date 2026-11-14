@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import Heading from '@/components/Heading.vue';
 import Link from '@/components/OrganizationLink.vue';
 import {
     Table,
@@ -10,6 +9,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import { dashboard } from '@/routes';
 import type { BreadcrumbItem } from '@/types';
@@ -47,7 +47,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 <template>
     <Head title="Snapshot Limbah Expired" />
     <WasteManagementLayout :breadcrumbs="breadcrumbs" title="Limbah Expired">
-        <div class="space-y-5 p-4 sm:p-6">
+        <div class="space-y-4 p-4 sm:p-4">
             <Heading
                 title="Limbah Expired"
                 :description="`${snapshot.organization_name} · Snapshot ${snapshot.label}${snapshot.unit ? ' · Satuan ' + snapshot.unit : ''}`"

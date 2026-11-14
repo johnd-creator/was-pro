@@ -316,21 +316,24 @@ export interface FabaChartData {
     label: string;
     month: number;
     year: number;
-    production: number;
-    utilization: number;
-    closing_balance: number;
-    production_fly_ash: number;
-    production_bottom_ash: number;
-    utilization_fly_ash: number;
-    utilization_bottom_ash: number;
-    closing_fly_ash: number;
-    closing_bottom_ash: number;
+    production: number | null;
+    utilization: number | null;
+    closing_balance: number | null;
+    production_fly_ash: number | null;
+    production_bottom_ash: number | null;
+    utilization_fly_ash: number | null;
+    utilization_bottom_ash: number | null;
+    closing_fly_ash: number | null;
+    closing_bottom_ash: number | null;
     capacity_utilization_percentage: number | null;
     capacity_status: 'normal' | 'warning' | 'critical' | 'unavailable';
-    capacity: Record<'total' | 'fly_ash' | 'bottom_ash', DashboardCapacity>;
+    capacity: Record<
+        'total' | 'fly_ash' | 'bottom_ash',
+        DashboardCapacity
+    > | null;
     has_capacity_warning: boolean;
-    capacity_warning_threshold: number;
-    capacity_critical_threshold: number;
+    capacity_warning_threshold: number | null;
+    capacity_critical_threshold: number | null;
     warning_count: number;
     has_warning: boolean;
 }

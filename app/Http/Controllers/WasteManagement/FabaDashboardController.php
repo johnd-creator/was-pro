@@ -15,6 +15,11 @@ class FabaDashboardController extends Controller
 
     public function index(): Response
     {
+        return $this->fabaRecapService->withRecapSnapshot(fn (): Response => $this->dashboardResponse());
+    }
+
+    private function dashboardResponse(): Response
+    {
         $year = (int) request('year', now()->year);
         $yearlyRecap = $this->fabaRecapService->getYearlyRecap($year);
         $tpsCapacitySummary = $this->fabaRecapService->getTpsCapacitySummary($year);

@@ -41,6 +41,10 @@ class VendorRequest extends FormRequest
             $rules['license_expiry_date'] = ['nullable', 'date'];
         }
 
+        foreach (['is_transporter', 'is_processor', 'is_utilizer'] as $role) {
+            $rules[$role] = [\Illuminate\Support\Facades\Schema::hasColumn('vendors', $role) ? 'sometimes' : 'exclude', 'nullable', 'boolean'];
+        }
+
         return $rules;
     }
 

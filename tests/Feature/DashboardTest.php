@@ -86,7 +86,7 @@ test('authenticated users can visit the dashboard', function () {
             ->has('wasteBacklogUrgencyDistribution')
             ->has('fabaStats')
             ->has('fabaHeroStats')
-            ->has('fabaChart', 6)
+            ->has('fabaChart', 12)
             ->has('wasteChart', 6)
             ->has('notificationSummary')
             ->has('header')
@@ -330,7 +330,7 @@ test('dashboard reads movement-based faba data from migrated tenant schema', fun
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->component('Dashboard')
-            ->has('fabaChart', 6)
+            ->has('fabaChart', 12)
             ->has('fabaStats')
             ->has('fabaHeroStats')
         );
@@ -413,13 +413,13 @@ test('dashboard exposes faba hero stats using yearly semantics', function () {
             ->where('fabaHeroStats.total_utilization', 10)
             ->where('fabaHeroStats.current_balance', 15)
             ->where('fabaHeroStats.current_fly_ash_balance', 6)
-            ->where('fabaChart.5.closing_bottom_ash', 9)
+            ->where('fabaChart.2.closing_bottom_ash', 9)
         );
     $this->get(route('dashboard', ['month' => '2026-01']))->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->where('filters.month', '2026-01')
-            ->where('fabaChart.5.closing_fly_ash', 10)
-            ->where('fabaChart.5.closing_bottom_ash', 0)
+            ->where('fabaChart.0.closing_fly_ash', 10)
+            ->where('fabaChart.0.closing_bottom_ash', 0)
             ->where('fabaHeroStats.current_balance', 15)
             ->where('fabaHeroStats.current_fly_ash_balance', 6)
         );
@@ -741,8 +741,8 @@ test('dashboard filters metrics by selected month', function () {
             ->where('stats.total_waste_records', 1)
             ->where('fabaStats.total_production', 15)
             ->where('wasteChart.5.approved_input_count', 1)
-            ->where('fabaChart.5.month', 1)
-            ->where('fabaChart.5.year', 2026)
+            ->where('fabaChart.0.month', 1)
+            ->where('fabaChart.0.year', 2026)
         );
 });
 
@@ -1113,7 +1113,7 @@ test('dashboard exposes normal risk metadata when no active compliance issues ex
     CarbonImmutable::setTestNow();
 });
 
-test('dashboard separates material capacity risk from integrity warnings across six months', function () {
+test('dashboard separates material capacity risk from integrity warnings across the selected calendar year', function () {
     $organization = Organization::factory()->create(['code' => 'CAPBUNDLE', 'schema_name' => 'tenant_capacity_bundle']);
     migrateTenantSchema($organization);
     $tenant = app(TenantService::class);
@@ -1131,12 +1131,12 @@ test('dashboard separates material capacity risk from integrity warnings across 
     $this->actingAs($user)->get(route('dashboard', ['month' => '2026-03']))
         ->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
         ->where('header.risk_status', 'critical')
-        ->where('fabaChart.5.capacity.fly_ash.utilization_percentage', 196)
-        ->where('fabaChart.5.capacity.fly_ash.excess_quantity', 96)
-        ->where('fabaChart.5.capacity.bottom_ash.utilization_percentage', 0)
-        ->where('fabaChart.5.capacity.total.capacity', 200)
-        ->where('fabaChart.4.has_capacity_warning', true)
-        ->where('fabaChart.5.has_capacity_warning', true)
+        ->where('fabaChart.2.capacity.fly_ash.utilization_percentage', 196)
+        ->where('fabaChart.2.capacity.fly_ash.excess_quantity', 96)
+        ->where('fabaChart.2.capacity.bottom_ash.utilization_percentage', 0)
+        ->where('fabaChart.2.capacity.total.capacity', 200)
+        ->where('fabaChart.1.has_capacity_warning', true)
+        ->where('fabaChart.2.has_capacity_warning', true)
         );
 });
 
@@ -1172,9 +1172,9 @@ test('dashboard marks unavailable capacity without reporting a genuine zero perc
     $user = User::factory()->create(['organization_id' => $organization->id, 'role_id' => dashboardViewerRole()->id]);
     $this->actingAs($user)->get(route('dashboard'))->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('fabaChart.5.capacity.total.utilization_percentage', null)
-            ->where('fabaChart.5.capacity.total.status', 'unavailable')
-            ->where('fabaChart.5.capacity.fly_ash.utilization_percentage', null)
+            ->where('fabaChart.0.capacity.total.utilization_percentage', null)
+            ->where('fabaChart.0.capacity.total.status', 'unavailable')
+            ->where('fabaChart.0.capacity.fly_ash.utilization_percentage', null)
             ->where('header.risk_status', 'warning')
         );
 });
@@ -1367,3 +1367,37 @@ test('dashboard tolerates pending records with missing submission dates without 
         ->and($record->fresh()->submitted_at?->toIso8601String())->toBe($submittedAt ? CarbonImmutable::parse($submittedAt)->toIso8601String() : null);
     $tenant->switchToPublic();
 })->with([null, '2026-03-01 08:15:00']);
+
+test('FABA calendar chart preserves zeros and hides transactions after the selected cutoff', function () {
+    $organization = Organization::factory()->create(['code' => 'FABACALENDAR', 'schema_name' => 'tenant_faba_calendar']);
+    migrateTenantSchema($organization);
+    $tenant = app(TenantService::class);
+    $tenant->switchToSchema($organization->schema_name);
+    foreach ([[2025, 12, 7], [2026, 1, 10], [2026, 3, 4], [2026, 12, 1000]] as [$year, $month, $quantity]) {
+        FabaMovement::factory()->create([
+            'transaction_date' => sprintf('%d-%02d-01', $year, $month),
+            'period_year' => $year, 'period_month' => $month,
+            'material_type' => 'fly_ash', 'movement_type' => FabaMovement::TYPE_PRODUCTION,
+            'stock_effect' => FabaMovement::STOCK_EFFECT_IN, 'quantity' => $quantity,
+        ]);
+    }
+    $tenant->switchToPublic();
+    $user = User::factory()->create(['organization_id' => $organization->id, 'role_id' => dashboardViewerRole()->id]);
+    $this->actingAs($user)->get(route('dashboard', ['month' => '2026-03']))
+        ->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+        ->has('fabaChart', 12)
+        ->where('fabaChart.0.month', 1)->where('fabaChart.11.month', 12)
+        ->where('fabaChart.0.year', 2026)->where('fabaChart.11.year', 2026)
+        ->where('fabaChart.0.production', 10)->where('fabaChart.1.production', 0)
+        ->where('fabaChart.2.production', 4)
+        ->where('fabaChart.2.closing_balance', 21)
+        ->where('fabaChart.3.production', null)->where('fabaChart.11.production', null)
+        ->where('fabaChart.11.closing_balance', null)->where('fabaChart.11.capacity', null)
+        );
+    $this->get(route('dashboard', ['month' => '2025-12']))
+        ->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+        ->has('fabaChart', 12)->where('fabaChart.0.year', 2025)
+        ->where('fabaChart.0.production', 0)->where('fabaChart.11.production', 7)
+        ->where('fabaChart.11.closing_balance', 7)
+        );
+});

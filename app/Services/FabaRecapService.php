@@ -16,6 +16,25 @@ use Illuminate\Support\Str;
 
 class FabaRecapService
 {
+    /** @var array<string, array>|null */
+    private ?array $recapSnapshot = null;
+
+    /**
+     * Reuse recaps only while assembling a read-only dashboard response.
+     * Never retain a snapshot for a later request or an operational mutation.
+     */
+    public function withRecapSnapshot(callable $callback): mixed
+    {
+        $previous = $this->recapSnapshot;
+        $this->recapSnapshot = [];
+
+        try {
+            return $callback();
+        } finally {
+            $this->recapSnapshot = $previous;
+        }
+    }
+
     /**
      * @return array{year: int, month: int}|null
      */
@@ -98,35 +117,53 @@ class FabaRecapService
 
     public function getMonthlyRecap(int $year, int $month): array
     {
-        $movements = FabaMovement::query()->approved()->forPeriod($year, $month);
+        if ($this->recapSnapshot === null) {
+            return $this->buildMonthlyRecap($year, $month);
+        }
 
-        $productionFlyAsh = $this->sumMovementTypes((clone $movements), FabaMovement::MATERIAL_FLY_ASH, [
+        $connection = FabaMovement::resolveConnection();
+        $scope = $connection->selectOne('SELECT current_database() AS database_name, current_schemas(true)::text AS schemas');
+        $key = json_encode([spl_object_id($connection), $scope->database_name, $scope->schemas, $year, $month], JSON_THROW_ON_ERROR);
+
+        return $this->recapSnapshot[$key] ??= $this->buildMonthlyRecap($year, $month);
+    }
+
+    protected function buildMonthlyRecap(int $year, int $month): array
+    {
+        $movements = FabaMovement::query()->approved()->forPeriod($year, $month)
+            ->selectRaw('movement_type, stock_effect, material_type, SUM(quantity) as total_quantity, COUNT(*) as movements_count')
+            ->groupBy('movement_type', 'stock_effect', 'material_type')
+            ->orderBy('movement_type')
+            ->orderBy('stock_effect')
+            ->get();
+
+        $productionFlyAsh = $this->sumMovementTypes($movements, FabaMovement::MATERIAL_FLY_ASH, [
             FabaMovement::TYPE_PRODUCTION,
             FabaMovement::TYPE_WORKSHOP,
         ]);
-        $productionBottomAsh = $this->sumMovementTypes((clone $movements), FabaMovement::MATERIAL_BOTTOM_ASH, [
+        $productionBottomAsh = $this->sumMovementTypes($movements, FabaMovement::MATERIAL_BOTTOM_ASH, [
             FabaMovement::TYPE_PRODUCTION,
             FabaMovement::TYPE_WORKSHOP,
         ]);
-        $utilizationFlyAsh = $this->sumMovementTypes((clone $movements), FabaMovement::MATERIAL_FLY_ASH, [
+        $utilizationFlyAsh = $this->sumMovementTypes($movements, FabaMovement::MATERIAL_FLY_ASH, [
             FabaMovement::TYPE_UTILIZATION_EXTERNAL,
             FabaMovement::TYPE_UTILIZATION_INTERNAL,
         ]);
-        $utilizationBottomAsh = $this->sumMovementTypes((clone $movements), FabaMovement::MATERIAL_BOTTOM_ASH, [
+        $utilizationBottomAsh = $this->sumMovementTypes($movements, FabaMovement::MATERIAL_BOTTOM_ASH, [
             FabaMovement::TYPE_UTILIZATION_EXTERNAL,
             FabaMovement::TYPE_UTILIZATION_INTERNAL,
         ]);
 
         $openingFlyAsh = $this->getOpeningBalanceForMaterial($year, $month, FabaMovement::MATERIAL_FLY_ASH);
         $openingBottomAsh = $this->getOpeningBalanceForMaterial($year, $month, FabaMovement::MATERIAL_BOTTOM_ASH);
-        $closingFlyAsh = round($openingFlyAsh + $this->sumInflows((clone $movements), FabaMovement::MATERIAL_FLY_ASH) - $this->sumOutflows((clone $movements), FabaMovement::MATERIAL_FLY_ASH), 2);
-        $closingBottomAsh = round($openingBottomAsh + $this->sumInflows((clone $movements), FabaMovement::MATERIAL_BOTTOM_ASH) - $this->sumOutflows((clone $movements), FabaMovement::MATERIAL_BOTTOM_ASH), 2);
+        $closingFlyAsh = round($openingFlyAsh + $this->sumInflows($movements, FabaMovement::MATERIAL_FLY_ASH) - $this->sumOutflows($movements, FabaMovement::MATERIAL_FLY_ASH), 2);
+        $closingBottomAsh = round($openingBottomAsh + $this->sumInflows($movements, FabaMovement::MATERIAL_BOTTOM_ASH) - $this->sumOutflows($movements, FabaMovement::MATERIAL_BOTTOM_ASH), 2);
         $totalProduction = round($productionFlyAsh + $productionBottomAsh, 2);
         $totalUtilization = round($utilizationFlyAsh + $utilizationBottomAsh, 2);
         $openingBalance = round($openingFlyAsh + $openingBottomAsh, 2);
         $closingBalance = round($closingFlyAsh + $closingBottomAsh, 2);
 
-        $balanceComponents = $this->getBalanceComponents((clone $movements));
+        $balanceComponents = $this->formatBalanceComponents($movements);
         $totalInflows = round((float) collect($balanceComponents)->where('stock_effect', FabaMovement::STOCK_EFFECT_IN)->sum('total'), 2);
 
         $approval = $this->getMonthlyApproval($year, $month)?->load([
@@ -134,6 +171,8 @@ class FabaRecapService
             'approvedByUser:id,name',
             'rejectedByUser:id,name',
         ]);
+
+        $hasOpeningBalanceSource = $this->hasOpeningBalanceSource($year, $month);
 
         return [
             'year' => $year,
@@ -153,27 +192,25 @@ class FabaRecapService
             'closing_balance' => $closingBalance,
             'warning_negative_balance' => $closingBalance < 0,
             'warning_utilization_without_production' => $totalProduction <= 0 && $totalUtilization > 0,
-            'warning_missing_opening_balance' => ! $this->hasOpeningBalanceSource($year, $month),
-            'production_movements_count' => FabaMovement::query()
-                ->approved()
-                ->forPeriod($year, $month)
+            'warning_missing_opening_balance' => ! $hasOpeningBalanceSource,
+            'production_movements_count' => (int) $movements
                 ->whereIn('movement_type', [FabaMovement::TYPE_PRODUCTION, FabaMovement::TYPE_WORKSHOP, FabaMovement::TYPE_REJECT, FabaMovement::TYPE_DISPOSAL_POK])
-                ->count(),
-            'utilization_movements_count' => FabaMovement::query()
-                ->approved()
-                ->forPeriod($year, $month)
+                ->sum('movements_count'),
+            'utilization_movements_count' => (int) $movements
                 ->whereIn('movement_type', [FabaMovement::TYPE_UTILIZATION_EXTERNAL, FabaMovement::TYPE_UTILIZATION_INTERNAL])
-                ->count(),
+                ->sum('movements_count'),
             'approval' => $approval,
             'balance_components' => $balanceComponents,
             'movement_summary' => [
-                'inflow_fly_ash' => $this->sumInflows((clone $movements), FabaMovement::MATERIAL_FLY_ASH),
-                'inflow_bottom_ash' => $this->sumInflows((clone $movements), FabaMovement::MATERIAL_BOTTOM_ASH),
-                'outflow_fly_ash' => $this->sumOutflows((clone $movements), FabaMovement::MATERIAL_FLY_ASH),
-                'outflow_bottom_ash' => $this->sumOutflows((clone $movements), FabaMovement::MATERIAL_BOTTOM_ASH),
+                'inflow_fly_ash' => $this->sumInflows($movements, FabaMovement::MATERIAL_FLY_ASH),
+                'inflow_bottom_ash' => $this->sumInflows($movements, FabaMovement::MATERIAL_BOTTOM_ASH),
+                'outflow_fly_ash' => $this->sumOutflows($movements, FabaMovement::MATERIAL_FLY_ASH),
+                'outflow_bottom_ash' => $this->sumOutflows($movements, FabaMovement::MATERIAL_BOTTOM_ASH),
             ],
             'warnings' => $this->getWarnings($year, $month, [
                 'total_inflows' => $totalInflows,
+                'has_opening_balance_source' => $hasOpeningBalanceSource,
+                'period_status' => $approval?->status ?? FabaMonthlyApproval::STATUS_DRAFT,
                 'total_production' => $totalProduction,
                 'total_utilization' => $totalUtilization,
                 'opening_balance' => $openingBalance,
@@ -830,13 +867,14 @@ class FabaRecapService
 
     public function getPeriodMeta(int $year, int $month): array
     {
-        $approval = $this->getMonthlyApproval($year, $month) ?? FabaMonthlyApproval::draftForPeriod($year, $month);
+        $recap = $this->getMonthlyRecap($year, $month);
+        $approval = $recap['approval'] ?? FabaMonthlyApproval::draftForPeriod($year, $month);
         $hasTransactions = $this->hasTransactionsForPeriod($year, $month);
         $hasPendingTransactions = FabaMovement::query()
             ->forPeriod($year, $month)
             ->pendingApproval()
             ->exists();
-        $warnings = $this->getMonthlyRecap($year, $month)['warnings'];
+        $warnings = $recap['warnings'];
         $operationalStatus = 'draft';
 
         if ($approval->status === FabaMonthlyApproval::STATUS_APPROVED) {
@@ -1082,7 +1120,7 @@ class FabaRecapService
             ];
         }
 
-        if (! $this->hasOpeningBalanceSource($year, $month)) {
+        if (! $context['has_opening_balance_source']) {
             $warnings[] = [
                 'code' => 'missing_opening_balance',
                 'message' => 'Opening balance historis belum ditentukan untuk periode ini.',
@@ -1107,7 +1145,7 @@ class FabaRecapService
             ];
         }
 
-        if ($this->getPeriodStatus($year, $month) === FabaMonthlyApproval::STATUS_SUBMITTED && $invalidExternalDocuments > 0) {
+        if ($context['period_status'] === FabaMonthlyApproval::STATUS_SUBMITTED && $invalidExternalDocuments > 0) {
             $warnings[] = [
                 'code' => 'submitted_period_incomplete',
                 'message' => 'Periode sudah diajukan tetapi masih ada data yang belum lengkap.',
@@ -1176,13 +1214,21 @@ class FabaRecapService
      */
     protected function getBalanceComponents(\Illuminate\Database\Eloquent\Builder $query): array
     {
-        return $query
+        $totals = $query
             ->where('movement_type', '!=', FabaMovement::TYPE_OPENING_BALANCE)
             ->selectRaw('movement_type, stock_effect, material_type, SUM(quantity) as total_quantity')
             ->groupBy('movement_type', 'stock_effect', 'material_type')
             ->orderBy('movement_type')
             ->orderBy('stock_effect')
-            ->get()
+            ->get();
+
+        return $this->formatBalanceComponents($totals);
+    }
+
+    protected function formatBalanceComponents(Collection $totals): array
+    {
+        return $totals
+            ->where('movement_type', '!=', FabaMovement::TYPE_OPENING_BALANCE)
             ->groupBy(fn (FabaMovement $movement): string => $movement->movement_type.':'.$movement->stock_effect)
             ->map(function (Collection $group): array {
                 $flyAsh = round((float) $group->where('material_type', FabaMovement::MATERIAL_FLY_ASH)->sum('total_quantity'), 2);
@@ -1200,29 +1246,29 @@ class FabaRecapService
             ->all();
     }
 
-    protected function sumMovementTypes($query, string $materialType, array $movementTypes): float
+    protected function sumMovementTypes(Collection $totals, string $materialType, array $movementTypes): float
     {
-        return round((float) $query
+        return round((float) $totals
             ->where('material_type', $materialType)
             ->whereIn('movement_type', $movementTypes)
-            ->sum('quantity'), 2);
+            ->sum('total_quantity'), 2);
     }
 
-    protected function sumInflows($query, string $materialType): float
+    protected function sumInflows(Collection $totals, string $materialType): float
     {
-        return round((float) $query
+        return round((float) $totals
             ->where('material_type', $materialType)
             ->where('stock_effect', FabaMovement::STOCK_EFFECT_IN)
             ->where('movement_type', '!=', FabaMovement::TYPE_OPENING_BALANCE)
-            ->sum('quantity'), 2);
+            ->sum('total_quantity'), 2);
     }
 
-    protected function sumOutflows($query, string $materialType): float
+    protected function sumOutflows(Collection $totals, string $materialType): float
     {
-        return round((float) $query
+        return round((float) $totals
             ->where('material_type', $materialType)
             ->where('stock_effect', FabaMovement::STOCK_EFFECT_OUT)
-            ->sum('quantity'), 2);
+            ->sum('total_quantity'), 2);
     }
 
     protected function formatMovementDisplayNumber(FabaMovement $movement): string

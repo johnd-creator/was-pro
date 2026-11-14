@@ -28,6 +28,9 @@ class Vendor extends Model
         'license_number',
         'license_expiry_date',
         'is_active',
+        'is_transporter',
+        'is_processor',
+        'is_utilizer',
         'created_by',
         'updated_by',
     ];
@@ -42,6 +45,9 @@ class Vendor extends Model
         return [
             'license_expiry_date' => 'date',
             'is_active' => 'boolean',
+            'is_transporter' => 'boolean',
+            'is_processor' => 'boolean',
+            'is_utilizer' => 'boolean',
         ];
     }
 

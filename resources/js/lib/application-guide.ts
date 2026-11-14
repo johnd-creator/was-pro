@@ -295,7 +295,7 @@ export const guideCases: GuideCase[] = [
             'Saldo tercatat, pending aktual dan reservasi rencana memiliki arti berbeda.',
         prerequisites: ['Hak melihat catatan limbah pada organisasi aktif.'],
         steps: [
-            'Buka Neraca Operasional Limbah dan pilih periode/filter yang diperlukan.',
+            'Buka Neraca Limbah B3 dan pilih periode/filter yang diperlukan.',
             'Bandingkan limbah masuk disetujui dengan pengangkutan aktual disetujui. Neraca memakai tanggal transaksi dan status saat laporan dibuka, bukan snapshot persetujuan historis. Saldo akhir adalah saldo sebelum periode ditambah masuk dikurangi keluar.',
             'Periksa pending aktual dan alokasi rencana yang belum terpakai untuk memahami kapasitas yang masih dapat diajukan.',
             'Baca jumlah per satuan. Jangan menjumlahkan kg, ton atau liter sebagai satu kuantitas tanpa dasar konversi.',

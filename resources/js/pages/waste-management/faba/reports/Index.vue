@@ -12,7 +12,6 @@ import {
 } from 'lucide-vue-next';
 import { computed, reactive, ref, watch } from 'vue';
 import FabaBalanceReconciliation from '@/components/FabaBalanceReconciliation.vue';
-import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +23,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import { formatFabaMaterial, formatFabaMovementType } from '@/lib/faba';
@@ -238,37 +238,13 @@ function applyFilters(): void {
     <WasteManagementLayout :breadcrumbs="breadcrumbItems" title="Laporan FABA">
         <Head title="Laporan FABA" />
 
-        <div
-            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
-        >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[380px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-14 left-1/4 -z-10 h-64 w-64 rounded-full bg-cyan-200/20 blur-3xl"
-            />
-            <div
-                class="pointer-events-none absolute top-16 right-0 -z-10 h-72 w-72 rounded-full bg-amber-200/15 blur-3xl"
-            />
-
-            <div class="space-y-8">
-                <section
-                    class="wm-surface-hero overflow-hidden rounded-[30px] to-cyan-50/20 dark:to-cyan-950/18"
-                >
-                    <div
-                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:p-6"
-                    >
-                        <div class="space-y-5">
+        <div class="relative min-w-0 overflow-x-hidden p-4">
+            <div class="space-y-4">
+                <section class="space-y-4">
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+                        <div class="space-y-4">
                             <div class="space-y-3">
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.16em] text-cyan-700/70 uppercase"
-                                >
-                                    Report Center
-                                </p>
-                                <Heading
-                                    title="Laporan FABA"
-                                    description="Susun export operasional dan eksekutif dari satu panel yang lebih ringkas, dengan konteks periode, segmentasi, dan risiko aktif yang langsung terbaca."
-                                />
+                                <Heading title="Laporan FABA" />
                             </div>
 
                             <div class="grid gap-3 sm:grid-cols-3">

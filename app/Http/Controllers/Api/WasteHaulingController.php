@@ -19,7 +19,7 @@ class WasteHaulingController extends ApiController
         $user = $request->user();
 
         if (! $this->canListBacklog($user)) {
-            return $this->error('Anda tidak memiliki izin untuk melihat backlog pengangkutan.', 'FORBIDDEN', status: 403);
+            return $this->error('Anda tidak memiliki izin untuk melihat limbah belum terkelola.', 'FORBIDDEN', status: 403);
         }
 
         $query = WasteRecord::query()

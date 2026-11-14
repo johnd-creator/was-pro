@@ -86,7 +86,7 @@ const actions: Record<GuideAction, { label: string; url: () => string }> = {
     profile: { label: 'Pengaturan Profil', url: profile.url },
     records: { label: 'Catatan Limbah', url: waste.records.index.url },
     balance: {
-        label: 'Neraca Operasional Limbah',
+        label: 'Neraca Limbah B3',
         url: waste.balance.index.url,
     },
     plans: { label: 'Rencana Angkut', url: plansIndex.url },

@@ -2,7 +2,6 @@
 import { Head, router } from '@inertiajs/vue3';
 import { Plus, Search, Wrench } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
-import Heading from '@/components/Heading.vue';
 import Link from '@/components/OrganizationLink.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,6 +21,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
@@ -92,37 +92,13 @@ const { scopedUrl } = useOrganizationContext();
         title="Adjustment FABA"
     >
         <Head title="Adjustment FABA" />
-        <div
-            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
-        >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[340px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-10 left-1/3 -z-10 h-56 w-56 rounded-full bg-orange-200/15 blur-3xl"
-            />
-            <div
-                class="pointer-events-none absolute top-28 right-0 -z-10 h-56 w-56 rounded-full bg-slate-200/25 blur-3xl"
-            />
-
-            <div class="space-y-8">
-                <section
-                    class="wm-surface-hero overflow-hidden rounded-[30px] via-slate-50/80 to-orange-50/20 dark:via-slate-900 dark:to-orange-950/18"
-                >
-                    <div
-                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6"
-                    >
-                        <div class="space-y-5">
+        <div class="relative min-w-0 overflow-x-hidden p-4">
+            <div class="space-y-4">
+                <section class="space-y-4">
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                        <div class="space-y-4">
                             <div class="space-y-3">
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.16em] text-orange-700/70 uppercase"
-                                >
-                                    Adjustment Desk
-                                </p>
-                                <Heading
-                                    title="Adjustment / Koreksi"
-                                    description="Kelola koreksi stok FABA berbasis movement dengan kontrol yang lebih mudah discan."
-                                />
+                                <Heading title="Adjustment / Koreksi" />
                             </div>
 
                             <div class="grid gap-3 sm:grid-cols-3">

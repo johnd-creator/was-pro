@@ -40,7 +40,14 @@ class WasteRecordRequest extends FormRequest
             $wasteTypeRule->where('is_active', true);
         }
 
+        $sourceRule = Rule::exists('waste_sources', 'id')->whereNull('deleted_at');
+        if (! $record || (string) $record->source_id !== (string) $this->input('source_id')) {
+            $sourceRule->where('is_active', true);
+        }
         $rules = [
+            'source_id' => \App\Models\WasteSource::available()
+                ? ['sometimes', 'nullable', 'uuid', $sourceRule]
+                : ['exclude'],
             'date' => ['required', 'date', 'before_or_equal:today'],
             'waste_type_id' => ['required', 'uuid', $wasteTypeRule],
             'quantity' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
@@ -54,7 +61,14 @@ class WasteRecordRequest extends FormRequest
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
             if ($record && ! $record->canBeEdited()) {
                 // If record is not editable, only allow notes
+                $sourceRule = Rule::exists('waste_sources', 'id')->whereNull('deleted_at');
+                if (! $record || (string) $record->source_id !== (string) $this->input('source_id')) {
+                    $sourceRule->where('is_active', true);
+                }
                 $rules = [
+                    'source_id' => \App\Models\WasteSource::available()
+                        ? ['sometimes', 'nullable', 'uuid', $sourceRule]
+                        : ['exclude'],
                     'notes' => ['nullable', 'string'],
                 ];
             }
@@ -71,6 +85,8 @@ class WasteRecordRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'source_id.exists' => 'Sumber limbah tidak tersedia untuk organisasi ini.',
+            'source_id.prohibited' => 'Master sumber limbah belum diaktifkan.',
             'date.required' => 'Tanggal pencatatan wajib diisi.',
             'date.date' => 'Tanggal pencatatan harus berupa tanggal yang valid.',
             'date.before_or_equal' => 'Tanggal pencatatan tidak boleh melebihi hari ini.',

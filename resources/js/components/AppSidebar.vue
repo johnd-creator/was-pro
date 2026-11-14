@@ -38,7 +38,7 @@ import { dashboard as dashboardRoute } from '@/routes';
             <p
                 class="mt-2 px-1 text-[10px] leading-tight font-semibold text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden"
             >
-                Pusat Operasional Limbah
+                Waste Storage and Process Record Online
             </p>
         </SidebarHeader>
 

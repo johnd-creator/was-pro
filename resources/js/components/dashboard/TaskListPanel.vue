@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePage } from '@inertiajs/vue3';
 import {
     ArrowRight,
     CheckCircle2,
@@ -12,6 +13,7 @@ import type { LucideIcon } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import Link from '@/components/OrganizationLink.vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { usePermissions } from '@/composables/usePermissions';
 
 interface DashboardTaskItem {
     id: string;
@@ -38,6 +40,18 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const page = usePage();
+const { hasPermission } = usePermissions();
+const canOpenPlans = computed(
+    () =>
+        page.props.hauling_plans_available === true &&
+        [
+            'waste_hauling.view_all',
+            'waste_hauling.view_own',
+            'waste_hauling.approve',
+            'waste_hauling.reject',
+        ].some(hasPermission),
+);
 
 const activeTab = ref<TabType>(
     props.haulingAttentionCount >= props.wastePendingCount &&
@@ -145,7 +159,7 @@ const tabs = computed<Array<{ value: TabType; label: string; count: number }>>(
     <Card
         class="min-w-0 gap-0 overflow-hidden rounded-2xl border-slate-200 bg-white py-0 shadow-none dark:border-slate-800 dark:bg-slate-900"
     >
-        <CardHeader class="gap-4 px-5 pt-5 pb-4">
+        <CardHeader class="gap-3 px-4 pt-3 pb-3">
             <div class="flex items-start justify-between gap-3">
                 <div>
                     <p
@@ -188,7 +202,7 @@ const tabs = computed<Array<{ value: TabType; label: string; count: number }>>(
                 </button>
             </div>
         </CardHeader>
-        <CardContent class="px-5 pb-5">
+        <CardContent class="px-4 pb-4">
             <div
                 class="mb-3 flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400"
                 aria-live="polite"
@@ -276,6 +290,14 @@ const tabs = computed<Array<{ value: TabType; label: string; count: number }>>(
                     ></Link>
                 </li>
             </ul>
+            <Link
+                v-if="activeTab === 'hauling_attention' && canOpenPlans"
+                href="/waste-management/hauling-plans"
+                class="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-blue-200 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950"
+                >Buka Rencana Angkut<ArrowRight
+                    class="size-4"
+                    aria-hidden="true"
+            /></Link>
             <Link
                 :href="viewAllHref"
                 class="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"

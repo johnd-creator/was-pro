@@ -31,7 +31,7 @@ class UnifiedDashboardService
 
     public function getUnifiedData(Organization $organization, ?string $requestedMonth = null): array
     {
-        return $this->withinOrganizationSchema($organization, function () use ($organization, $requestedMonth): array {
+        return $this->withinOrganizationSchema($organization, fn (): array => $this->fabaRecapService->withRecapSnapshot(function () use ($organization, $requestedMonth): array {
             $this->availableMonths = $this->getAvailableMonthOptions();
 
             $resolvedMonth = $this->resolveRequestedMonth($requestedMonth);
@@ -81,7 +81,7 @@ class UnifiedDashboardService
                 'faba_pending_count' => $this->getFabaPendingCount(),
                 'hauling_attention_count' => $this->getHaulingAttentionCount(),
             ];
-        });
+        }));
     }
 
     private function getWasteStats(): array
@@ -307,11 +307,33 @@ class UnifiedDashboardService
 
     private function getFabaChartData(): array
     {
-        $anchorDate = CarbonImmutable::create($this->selectedYear, $this->selectedMonth, 1);
-
-        return collect(range(5, 0))
-            ->map(function (int $offset) use ($anchorDate): array {
-                $date = $anchorDate->subMonths($offset);
+        return collect(range(1, 12))
+            ->map(function (int $month): array {
+                $date = CarbonImmutable::create($this->selectedYear, $month, 1);
+                if ($month > $this->selectedMonth) {
+                    return [
+                        'label' => $this->fabaRecapService->formatMonthLabel($month),
+                        'month' => $month,
+                        'year' => $this->selectedYear,
+                        'production' => null,
+                        'utilization' => null,
+                        'closing_balance' => null,
+                        'production_fly_ash' => null,
+                        'production_bottom_ash' => null,
+                        'utilization_fly_ash' => null,
+                        'utilization_bottom_ash' => null,
+                        'closing_fly_ash' => null,
+                        'closing_bottom_ash' => null,
+                        'capacity' => null,
+                        'capacity_utilization_percentage' => null,
+                        'capacity_status' => 'unavailable',
+                        'has_capacity_warning' => false,
+                        'capacity_warning_threshold' => null,
+                        'capacity_critical_threshold' => null,
+                        'warning_count' => 0,
+                        'has_warning' => false,
+                    ];
+                }
                 $monthlyRecap = $this->fabaRecapService->getMonthlyRecap($date->year, $date->month);
                 $capacitySummary = $this->fabaRecapService->getTpsCapacitySummary($date->year, $date->month);
                 $hasPeriodActivity = $this->hasFabaPeriodActivity($date->year, $date->month);
@@ -551,6 +573,19 @@ class UnifiedDashboardService
             ->all();
     }
 
+    private function pendingHaulingApprovalTasks(): array
+    {
+        return collect($this->notificationData['alerts'] ?? [])
+            ->filter(fn (array $alert): bool => str_starts_with($alert['id'], 'hauling_plan_') || str_starts_with($alert['id'], 'hauling_actual_'))
+            ->map(fn (array $alert): array => [
+                'id' => $alert['id'], 'type' => 'waste_hauling', 'task_group' => 'approval',
+                'title' => $alert['title'], 'subtitle' => $alert['description'],
+                'status' => 'Menunggu persetujuan', 'priority' => 'warning', 'priority_weight' => 5,
+                'age_label' => str_starts_with($alert['id'], 'hauling_actual_') ? $this->formatAgeLabel($alert['submitted_at'] ?? null) : 'Rencana belum diputuskan', 'href' => $alert['source_url'],
+                'submitted_at_timestamp' => 0,
+            ])->values()->all();
+    }
+
     private function getHaulingAttentionTasks(): array
     {
         $user = Auth::user();
@@ -634,6 +669,7 @@ class UnifiedDashboardService
                     'submitted_at_timestamp' => $record->expiry_date?->getTimestamp() ?? $record->date?->getTimestamp() ?? 0,
                 ];
             })
+            ->concat($this->pendingHaulingApprovalTasks())
             ->sortBy([
                 ['priority_weight', 'desc'],
                 ['submitted_at_timestamp', 'asc'],
@@ -672,7 +708,7 @@ class UnifiedDashboardService
 
         return $records
             ->filter(fn (WasteRecord $record): bool => $record->getRemainingQuantity() > 0)
-            ->count();
+            ->count() + count($this->pendingHaulingApprovalTasks());
     }
 
     private function getOperatorFabaTasks(User $user): array
@@ -1218,8 +1254,12 @@ class UnifiedDashboardService
         $submittedAtDate = CarbonImmutable::parse($submittedAt);
         $diffHours = max(0, $submittedAtDate->diffInHours(now()));
 
+        if ($diffHours < 1) {
+            return '< 1 jam';
+        }
+
         if ($diffHours < 24) {
-            return "{$diffHours} jam";
+            return floor($diffHours).' jam';
         }
 
         return floor($diffHours / 24).' hari';

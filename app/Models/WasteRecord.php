@@ -11,6 +11,20 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class WasteRecord extends Model
 {
+    public function wasteSource(): BelongsTo
+    {
+        return $this->belongsTo(WasteSource::class, 'source_id')->withTrashed();
+    }
+
+    public function getSourceNameAttribute(): ?string
+    {
+        if (! $this->getAttribute('source_id')) {
+            return null;
+        }
+
+        return $this->wasteSource?->name;
+    }
+
     use \App\Concerns\RestoresOperationalWrites, \App\Concerns\SerializesOperationalWrites, HasFactory, HasUuids, SoftDeletes {
         SoftDeletes::restore as protected restoreWithSoftDeletes;
         \App\Concerns\RestoresOperationalWrites::restore insteadof SoftDeletes;
@@ -61,6 +75,7 @@ class WasteRecord extends Model
         'quantity',
         'unit',
         'source',
+        'source_id',
         'description',
         'notes',
         'status',

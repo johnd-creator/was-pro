@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
 import { CalendarClock, FileText, Layers3, PackageOpen } from 'lucide-vue-next';
-import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import {
@@ -62,36 +62,12 @@ const { scopedUrl } = useOrganizationContext();
         title="Detail Produksi FABA"
     >
         <Head title="Detail Produksi FABA" />
-        <div
-            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
-        >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-10 left-1/3 -z-10 h-56 w-56 rounded-full bg-blue-200/15 blur-3xl"
-            />
-            <div
-                class="pointer-events-none absolute top-20 right-0 -z-10 h-56 w-56 rounded-full bg-emerald-200/15 blur-3xl"
-            />
-
-            <div class="mx-auto max-w-5xl space-y-8">
-                <section
-                    class="wm-surface-hero overflow-hidden rounded-[30px] via-slate-50/80 to-blue-50/20 dark:via-slate-900 dark:to-blue-950/20"
-                >
-                    <div
-                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:p-6"
-                    >
+        <div class="relative min-w-0 overflow-x-hidden p-4">
+            <div class="mx-auto max-w-5xl space-y-4">
+                <section class="space-y-4">
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
                         <div class="space-y-4">
-                            <p
-                                class="text-[11px] font-semibold tracking-[0.16em] text-blue-700/70 uppercase"
-                            >
-                                Production Detail
-                            </p>
-                            <Heading
-                                :title="entry.display_number"
-                                description="Detail transaksi produksi FABA dengan ringkasan status dan metadata utama."
-                            />
+                            <Heading :title="entry.display_number" />
                             <div class="flex flex-wrap gap-3">
                                 <Badge
                                     variant="secondary"

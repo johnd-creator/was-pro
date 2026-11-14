@@ -18,7 +18,10 @@ withDefaults(defineProps<Props>(), {
 <template>
     <AppShell variant="sidebar">
         <AppSidebar />
-        <AppContent variant="sidebar" class="overflow-x-hidden">
+        <AppContent
+            variant="sidebar"
+            class="overflow-x-hidden [--card-gap:0.75rem] [--card-padding:1rem]"
+        >
             <AppSidebarHeader :breadcrumbs="breadcrumbs" />
             <OrganizationContextBar />
             <slot />

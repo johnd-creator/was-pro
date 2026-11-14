@@ -3,6 +3,7 @@ export interface HaulingPlanRecord {
     waste_type: { name: string | null; code: string | null } | null;
     id: string;
     record_number: string;
+    date: string | null;
     unit: string;
     quantity: number;
     remaining_quantity: number;
@@ -53,6 +54,7 @@ export interface HaulingWasteType {
 }
 
 export interface HaulingRecord {
+    requires_plan?: boolean;
     id: string;
     record_number: string;
     date: string;

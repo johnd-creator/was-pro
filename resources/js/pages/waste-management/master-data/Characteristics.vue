@@ -3,7 +3,6 @@ import { Head, router } from '@inertiajs/vue3';
 import { Plus } from 'lucide-vue-next';
 import { ref } from 'vue';
 import CharacteristicsController from '@/actions/App/Http/Controllers/WasteManagement/MasterData/CharacteristicsController';
-import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,6 +26,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import type { BreadcrumbItem } from '@/types';
@@ -145,34 +145,13 @@ const { scopedUrl } = useOrganizationContext();
     >
         <Head title="Characteristics - Waste Management" />
 
-        <div
-            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
-        >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-10 left-1/4 -z-10 h-56 w-56 rounded-full bg-rose-200/18 blur-3xl"
-            />
-
-            <div class="space-y-8">
-                <section
-                    class="wm-surface-hero overflow-hidden rounded-[30px] to-rose-50/20 dark:to-rose-950/18"
-                >
-                    <div
-                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:p-6"
-                    >
-                        <div class="space-y-5">
+        <div class="relative min-w-0 overflow-x-hidden p-4">
+            <div class="space-y-4">
+                <section class="space-y-4">
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+                        <div class="space-y-4">
                             <div class="space-y-3">
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.16em] text-rose-700/70 uppercase"
-                                >
-                                    Risk Tags
-                                </p>
-                                <Heading
-                                    title="Karakteristik Limbah"
-                                    description="Kelola karakteristik limbah berbahaya dan non-berbahaya untuk klasifikasi dan kontrol risiko."
-                                />
+                                <Heading title="Karakteristik Limbah" />
                             </div>
 
                             <div class="grid gap-3 sm:grid-cols-2">

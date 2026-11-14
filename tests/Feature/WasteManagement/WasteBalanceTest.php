@@ -191,7 +191,7 @@ test('balance CSV includes period basis numeric negative values quoted cells and
         $rows[] = $row;
     }
     fclose($file);
-    expect($rows[0])->toBe(['Neraca Operasional Limbah', '2026-10-01', '2026-10-31'])
+    expect($rows[0])->toBe(['Neraca Limbah B3', '2026-10-01', '2026-10-31'])
         ->and($rows[1][1])->toBe(WasteBalanceService::BASIS)
         ->and($rows[3])->toBe(["'=DANGEROUS()", "'+CODE", 'kg', '0', '5', '10', '-5', '1'])
         ->and($rows[9][0])->toBe("'@REF")
@@ -202,4 +202,33 @@ test('balance CSV includes period basis numeric negative values quoted cells and
 test('empty balance has no invented zero total or anomaly', function () {
     $this->get(balanceUrl())->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
         ->where('report.rows', [])->where('report.totals', []));
+});
+
+test('annual balance exposes all twelve months and preserves range mode', function () {
+    $record = balanceRecord(['date' => '2025-12-31', 'quantity' => 1000]);
+    balanceRecord(['waste_type_id' => $record->waste_type_id, 'date' => '2026-01-01', 'quantity' => 2000]);
+    balanceRecord(['waste_type_id' => $record->waste_type_id, 'date' => '2026-12-31', 'quantity' => 500]);
+    balanceHauling($record, ['hauling_date' => '2026-06-01', 'quantity' => 500]);
+    $this->get(balanceUrl('index', ['view' => 'annual', 'year' => 2026]))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('viewMode', 'annual')->where('annual.year', 2026)->has('annual.rows', 1)->has('annual.rows.0.months', 12)
+        ->where('annual.rows.0.unit', 'ton')->where('annual.rows.0.opening', 1)->where('annual.rows.0.incoming', 2.5)
+        ->where('annual.rows.0.months.0.incoming', 2)->where('annual.rows.0.months.5.outgoing', 0.5)
+        ->where('annual.rows.0.months.11.incoming', 0.5)->where('annual.rows.0.closing', 3));
+    $this->get(balanceUrl())->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->where('viewMode', 'range')->where('annual', null));
+    $this->get(balanceUrl('index', ['view' => 'annual', 'year' => 1999]))->assertSessionHasErrors('year');
+});
+
+test('annual balance respects own-only scope and rejects cross tenant requests', function () {
+    $this->tenantService->switchToPublic();
+    $role = Role::factory()->create();
+    $role->permissions()->attach(Permission::query()->where('slug', 'waste_records.view_own')->value('id'));
+    $operator = User::factory()->create(['organization_id' => $this->organization->id, 'role_id' => $role->id, 'is_super_admin' => false, 'email_verified_at' => now()]);
+    $other = Organization::factory()->create();
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    balanceRecord(['created_by' => $operator->id, 'date' => '2026-02-01', 'quantity' => 1000]);
+    balanceRecord(['date' => '2026-02-01', 'quantity' => 9000]);
+    $this->actingAs($operator);
+    $this->get(balanceUrl('index', ['view' => 'annual', 'year' => 2026]))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+        ->has('annual.rows', 1)->where('annual.rows.0.incoming', 1));
+    $this->get(balanceUrl('index', ['view' => 'annual', 'year' => 2026, 'organization_id' => $other->id]))->assertForbidden();
 });

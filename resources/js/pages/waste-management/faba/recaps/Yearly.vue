@@ -8,7 +8,6 @@ import {
 } from 'lucide-vue-next';
 import { computed, reactive } from 'vue';
 import FabaBalanceReconciliation from '@/components/FabaBalanceReconciliation.vue';
-import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -19,6 +18,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import wasteManagementRoutes from '@/routes/waste-management';
@@ -69,37 +69,13 @@ const { scopedUrl } = useOrganizationContext();
     >
         <Head title="Rekap Tahunan FABA" />
 
-        <div
-            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
-        >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[340px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-12 left-1/4 -z-10 h-56 w-56 rounded-full bg-amber-200/18 blur-3xl"
-            />
-            <div
-                class="pointer-events-none absolute top-20 right-0 -z-10 h-64 w-64 rounded-full bg-emerald-200/15 blur-3xl"
-            />
-
-            <div class="space-y-8">
-                <section
-                    class="wm-surface-hero overflow-hidden rounded-[30px] via-slate-50/80 to-amber-50/20 dark:via-slate-900 dark:to-amber-950/18"
-                >
-                    <div
-                        class="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:p-6"
-                    >
-                        <div class="space-y-5">
+        <div class="relative min-w-0 overflow-x-hidden p-4">
+            <div class="space-y-4">
+                <section class="space-y-4">
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+                        <div class="space-y-4">
                             <div class="space-y-3">
-                                <p
-                                    class="text-[11px] font-semibold tracking-[0.16em] text-amber-700/70 uppercase"
-                                >
-                                    Annual Recap
-                                </p>
-                                <Heading
-                                    title="Rekap Tahunan FABA"
-                                    description="Baca Januari sampai Desember dalam satu tabel yang lebih jelas, dengan warning tahunan dan total utama yang langsung terlihat."
-                                />
+                                <Heading title="Rekap Tahunan FABA" />
                             </div>
 
                             <div class="grid gap-3 sm:grid-cols-3">

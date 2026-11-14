@@ -9,7 +9,6 @@ import {
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import WasteRecordsController from '@/actions/App/Http/Controllers/WasteManagement/WasteRecordsController';
-import Heading from '@/components/Heading.vue';
 import Link from '@/components/OrganizationLink.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -23,6 +22,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import type { BreadcrumbItem } from '@/types';
@@ -43,13 +43,12 @@ interface WasteType {
 
 interface WasteRecord {
     id: string;
+    source_id?: string | null;
     record_number: string;
     date: string;
     waste_type_id: string;
     quantity: number;
     unit: string;
-    source: string | null;
-    description: string | null;
     notes: string | null;
     status: string;
 }
@@ -57,6 +56,7 @@ interface WasteRecord {
 type Props = {
     wasteRecord: WasteRecord;
     wasteTypes: WasteType[];
+    wasteSources?: { id: string; name: string; is_active: boolean }[];
 };
 
 const props = defineProps<Props>();
@@ -81,8 +81,7 @@ const form = useForm({
     waste_type_id: props.wasteRecord.waste_type_id,
     quantity: String(props.wasteRecord.quantity),
     unit: props.wasteRecord.unit,
-    source: props.wasteRecord.source ?? '',
-    description: props.wasteRecord.description ?? '',
+    source_id: props.wasteRecord.source_id ?? '',
     notes: props.wasteRecord.notes ?? '',
 });
 
@@ -156,12 +155,6 @@ const expiryInfo = computed(() => {
     };
 });
 
-function getHazardousClass(isHazardous: boolean): string {
-    return isHazardous
-        ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-        : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-}
-
 function resetMessages(): void {
     statusMessage.value = null;
     errorMessage.value = null;
@@ -193,20 +186,8 @@ const { scopedUrl } = useOrganizationContext();
     >
         <Head :title="`Edit ${wasteRecord.record_number}`" />
 
-        <div
-            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
-        >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[340px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-10 left-1/3 -z-10 h-56 w-56 rounded-full bg-sky-200/15 blur-3xl"
-            />
-            <div
-                class="pointer-events-none absolute top-28 right-0 -z-10 h-56 w-56 rounded-full bg-emerald-200/15 blur-3xl"
-            />
-
-            <div class="space-y-8">
+        <div class="relative min-w-0 overflow-x-hidden p-4">
+            <div class="space-y-4">
                 <Alert
                     v-if="statusMessage"
                     class="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-100"
@@ -225,23 +206,16 @@ const { scopedUrl } = useOrganizationContext();
                 </Alert>
 
                 <div
-                    class="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]"
+                    class="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]"
                 >
                     <Card
                         class="wm-surface-elevated overflow-hidden rounded-[30px] dark:bg-slate-950/95"
                     >
-                        <CardContent class="space-y-5 p-6 lg:p-8">
+                        <CardContent class="space-y-4 p-4 lg:p-4">
                             <Heading
                                 :title="`Edit ${wasteRecord.record_number}`"
-                                description="Perbarui data catatan limbah sebelum diajukan ulang atau dilanjutkan ke proses berikutnya."
                             />
-                            <p
-                                class="-mt-5 text-sm leading-6 text-muted-foreground"
-                            >
-                                Pastikan jenis limbah, jumlah, dan sumber sesuai
-                                dengan kondisi aktual agar proses review dan
-                                transportasi berikutnya tidak terhambat.
-                            </p>
+
                             <div class="flex flex-wrap gap-3">
                                 <Button
                                     type="button"
@@ -307,8 +281,10 @@ const { scopedUrl } = useOrganizationContext();
                                 </p>
                                 <p class="mt-1 text-xs text-slate-300">
                                     {{
-                                        selectedWasteType.category?.name ||
-                                        'Tanpa kategori'
+                                        props.wasteSources?.find(
+                                            (source) =>
+                                                source.id === form.source_id,
+                                        )?.name || 'Belum tercatat'
                                     }}
                                 </p>
                             </div>
@@ -361,7 +337,7 @@ const { scopedUrl } = useOrganizationContext();
                     </Card>
                 </div>
 
-                <form @submit.prevent="submit" class="space-y-6">
+                <form @submit.prevent="submit" class="space-y-4">
                     <Card
                         class="wm-surface-elevated overflow-hidden rounded-[30px] dark:bg-slate-950/95"
                     >
@@ -417,25 +393,13 @@ const { scopedUrl } = useOrganizationContext();
                                                         type.code
                                                     }})</span
                                                 >
-                                                <span
-                                                    v-if="type.characteristic"
-                                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                                    :class="
-                                                        getHazardousClass(
-                                                            type.characteristic
-                                                                .is_hazardous,
-                                                        )
-                                                    "
-                                                >
-                                                    {{ type.category?.name }}
-                                                </span>
                                             </div>
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <p class="text-xs text-muted-foreground">
-                                    Pemilihan jenis limbah akan menentukan
-                                    kategori dan batas masa simpan.
+                                    Pemilihan jenis limbah akan menentukan batas
+                                    masa simpan.
                                 </p>
                                 <p
                                     v-if="form.errors.waste_type_id"
@@ -498,26 +462,6 @@ const { scopedUrl } = useOrganizationContext();
                                     {{ form.errors.unit }}
                                 </p>
                             </div>
-
-                            <div class="grid gap-2 lg:col-span-2">
-                                <Label for="source">Sumber / lokasi</Label>
-                                <Input
-                                    id="source"
-                                    v-model="form.source"
-                                    placeholder="Contoh: Gudang A, Area Produksi 2"
-                                />
-                                <p class="text-xs text-muted-foreground">
-                                    Cantumkan lokasi atau sumber limbah agar
-                                    proses verifikasi dan pengangkutan lebih
-                                    jelas.
-                                </p>
-                                <p
-                                    v-if="form.errors.source"
-                                    class="text-xs text-destructive"
-                                >
-                                    {{ form.errors.source }}
-                                </p>
-                            </div>
                         </CardContent>
                     </Card>
 
@@ -532,22 +476,42 @@ const { scopedUrl } = useOrganizationContext();
                             </CardDescription>
                         </CardHeader>
                         <CardContent class="grid gap-6 lg:grid-cols-2">
-                            <div class="grid gap-2">
-                                <Label for="description">Deskripsi</Label>
-                                <Textarea
-                                    id="description"
-                                    v-model="form.description"
-                                    rows="4"
-                                    placeholder="Jelaskan konteks limbah atau kondisi khusus bila diperlukan."
-                                />
-                                <p
-                                    v-if="form.errors.description"
-                                    class="text-xs text-destructive"
+                            <div class="space-y-2">
+                                <Label for="source_id">Sumber limbah</Label>
+                                <select
+                                    id="source_id"
+                                    v-model="form.source_id"
+                                    class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                    :disabled="!props.wasteSources?.length"
                                 >
-                                    {{ form.errors.description }}
+                                    <option value="">Belum tercatat</option>
+                                    <option
+                                        v-for="source in props.wasteSources"
+                                        :key="source.id"
+                                        :value="source.id"
+                                    >
+                                        {{ source.name
+                                        }}{{
+                                            source.is_active
+                                                ? ''
+                                                : ' (nonaktif)'
+                                        }}
+                                    </option>
+                                </select>
+                                <p
+                                    v-if="!props.wasteSources?.length"
+                                    class="text-xs text-muted-foreground"
+                                >
+                                    Master sumber belum tersedia. Pengelola
+                                    dapat menambahkannya di Master Data.
+                                </p>
+                                <p
+                                    v-if="form.errors.source_id"
+                                    class="text-sm text-destructive"
+                                >
+                                    {{ form.errors.source_id }}
                                 </p>
                             </div>
-
                             <div class="grid gap-2">
                                 <Label for="notes">Catatan internal</Label>
                                 <Textarea

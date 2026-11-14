@@ -12,9 +12,9 @@ import {
     index,
     update,
 } from '@/actions/App/Http/Controllers/WasteManagement/OperationalInboxController';
-import Heading from '@/components/Heading.vue';
 import Link from '@/components/OrganizationLink.vue';
 import { Button } from '@/components/ui/button';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import type { BreadcrumbItem } from '@/types';
@@ -106,11 +106,8 @@ function statusLabel(status: string | null): string {
         :breadcrumbs="breadcrumbs"
     >
         <Head title="Notifikasi Operasional" />
-        <div class="flex flex-col gap-6 p-4 md:p-6">
-            <Heading
-                title="Notifikasi Operasional"
-                description="Indikator yang perlu ditindaklanjuti dan riwayat pengajuan dalam satu halaman."
-            />
+        <div class="flex flex-col gap-4 p-4 md:p-4">
+            <Heading title="Notifikasi Operasional" />
             <section
                 class="space-y-4"
                 aria-labelledby="active-notifications-title"

@@ -382,7 +382,8 @@ test('plan submission notifications and audit viewer retain scoped plan history'
     $this->tenants->switchToSchema($this->organization->schema_name);
     $plan = WasteHaulingPlan::firstOrFail();
     expect(\App\Models\OperationalNotification::where('resource_type', 'waste_hauling_plan')->where('recipient_id', $this->supervisor->id)->count())->toBe(1);
-    $this->actingAs($this->supervisor)->get(route('waste-management.notifications.index', ['organization_id' => $this->organization->id]))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->where('notifications.0.source_url', planRoute($this, 'show', $plan)));
+    $response = $this->actingAs($this->supervisor)->get(route('waste-management.notifications.index', ['organization_id' => $this->organization->id]));
+    $response->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->where('notifications.0.source_url', planRoute($this, 'show', $plan)));
     $this->get(route('waste-management.audit.index', ['organization_id' => $this->organization->id, 'module' => 'waste_hauling_plans']))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->has('entries', 1)->where('entries.0.after.waste_record_id', $this->record->id));
     config(['hauling-plans.enabled' => false]);
     $this->get(route('waste-management.notifications.index', ['organization_id' => $this->organization->id]))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->has('notifications', 0));
@@ -534,3 +535,263 @@ test('invalid plan quantities return field warnings without creating operational
     $this->tenants->switchToSchema($this->organization->schema_name);
     expect(WasteHaulingPlan::count())->toBe(0)->and(WasteHauling::count())->toBe(0);
 })->with(['empty' => '', 'zero' => '0', 'negative' => '-1', 'precision' => '1.001', 'non-numeric' => 'asal', 'too-large' => '10000000000']);
+
+test('plan picker exposes the record entry date for period selection', function () {
+    $this->get(planRoute($this, 'index'))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('waste-management/hauling-plans/Index')
+        ->where('records.0.id', $this->record->id)
+        ->where('records.0.date', $this->record->date->toDateString()));
+});
+
+test('pending plans are visible in alerts and dashboard to a separate reviewer across reporting months', function () {
+    $plan = haulingPlan($this);
+    $plan->forceFill(['submitted_at' => now()->subMonths(3)])->saveQuietly();
+    $this->actingAs($this->supervisor);
+    $alerts = app(\App\Services\OperationalAlerts::class)->summary($this->supervisor, $this->organization, now()->format('Y-m'));
+    expect($alerts['summary']['pending_hauling_plans_count'])->toBe(1);
+    $item = collect($alerts['alerts'])->firstWhere('id', 'hauling_plan_'.$plan->id);
+    expect($item['source_url'])->toContain($plan->id)->toContain('organization_id='.$this->organization->id);
+    $dashboard = app(\App\Services\UnifiedDashboardService::class)->getUnifiedData($this->organization);
+    expect(collect($dashboard['hauling_attention_tasks'])->pluck('id')->all())->toContain('hauling_plan_'.$plan->id);
+    $this->get(route('waste-management.haulings.pending-approval', ['organization_id' => $this->organization->id]))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->has('pendingPlans', 1)->where('pendingPlans.0.id', 'hauling_plan_'.$plan->id)->has('haulings', 0));
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect($plan->fresh()->status)->toBe('pending_approval');
+});
+
+test('plan alerts exclude self review approved plans and users without review permission', function () {
+    $plan = haulingPlan($this);
+    $service = app(\App\Services\OperationalAlerts::class);
+    expect($service->summary($this->creator, $this->organization, null)['summary']['pending_hauling_plans_count'])->toBe(0);
+    $this->actingAs($this->supervisor);
+    $plan->approve($this->supervisor->id);
+    expect($service->summary($this->supervisor, $this->organization, null)['summary']['pending_hauling_plans_count'])->toBe(0);
+    $this->actingAs($this->creator);
+    haulingPlan($this, '10.00');
+    $role = Role::factory()->create();
+    $operator = User::factory()->create(['organization_id' => $this->organization->id, 'role_id' => $role->id, 'is_super_admin' => false]);
+    expect($service->summary($operator, $this->organization, null)['summary']['pending_hauling_plans_count'])->toBe(0);
+    config(['hauling-plans.enabled' => false]);
+    expect($service->summary($this->supervisor, $this->organization, null)['summary']['pending_hauling_plans_count'])->toBe(0);
+});
+
+test('plan alert queries stay in the selected tenant and tolerate tenants without plan tables', function () {
+    haulingPlan($this);
+    $other = Organization::factory()->create();
+    $this->tenants->createSchema($other->schema_name);
+    $this->tenants->switchToSchema($other->schema_name);
+    expect(app(\App\Services\OperationalAlerts::class)->summary($this->supervisor, $other, null)['summary']['pending_hauling_plans_count'])->toBe(0);
+    $this->tenants->runMigrationsForTenant($other->schema_name, 'database/migrations/tenant');
+    $this->tenants->switchToSchema($other->schema_name);
+    expect(app(\App\Services\OperationalAlerts::class)->summary($this->supervisor, $other, null)['summary']['pending_hauling_plans_count'])->toBe(0);
+});
+
+test('ordinary reviewer permission includes plans while a foreign organization user is denied', function () {
+    $plan = haulingPlan($this);
+    $role = Role::factory()->create();
+    $permission = \App\Models\Permission::where('slug', 'waste_hauling.reject')->firstOrFail();
+    $role->permissions()->sync([$permission->id]);
+    $reviewer = User::factory()->create(['organization_id' => $this->organization->id, 'role_id' => $role->id, 'is_super_admin' => false]);
+    $service = app(\App\Services\OperationalAlerts::class);
+    expect($service->summary($reviewer, $this->organization, null)['summary']['pending_hauling_plans_count'])->toBe(1);
+    $foreign = Organization::factory()->create();
+    $foreignUser = User::factory()->create(['organization_id' => $foreign->id, 'role_id' => $role->id, 'is_super_admin' => false]);
+    expect(fn () => $service->summary($foreignUser, $this->organization, null))->toThrow(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+});
+
+test('one approved batch plan accepts repeated partial haulings until its budget is exhausted', function () {
+    $plan = haulingPlan($this, '80.00');
+    $this->actingAs($this->supervisor)->post(planRoute($this, 'approve', $plan))->assertSessionHas('success');
+    $params = ['organization_id' => $this->organization->id];
+    $actualIds = [];
+    foreach (['30.00', '50.00'] as $quantity) {
+        $this->actingAs($this->creator)->post(route('waste-management.haulings.store', $params), [
+            'waste_record_id' => $this->record->id,
+            'waste_hauling_plan_id' => $plan->id,
+            'hauling_date' => app(HaulingPlans::class)->actualDateLimit(),
+            'quantity' => $quantity,
+        ])->assertSessionHas('success');
+        $this->tenants->switchToSchema($this->organization->schema_name);
+        $actualIds[] = WasteHauling::whereNotIn('id', $actualIds)->firstOrFail()->id;
+    }
+    expect($this->record->getRemainingQuantity())->toBe(100.0);
+    $this->get(planRoute($this, 'show', $plan))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+        ->has('plan.actuals', 2)->where('plan.pending_actual_quantity', 80)
+        ->where('plan.remaining_plan_quantity', 0)->where('plan.abilities.can_realize', false));
+    $this->post(route('waste-management.haulings.store', $params), [
+        'waste_record_id' => $this->record->id, 'waste_hauling_plan_id' => $plan->id,
+        'hauling_date' => app(HaulingPlans::class)->actualDateLimit(), 'quantity' => '0.01',
+    ])->assertSessionHas('error');
+    foreach ($actualIds as $id) {
+        $this->actingAs($this->supervisor)->post(route('waste-management.haulings.approve', [$id, ...$params]))->assertSessionHas('success');
+    }
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHauling::count())->toBe(2)->and($this->record->getRemainingQuantity())->toBe(20.0);
+    $this->get(planRoute($this, 'show', $plan))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+        ->has('plan.actuals', 2)->where('plan.approved_actual_quantity', 80)
+        ->where('plan.pending_actual_quantity', 0)->where('plan.remaining_plan_quantity', 0));
+});
+
+function planOperationalUser($test, string $slug): User
+{
+    return User::factory()->create(['organization_id' => $test->organization->id, 'role_id' => Role::where('slug', $slug)->firstOrFail()->id, 'is_super_admin' => false, 'email_verified_at' => now()]);
+}
+
+test('operator realizes approved coordinator plan without broad permissions and supervisor approves each partial', function () {
+    $coordinator = planOperationalUser($this, 'coordinator');
+    $operator = planOperationalUser($this, 'operator');
+    $supervisor = planOperationalUser($this, 'supervisor');
+    $this->creator = $coordinator;
+    $this->actingAs($coordinator);
+    $plan = haulingPlan($this, '80.00');
+    $params = ['organization_id' => $this->organization->id];
+    $this->actingAs($operator)->get(planRoute($this, 'show', $plan))->assertForbidden();
+    $this->actingAs($supervisor)->post(planRoute($this, 'approve', $plan))->assertSessionHas('success');
+    $this->actingAs($operator);
+    expect($operator->hasPermission('waste_hauling.view_all'))->toBeFalse();
+    $this->get(planRoute($this, 'index'))->assertOk()->assertInertia(fn (AssertableInertia $p) => $p->has('plans', 1)->has('records', 0)->where('plans.0.abilities.can_realize', true));
+    $this->get(route('waste-management.haulings.index', $params))->assertOk()->assertInertia(fn (AssertableInertia $p) => $p->has('records', 1)->where('records.0.requires_plan', true)->where('records.0.available_quantity', 0));
+    $this->get(route('waste-management.haulings.create', [...$params, 'waste_record' => $this->record->id, 'waste_hauling_plan_id' => $plan->id]))->assertOk();
+    $this->get(route('waste-management.haulings.create', [...$params, 'waste_record' => $this->record->id]))->assertForbidden();
+    $this->get(route('waste-management.haulings.create', [...$params, 'waste_record' => $this->record->id, 'waste_hauling_plan_id' => ['bad']]))->assertForbidden();
+    $body = ['waste_record_id' => $this->record->id, 'hauling_date' => app(HaulingPlans::class)->actualDateLimit(), 'quantity' => 30];
+    $this->post(route('waste-management.haulings.store', $params), $body)->assertForbidden();
+    foreach ([30, 50] as $quantity) {
+        $this->actingAs($operator)->post(route('waste-management.haulings.store', $params), [...$body, 'waste_hauling_plan_id' => $plan->id, 'quantity' => $quantity])->assertSessionHas('success');
+        $this->tenants->switchToSchema($this->organization->schema_name);
+        $actual = WasteHauling::pendingApproval()->firstOrFail();
+        $this->post(route('waste-management.haulings.approve', [$actual->id, ...$params]))->assertForbidden();
+        $this->actingAs($supervisor)->post(route('waste-management.haulings.approve', [$actual->id, ...$params]))->assertSessionHas('success');
+    }
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect($this->record->getRemainingQuantity())->toBe(20.0)->and(WasteHauling::where('created_by', $operator->id)->count())->toBe(2);
+    $this->actingAs($operator)->post(route('waste-management.haulings.store', $params), [...$body, 'waste_hauling_plan_id' => $plan->id, 'quantity' => 0.01])->assertSessionHas('error');
+});
+
+test('shared coordinator plan never exposes other operators realization details and closes access when closed', function () {
+    $coordinator = planOperationalUser($this, 'coordinator');
+    $operator = planOperationalUser($this, 'operator');
+    $this->creator = $coordinator;
+    $this->actingAs($coordinator);
+    $plan = haulingPlan($this);
+    $this->actingAs($this->supervisor);
+    $plan->approve($this->supervisor->id);
+    $this->actingAs($coordinator);
+    $otherActual = haulingActual($this, $plan);
+    $this->actingAs($this->supervisor);
+    $otherActual->approve($this->supervisor->id);
+    $this->actingAs($operator);
+    $params = ['organization_id' => $this->organization->id];
+    $this->get(planRoute($this, 'show', $plan))->assertOk()->assertInertia(fn (AssertableInertia $p) => $p->has('plan.actuals', 0)->where('plan.approved_actual_quantity', 30));
+    $this->get(route('waste-management.haulings.index', $params))->assertOk()->assertInertia(fn (AssertableInertia $p) => $p->has('records.0.hauling_history', 0));
+    $this->get(route('waste-management.haulings.show', [$otherActual->id, ...$params]))->assertForbidden();
+    $this->get(route('waste-management.haulings.attachment', [$otherActual->id, ...$params]))->assertForbidden();
+    $this->post(planRoute($this, 'close', $plan), ['closure_reason' => 'No access'])->assertForbidden();
+    $this->actingAs($this->supervisor);
+    $plan->close($this->supervisor->id, 'Completed');
+    $this->actingAs($operator)->get(planRoute($this, 'show', $plan))->assertForbidden();
+    $this->post(route('waste-management.haulings.store', $params), ['waste_record_id' => $this->record->id, 'waste_hauling_plan_id' => $plan->id, 'hauling_date' => now()->toDateString(), 'quantity' => 10])->assertForbidden();
+});
+
+test('operator sharing stays in the selected tenant and requires all operational permissions', function () {
+    $this->creator = planOperationalUser($this, 'coordinator');
+    $this->actingAs($this->creator);
+    $plan = haulingPlan($this);
+    $this->actingAs($this->supervisor);
+    $plan->approve($this->supervisor->id);
+    $operator = planOperationalUser($this, 'operator');
+    $foreign = Organization::factory()->create();
+    $this->tenants->createSchema($foreign->schema_name);
+    $this->tenants->runMigrationsForTenant($foreign->schema_name, 'database/migrations/tenant');
+    $foreignOperator = User::factory()->create(['organization_id' => $foreign->id, 'role_id' => $operator->role_id, 'is_super_admin' => false]);
+    $this->actingAs($foreignOperator)->get(planRoute($this, 'show', $plan))->assertForbidden();
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    $this->actingAs($operator);
+    expect(app(HaulingPlans::class)->canOperatePlan($plan->id))->toBeTrue();
+    $coordinatorRole = $this->creator->role;
+    $coordinatorRole->update(['is_active' => false]);
+    expect(app(HaulingPlans::class)->canOperatePlan($plan->id))->toBeFalse();
+    $coordinatorRole->update(['is_active' => true]);
+    $role = $operator->role;
+    $role->permissions()->detach(\App\Models\Permission::where('slug', 'waste_hauling.create')->value('id'));
+    $operator->unsetRelation('role');
+    $this->get(planRoute($this, 'show', $plan))->assertForbidden();
+});
+
+test('parallel operator partials cannot exceed a shared coordinator plan budget', function () {
+    $this->creator = planOperationalUser($this, 'coordinator');
+    $operator = planOperationalUser($this, 'operator');
+    $this->actingAs($this->creator);
+    $this->post(planRoute($this, 'store'), ['waste_record_id' => $this->record->id, 'planned_date' => now()->toDateString(), 'quantity' => 50])->assertSessionHas('success');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    $plan = WasteHaulingPlan::firstOrFail();
+    $this->actingAs($this->supervisor)->post(planRoute($this, 'approve', $plan))->assertSessionHas('success');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    \Illuminate\Support\Facades\DB::unprepared('CREATE FUNCTION shared_actual_delay() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(1); RETURN NEW; END $$; CREATE TRIGGER shared_actual_delay BEFORE INSERT ON waste_haulings FOR EACH ROW EXECUTE FUNCTION shared_actual_delay()');
+    $request = ['url' => route('waste-management.haulings.store', ['organization_id' => $this->organization->id]), 'web_actor' => $operator->id, 'body' => ['waste_record_id' => $this->record->id, 'waste_hauling_plan_id' => $plan->id, 'hauling_date' => now()->toDateString(), 'quantity' => '30.00']];
+    $this->tenants->switchToPublic();
+    $results = runPlanWorkers([$request, $request]);
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHauling::count())->toBe(1)->and(WasteHauling::first()->created_by)->toBe($operator->id)
+        ->and(count(array_filter(array_column($results, 'error'))))->toBe(1)
+        ->and($this->record->getRemainingQuantity())->toBe(100.0);
+});
+
+test('actual approval alerts include multiple old pending actuals once independently of plans and timestamps', function () {
+    $first = haulingActual($this, null, '20.00');
+    $first->forceFill(['submitted_at' => now()->subMonths(4)])->saveQuietly();
+    $second = haulingActual($this, null, '20.00');
+    $second->forceFill(['submitted_at' => null])->saveQuietly();
+    $plan = haulingPlan($this, '30.00');
+    $this->actingAs($this->supervisor);
+    $service = app(\App\Services\OperationalAlerts::class);
+    $result = $service->summary($this->supervisor, $this->organization, now()->format('Y-m'));
+    expect($result['summary']['pending_hauling_approvals_count'])->toBe(2)->and($result['summary']['pending_hauling_plans_count'])->toBe(1);
+    $alerts = collect($result['alerts'])->filter(fn ($a) => str_starts_with($a['id'], 'hauling_actual_'));
+    expect($alerts)->toHaveCount(2)->and($alerts->firstWhere('id', 'hauling_actual_'.$second->id)['submitted_at'])->toBeNull();
+    expect($alerts->first()['source_url'])->toContain($first->id)->toContain('organization_id='.$this->organization->id);
+    expect($result['summary']['total_count'])->toBe(array_sum(array_column($result['alerts'], 'count')));
+    $dashboard = app(\App\Services\UnifiedDashboardService::class)->getUnifiedData($this->organization);
+    expect(collect($dashboard['hauling_attention_tasks'])->pluck('id')->all())->toContain('hauling_actual_'.$first->id, 'hauling_actual_'.$second->id, 'hauling_plan_'.$plan->id);
+    $this->get(route('waste-management.haulings.show', ['wasteHauling' => $first->id, 'organization_id' => $this->organization->id]))->assertOk();
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    config(['hauling-plans.enabled' => false, 'operational-inbox.enabled' => false]);
+    $result = $service->summary($this->supervisor, $this->organization, null);
+    expect($result['summary']['pending_hauling_approvals_count'])->toBe(2)->and($result['summary']['pending_hauling_plans_count'])->toBe(0);
+});
+
+test('actual approval alerts exclude own submissions nonreviewers and decided actuals', function () {
+    $actual = haulingActual($this, null, '20.00');
+    $service = app(\App\Services\OperationalAlerts::class);
+    expect($service->summary($this->creator, $this->organization, null)['summary']['pending_hauling_approvals_count'])->toBe(0);
+    $role = Role::factory()->create();
+    $operator = User::factory()->create(['organization_id' => $this->organization->id, 'role_id' => $role->id, 'is_super_admin' => false]);
+    expect($service->summary($operator, $this->organization, null)['summary']['pending_hauling_approvals_count'])->toBe(0);
+    $this->actingAs($this->supervisor);
+    $actual->approve($this->supervisor->id);
+    expect($service->summary($this->supervisor, $this->organization, null)['summary']['pending_hauling_approvals_count'])->toBe(0);
+});
+
+test('actual approval alerts respect reject-only permission and foreign tenant boundaries', function () {
+    haulingActual($this, null, '20.00');
+    $role = Role::factory()->create();
+    $role->permissions()->sync(\App\Models\Permission::where('slug', 'waste_hauling.reject')->pluck('id'));
+    $reviewer = User::factory()->create(['organization_id' => $this->organization->id, 'role_id' => $role->id, 'is_super_admin' => false]);
+    $service = app(\App\Services\OperationalAlerts::class);
+    expect($service->summary($reviewer, $this->organization, null)['summary']['pending_hauling_approvals_count'])->toBe(1);
+    $other = Organization::factory()->create();
+    $this->tenants->createSchema($other->schema_name);
+    $this->tenants->switchToSchema($other->schema_name);
+    expect($service->summary($this->supervisor, $other, null)['summary']['pending_hauling_approvals_count'])->toBe(0);
+    expect(fn () => $service->summary($reviewer, $other, null))->toThrow(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+});
+
+test('actual approval alerts remove rejected and cancelled actuals', function (string $status) {
+    $actual = haulingActual($this, null, '20.00');
+    if ($status === 'rejected') {
+        $this->actingAs($this->supervisor);
+        $actual->reject($this->supervisor->id, 'Data perlu diperbaiki');
+    } else {
+        $actual->cancel();
+    }
+    expect(app(\App\Services\OperationalAlerts::class)->summary($this->supervisor, $this->organization, null)['summary']['pending_hauling_approvals_count'])->toBe(0);
+})->with(['rejected', 'cancelled']);

@@ -11,7 +11,6 @@ import {
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import WasteRecordsController from '@/actions/App/Http/Controllers/WasteManagement/WasteRecordsController';
-import Heading from '@/components/Heading.vue';
 import Link from '@/components/OrganizationLink.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -24,6 +23,7 @@ import {
 } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import ExpiryBadge from '@/components/waste-management/ExpiryBadge.vue';
 import StatusBadge from '@/components/waste-management/StatusBadge.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
@@ -33,6 +33,7 @@ import type { BreadcrumbItem } from '@/types';
 
 interface WasteRecord {
     id: string;
+    source_name?: string | null;
     record_number: string;
     date: string;
     expiry_date: string | null;
@@ -298,20 +299,8 @@ const { scopedUrl } = useOrganizationContext();
     >
         <Head :title="`${wasteRecord.record_number} - Catatan Limbah`" />
 
-        <div
-            class="relative overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
-        >
-            <div
-                class="wm-page-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[340px]"
-            />
-            <div
-                class="pointer-events-none absolute -top-10 left-1/3 -z-10 h-56 w-56 rounded-full bg-sky-200/15 blur-3xl"
-            />
-            <div
-                class="pointer-events-none absolute top-28 right-0 -z-10 h-56 w-56 rounded-full bg-emerald-200/15 blur-3xl"
-            />
-
-            <div class="space-y-8">
+        <div class="relative min-w-0 overflow-x-hidden p-4">
+            <div class="space-y-4">
                 <Alert
                     v-if="statusMessage"
                     class="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-100"
@@ -330,13 +319,13 @@ const { scopedUrl } = useOrganizationContext();
                 </Alert>
 
                 <section
-                    class="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]"
+                    class="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]"
                 >
                     <Card
                         class="overflow-hidden rounded-[30px] border-slate-200/70 bg-linear-to-br from-white via-slate-50/60 to-sky-50/20 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800/80 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950/18 dark:shadow-[0_24px_60px_-36px_rgba(2,6,23,0.9)]"
                     >
                         <CardContent
-                            class="space-y-6 p-6 text-slate-900 lg:p-8 dark:text-slate-100"
+                            class="space-y-4 p-4 text-slate-900 lg:p-4 dark:text-slate-100"
                         >
                             <div
                                 class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
@@ -357,10 +346,9 @@ const { scopedUrl } = useOrganizationContext();
                                     </div>
                                     <Heading
                                         :title="wasteRecord.record_number"
-                                        description="Pantau status catatan, tinjau data inti, dan lakukan tindakan workflow yang diperlukan dari satu halaman."
                                     />
                                     <p
-                                        class="-mt-5 text-sm leading-6 text-slate-600 dark:text-slate-300"
+                                        class="text-sm leading-6 text-slate-600 dark:text-slate-300"
                                     >
                                         {{ workflowSummary.description }}
                                     </p>
@@ -705,27 +693,17 @@ const { scopedUrl } = useOrganizationContext();
                                     </p>
                                 </div>
                                 <div>
-                                    <p class="font-medium">Kategori</p>
+                                    <p class="font-medium">Sumber limbah</p>
                                     <p
                                         class="text-slate-600 dark:text-slate-300"
                                     >
                                         {{
-                                            wasteRecord.waste_type?.category
-                                                ?.name || '-'
+                                            wasteRecord.source_name ||
+                                            'Belum tercatat'
                                         }}
                                     </p>
                                 </div>
-                                <div>
-                                    <p class="font-medium">Karakteristik</p>
-                                    <p
-                                        class="text-slate-600 dark:text-slate-300"
-                                    >
-                                        {{
-                                            wasteRecord.waste_type
-                                                ?.characteristic?.name || '-'
-                                        }}
-                                    </p>
-                                </div>
+
                                 <div>
                                     <p class="font-medium">Jumlah</p>
                                     <p
@@ -784,14 +762,7 @@ const { scopedUrl } = useOrganizationContext();
                                         </span>
                                     </div>
                                 </div>
-                                <div class="sm:col-span-2">
-                                    <p class="font-medium">Sumber / lokasi</p>
-                                    <p
-                                        class="text-slate-600 dark:text-slate-300"
-                                    >
-                                        {{ wasteRecord.source || '-' }}
-                                    </p>
-                                </div>
+
                                 <div
                                     v-if="
                                         wasteRecord.status === 'approved' &&
@@ -911,7 +882,7 @@ const { scopedUrl } = useOrganizationContext();
                     class="overflow-hidden rounded-[30px] border-slate-200/70 bg-linear-to-br from-white via-slate-50/60 to-emerald-50/16 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800/80 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950/14 dark:shadow-[0_24px_60px_-36px_rgba(2,6,23,0.9)]"
                 >
                     <CardHeader>
-                        <CardTitle>Deskripsi dan catatan internal</CardTitle>
+                        <CardTitle>Catatan internal</CardTitle>
                         <CardDescription>
                             Konteks tambahan untuk membantu review dan tindak
                             lanjut operasional.
@@ -920,14 +891,6 @@ const { scopedUrl } = useOrganizationContext();
                     <CardContent
                         class="grid gap-4 text-sm text-slate-900 lg:grid-cols-2 dark:text-slate-100"
                     >
-                        <div>
-                            <p class="font-medium">Deskripsi</p>
-                            <p
-                                class="mt-1 leading-6 text-slate-600 dark:text-slate-300"
-                            >
-                                {{ wasteRecord.description || '-' }}
-                            </p>
-                        </div>
                         <div>
                             <p class="font-medium">Catatan internal</p>
                             <p
@@ -976,7 +939,7 @@ const { scopedUrl } = useOrganizationContext();
                             <div
                                 class="mt-2 text-slate-600 dark:text-slate-300"
                             >
-                                {{ hauling.hauling_date }} •
+                                {{ hauling.hauling_date }} â€¢
                                 {{ hauling.quantity }} {{ hauling.unit }}
                             </div>
                             <div

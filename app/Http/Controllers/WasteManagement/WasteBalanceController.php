@@ -6,16 +6,23 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\WasteManagement\WasteBalanceRequest;
 use App\Services\CsvExportService;
 use App\Services\WasteBalanceService;
+use App\Services\WasteReportService;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class WasteBalanceController extends Controller
 {
-    public function index(WasteBalanceRequest $request, WasteBalanceService $service): Response
+    public function index(WasteBalanceRequest $request, WasteBalanceService $service, WasteReportService $reports): Response
     {
+        $annual = $request->validated('view') === 'annual'
+            ? $reports->annualReport($request->user(), $request->validated())
+            : null;
+
         return Inertia::render('waste-management/records/Balance', [
-            'report' => $service->report($request->user(), $request->validated('start_date'), $request->validated('end_date')),
+            'report' => $annual ?? $service->report($request->user(), $request->validated('start_date'), $request->validated('end_date')),
+            'annual' => $annual ? ['year' => $annual['year'], 'rows' => $annual['annual_rows']] : null,
+            'viewMode' => $request->validated('view'),
         ]);
     }
 
@@ -29,7 +36,7 @@ class WasteBalanceController extends Controller
             $write = function (array $values) use ($file): void {
                 CsvExportService::writeRow($file, $values);
             };
-            $write(['Neraca Operasional Limbah', $report['start_date'], $report['end_date']]);
+            $write(['Neraca Limbah B3', $report['start_date'], $report['end_date']]);
             $write(['Dasar perhitungan', $report['basis']]);
             $write(['Jenis limbah', 'Kode', 'Satuan', 'Saldo awal', 'Masuk', 'Keluar', 'Saldo akhir', 'Jumlah anomali']);
             foreach ($report['rows'] as $row) {
