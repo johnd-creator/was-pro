@@ -125,7 +125,10 @@ test('dashboard demo seed shows april as critical and previous month as safe', f
             ->component('Dashboard')
             ->where('header.risk_status', 'critical')
             ->where('stats.expired_waste', 2)
-            ->where('haulingAttentionCount', 4)
+            ->where('haulingAttentionCount', 5)
+            ->where('notificationSummary.pending_hauling_approvals_count', 1)
+            ->has('haulingAttentionTasks', 4)
+            ->where('haulingAttentionTasks.0.task_group', 'approval')
         );
 
     $safeResponse = $this->actingAs($supervisor)
