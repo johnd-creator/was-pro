@@ -90,16 +90,17 @@ test('record listing applies all supported sort orders with deterministic ties',
     expect(collect($first)->pluck('id')->merge(collect($second)->pluck('id'))->take(12)->values()->all())->toBe($tied->all());
 });
 
-test('record search includes record number waste names codes and both source formats', function () {
+test('record search includes record number waste names codes categories and both source formats', function () {
     $number = listingRecord($this, ['record_number' => 'UNIQUE-DOCUMENT']);
     $source = listingRecord($this, ['source' => 'Unique legacy location']);
     $this->tenants->switchToSchema($this->organization->schema_name);
     $type = WasteType::factory()->create(['name' => 'Unique Material Name', 'code' => 'UNIQUE-TYPE-CODE']);
+    $type->category->update(['name' => 'Unique Material Category']);
     $typed = listingRecord($this, ['waste_type_id' => $type->id]);
     $structured = WasteSource::query()->create(['name' => 'Unique Structured Location', 'is_active' => true]);
     $structuredRecord = listingRecord($this, ['source_id' => $structured->id]);
     listingRecord($this);
-    foreach (['unique-document' => $number, 'LEGACY LOCATION' => $source, 'material name' => $typed, 'unique-type-code' => $typed, 'structured location' => $structuredRecord] as $search => $record) {
+    foreach (['unique-document' => $number, 'LEGACY LOCATION' => $source, 'material name' => $typed, 'unique-type-code' => $typed, 'MATERIAL CATEGORY' => $typed, 'structured location' => $structuredRecord] as $search => $record) {
         $this->get(listingUrl($this, ['search' => $search]))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
             ->where('wasteRecords.total', 1)->where('wasteRecords.data.0.id', $record->id)->where('recordSummary.total', 5));
     }

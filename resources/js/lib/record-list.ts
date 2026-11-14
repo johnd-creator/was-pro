@@ -22,7 +22,11 @@ interface SearchableRecord {
     quantity: number | string;
     source?: string | null;
     source_name?: string | null;
-    waste_type?: { name: string; code: string };
+    waste_type?: {
+        name: string;
+        code: string;
+        category?: { name: string } | null;
+    };
 }
 export const recordContractHeaders = { 'X-Waspro-Records-Contract': '2' };
 const sorts: RecordSort[] = [
@@ -95,6 +99,7 @@ export function recordListPage<T extends SearchableRecord>(
             record.source_name,
             record.waste_type?.name,
             record.waste_type?.code,
+            record.waste_type?.category?.name,
         ].some((value) => value?.toLowerCase().includes(search)),
     );
     const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);

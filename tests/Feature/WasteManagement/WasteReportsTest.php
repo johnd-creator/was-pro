@@ -10,6 +10,7 @@ use App\Services\TenantService;
 use App\Services\WasteReportService;
 use Inertia\Testing\AssertableInertia;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use Symfony\Component\Process\Process;
 
 beforeEach(function () {
     $this->withoutVite();
@@ -37,6 +38,27 @@ function b3ReportUrl(string $name = 'index', array $filters = []): string
     return route('waste-management.reports.'.$name, [
         'organization_id' => test()->organization->id, ...test()->filters, ...$filters,
     ]);
+}
+
+/**
+ * Run memory bounds in a fresh PHP process, not after the suite's retained caches.
+ * Use the supported Pest CLI because runtime fluent calls cannot enable isolation.
+ */
+function runB3ReportMemoryTestInFreshProcess(string $description): bool
+{
+    if (getenv('WASPRO_REPORT_MEMORY_TEST') === $description) {
+        return false;
+    }
+
+    $process = new Process([
+        PHP_BINARY, base_path('vendor/bin/pest'), __FILE__, '--compact', '--colors=never', '--filter', $description,
+    ], base_path(), ['WASPRO_REPORT_MEMORY_TEST' => $description], timeout: 120);
+    $process->run();
+
+    expect($process->getExitCode())->toBe(0, $process->getOutput().$process->getErrorOutput())
+        ->and($process->getOutput())->toMatch('/Tests:\s+1 passed/');
+
+    return true;
 }
 
 test('b3 report centre exposes approved scoped balances and normalized filters', function () {
@@ -171,6 +193,10 @@ test('operator can export storage reports and cannot switch tenant', function ()
 });
 
 test('large PDF export returns actionable validation rather than rendering an unbounded table', function () {
+    if (runB3ReportMemoryTestInFreshProcess('large PDF export returns actionable validation rather than rendering an unbounded table')) {
+        return;
+    }
+
     $previousLimit = ini_get('memory_limit');
     ini_set('memory_limit', '128M');
     try {
@@ -184,6 +210,10 @@ test('large PDF export returns actionable validation rather than rendering an un
 });
 
 test('storage PDF renders at the row limit under 128 megabytes', function () {
+    if (runB3ReportMemoryTestInFreshProcess('storage PDF renders at the row limit under 128 megabytes')) {
+        return;
+    }
+
     $previousLimit = ini_get('memory_limit');
     ini_set('memory_limit', '128M');
     try {

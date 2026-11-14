@@ -92,7 +92,8 @@ class WasteRecordsController extends Controller
             $query->where(function ($q) use ($pattern): void {
                 $q->whereRaw('LOWER(record_number) LIKE ?', [$pattern])
                     ->orWhereRaw('LOWER(COALESCE(source, \'\')) LIKE ?', [$pattern])
-                    ->orWhereHas('wasteType', fn ($type) => $type->whereRaw('LOWER(name) LIKE ?', [$pattern])->orWhereRaw('LOWER(code) LIKE ?', [$pattern]));
+                    ->orWhereHas('wasteType', fn ($type) => $type->whereRaw('LOWER(name) LIKE ?', [$pattern])->orWhereRaw('LOWER(code) LIKE ?', [$pattern])
+                        ->orWhereHas('category', fn ($category) => $category->whereRaw('LOWER(name) LIKE ?', [$pattern])));
                 if (\App\Models\WasteSource::available()) {
                     $q->orWhereHas('wasteSource', fn ($source) => $source->whereRaw('LOWER(name) LIKE ?', [$pattern]));
                 }
@@ -518,7 +519,7 @@ class WasteRecordsController extends Controller
         $search = mb_strtolower(trim($request->validated('search') ?? ''));
         $storageStatus = $request->validated('attention') ?? $request->validated('storage_status') ?? 'all';
         $wasteRecords = $query->get()->filter(function (WasteRecord $record) use ($search, $storageStatus, $storageDate, $alerts, $snapshotExport, $request): bool {
-            $fields = [$record->record_number, $record->wasteType?->name, $record->wasteType?->code, $record->source_name, $record->source];
+            $fields = [$record->record_number, $record->wasteType?->name, $record->wasteType?->code, $record->wasteType?->category?->name, $record->source_name, $record->source];
             if ($search !== '' && ! collect($fields)->contains(fn (?string $value): bool => str_contains(mb_strtolower($value ?? ''), $search))) {
                 return false;
             }

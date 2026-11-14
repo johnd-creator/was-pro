@@ -22,6 +22,7 @@ const records = Array.from({ length: 27 }, (_, i) => ({
     waste_type: {
         name: i === 0 ? 'Oli unik' : 'Limbah',
         code: i === 0 ? 'B105D' : 'A1',
+        category: i === 0 ? { name: 'Kategori khusus' } : null,
     },
 }));
 
@@ -54,7 +55,13 @@ test('version matrix: new UI + new backend supports initial array and negotiated
     });
 });
 
-for (const search of ['wr-0', 'OLI UNIK', 'b105d', 'sumber khusus']) {
+for (const search of [
+    'wr-0',
+    'OLI UNIK',
+    'b105d',
+    'sumber khusus',
+    'KATEGORI KHUSUS',
+]) {
     test(`legacy full-array search reaches off-page record by ${search}`, () => {
         assert.deepEqual(
             recordListPage(records, { ...state, search }).data.map((r) => r.id),
