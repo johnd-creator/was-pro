@@ -619,7 +619,7 @@ const { scopedUrl } = useOrganizationContext();
                         >
                             <CardHeader>
                                 <CardTitle class="text-lg tracking-tight"
-                                    >Breakdown Internal</CardTitle
+                                    >Rincian Pemanfaatan Internal</CardTitle
                                 >
                             </CardHeader>
                             <CardContent class="space-y-3">

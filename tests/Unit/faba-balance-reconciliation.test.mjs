@@ -116,3 +116,105 @@ test('legacy payload without component details does not invent a reconciliation'
     );
     assert.doesNotMatch(html, /<table/);
 });
+test('workshop is included once in production while internal utilization stays separate', async () => {
+    const components = [
+        {
+            movement_type: 'workshop',
+            stock_effect: 'in',
+            fly_ash: 2.5,
+            bottom_ash: 1.5,
+            total: 4,
+        },
+        {
+            movement_type: 'production',
+            stock_effect: 'in',
+            fly_ash: 20,
+            bottom_ash: 10,
+            total: 30,
+        },
+        {
+            movement_type: 'utilization_internal',
+            stock_effect: 'out',
+            fly_ash: 3,
+            bottom_ash: 2,
+            total: 5,
+        },
+        {
+            movement_type: 'utilization_external',
+            stock_effect: 'out',
+            fly_ash: 7,
+            bottom_ash: 3,
+            total: 10,
+        },
+    ];
+    const original = structuredClone(components);
+    for (const yearly of [false, true]) {
+        const html = await renderToString(
+            createSSRApp(component, {
+                summary: { ...summary, balance_components: components },
+                periodLabel: '2026',
+                yearly,
+            }),
+        );
+        assert.doesNotMatch(html, /Workshop/);
+        assert.equal((html.match(/>Produksi</g) ?? []).length, 1);
+        assert.match(html, /22,50/);
+        assert.match(html, /11,50/);
+        assert.match(html, /34,00/);
+        assert.match(html, /Pemanfaatan Internal/);
+        assert.match(html, /-5,00/);
+        assert.match(html, /Pemanfaatan Eksternal/);
+        assert.match(html, /-10,00/);
+    }
+    assert.deepEqual(
+        components,
+        original,
+        'presentation must not mutate the source payload',
+    );
+});
+
+test('workshop stock direction is not lost when grouped for display', async () => {
+    const html = await renderToString(
+        createSSRApp(component, {
+            summary: {
+                ...summary,
+                balance_components: [
+                    {
+                        movement_type: 'production',
+                        stock_effect: 'in',
+                        fly_ash: 20,
+                        bottom_ash: 0,
+                        total: 20,
+                    },
+                    {
+                        movement_type: 'workshop',
+                        stock_effect: 'out',
+                        fly_ash: 2,
+                        bottom_ash: 0,
+                        total: 2,
+                    },
+                ],
+            },
+            periodLabel: '2026',
+        }),
+    );
+    assert.match(html, /20,00/);
+    assert.match(html, /-2,00/);
+    assert.doesNotMatch(html, /18,00/);
+});
+
+test('monthly recap keeps destination-level internal utilization visible', () => {
+    const monthly = fs.readFileSync(
+        path.join(
+            root,
+            'resources/js/pages/waste-management/faba/recaps/Monthly.vue',
+        ),
+        'utf8',
+    );
+    assert.match(monthly, /Rincian Pemanfaatan Internal/);
+    assert.match(
+        monthly,
+        /v-for="item in detail.internal_destination_breakdown"/,
+    );
+    assert.match(monthly, /item.internal_destination_name/);
+});

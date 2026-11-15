@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { formatFabaMovementType } from '@/lib/faba';
-import type { FabaBalanceReconciliation } from '@/types/faba';
+import type {
+    FabaBalanceComponent,
+    FabaBalanceReconciliation,
+} from '@/types/faba';
 
 const props = defineProps<{
     summary: FabaBalanceReconciliation;
@@ -24,7 +27,23 @@ const rows = computed(() => {
             total: props.summary.opening_balance,
         },
     ];
+    const components = new Map<string, FabaBalanceComponent>();
     for (const item of props.summary.balance_components ?? []) {
+        const movementType =
+            item.movement_type === 'workshop'
+                ? 'production'
+                : item.movement_type;
+        const key = movementType + '-' + item.stock_effect;
+        const existing = components.get(key);
+        if (existing) {
+            existing.fly_ash += item.fly_ash;
+            existing.bottom_ash += item.bottom_ash;
+            existing.total += item.total;
+        } else {
+            components.set(key, { ...item, movement_type: movementType });
+        }
+    }
+    for (const item of components.values()) {
         const sign = item.stock_effect === 'out' ? -1 : 1;
         result.push({
             key: `${item.movement_type}-${item.stock_effect}`,

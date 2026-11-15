@@ -35,7 +35,23 @@ interface Agreement {
     transporter: { name: string };
     receiver: { name: string };
 }
-defineProps<{ vendors: Party[]; agreements: Agreement[]; ready: boolean }>();
+const props = defineProps<{
+    vendors: Party[];
+    agreements: Agreement[];
+    ready: boolean;
+}>();
+function differsFromCurrentRole(
+    id: string,
+    role: 'transporter' | 'receiver',
+): boolean {
+    const vendor = props.vendors.find((v) => v.id === id);
+    return (
+        !!vendor &&
+        !(role === 'transporter'
+            ? vendor.is_transporter
+            : vendor.is_processor || vendor.is_utilizer)
+    );
+}
 const { scopedUrl } = useOrganizationContext();
 const { hasPermission } = usePermissions();
 const open = ref(false);
@@ -101,7 +117,8 @@ function submit() {
         <p class="mt-2 text-sm text-muted-foreground">
             Satu pengangkut dapat bekerja sama dengan beberapa pengelola atau
             pemanfaat. Masa berlaku dihitung dari tanggal dokumen, bukan
-            verifikasi izin.
+            verifikasi izin. Perubahan peran vendor tidak mengubah pihak pada
+            MoU yang sudah tercatat.
         </p>
         <p v-if="!ready" class="mt-4 text-sm">
             Fitur MoU menunggu penyiapan database. Data vendor tetap tersedia.
@@ -136,8 +153,36 @@ function submit() {
                                 }}
                             </div>
                         </td>
-                        <td class="p-2">{{ a.transporter.name }}</td>
-                        <td class="p-2">{{ a.receiver.name }}</td>
+                        <td class="p-2">
+                            {{ a.transporter.name }}
+                            <div
+                                v-if="
+                                    differsFromCurrentRole(
+                                        a.transporter_vendor_id,
+                                        'transporter',
+                                    )
+                                "
+                                class="text-xs text-muted-foreground"
+                            >
+                                Peran pada catatan lama; berbeda dari master
+                                saat ini.
+                            </div>
+                        </td>
+                        <td class="p-2">
+                            {{ a.receiver.name }}
+                            <div
+                                v-if="
+                                    differsFromCurrentRole(
+                                        a.receiver_vendor_id,
+                                        'receiver',
+                                    )
+                                "
+                                class="text-xs text-muted-foreground"
+                            >
+                                Peran pada catatan lama; berbeda dari master
+                                saat ini.
+                            </div>
+                        </td>
                         <td class="p-2">
                             {{ a.valid_from || '-' }} /
                             {{ a.valid_until || '-' }}

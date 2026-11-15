@@ -103,3 +103,30 @@ test('rollback refuses to erase stored roles or agreement history', function () 
     expect(fn () => $migration->down())->toThrow(RuntimeException::class);
     expect(VendorAgreement::find($agreement->id))->not->toBeNull();
 });
+
+test('role correction preserves historical parties but rejects their old roles in new agreements', function () {
+    $agreement = VendorAgreement::create($this->payload);
+    $this->vendor->update(['is_transporter' => false, 'is_processor' => false, 'is_utilizer' => false]);
+    $this->get(route('waste-management.master-data.vendors.index', ['organization_id' => $this->organization->id]))
+        ->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+        ->has('agreements', 1)
+        ->where('agreements.0.transporter_vendor_id', $this->vendor->id)
+        ->where('agreements.0.receiver_vendor_id', $this->vendor->id));
+    $this->put(agreementRoute($this, 'update', $agreement), [...$this->payload, 'notes' => 'Reviewed historical entry'])
+        ->assertSessionHasNoErrors();
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect($agreement->fresh()->transporter_vendor_id)->toBe($this->vendor->id)
+        ->and($agreement->fresh()->receiver_vendor_id)->toBe($this->vendor->id);
+    $this->post(agreementRoute($this, 'store'), [...$this->payload, 'document_number' => 'NEW-DOCUMENT'])
+        ->assertSessionHasErrors(['transporter_vendor_id', 'receiver_vendor_id']);
+});
+
+test('historical role exception cannot assign a different vendor with an unsuitable role', function () {
+    $agreement = VendorAgreement::create($this->payload);
+    $other = Vendor::factory()->create(['is_active' => true, 'is_transporter' => false, 'is_processor' => false, 'is_utilizer' => false]);
+    $this->put(agreementRoute($this, 'update', $agreement), [...$this->payload, 'transporter_vendor_id' => $other->id, 'receiver_vendor_id' => $other->id])
+        ->assertSessionHasErrors(['transporter_vendor_id', 'receiver_vendor_id']);
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect($agreement->fresh()->transporter_vendor_id)->toBe($this->vendor->id)
+        ->and($agreement->fresh()->receiver_vendor_id)->toBe($this->vendor->id);
+});
