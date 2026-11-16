@@ -69,65 +69,104 @@ const wasteTypes = computed(() => availablePlanWasteTypes(periodRecords.value));
 const filteredRecords = computed(() =>
     planRecordsForType(periodRecords.value, selectedWasteTypeId.value),
 );
-watch([startDate, endDate], () => {
-    selectedWasteTypeId.value = '';
-    form.waste_record_id = '';
-    form.quantity = '';
-    form.clearErrors('waste_record_id', 'quantity');
-});
+type PlanItem = { waste_record_id: string; quantity: string | number };
 const form = useForm({
-    waste_record_id: preselectedRecord?.id ?? '',
+    items: (preselectedRecord
+        ? [{ waste_record_id: preselectedRecord.id, quantity: '' }]
+        : []) as PlanItem[],
     planned_date: formatLocalDate(),
-    quantity: '' as string | number,
     notes: '',
 });
+function clearSelection(): void {
+    form.items = [];
+    form.clearErrors();
+}
 watch(
-    selectedWasteTypeId,
+    [startDate, endDate],
     () => {
-        form.waste_record_id = '';
-        form.quantity = '';
-        form.clearErrors('waste_record_id', 'quantity');
+        selectedWasteTypeId.value = '';
+        clearSelection();
     },
     { flush: 'sync' },
 );
-watch(
-    () => form.waste_record_id,
-    () => {
-        form.quantity = '';
-        form.clearErrors('quantity');
-    },
-    { flush: 'sync' },
-);
-const selectedRecord = computed(() =>
-    filteredRecords.value.find((record) => record.id === form.waste_record_id),
-);
-const quantityError = computed(() =>
-    planQuantityError(form.quantity, selectedRecord.value),
+watch(selectedWasteTypeId, clearSelection, { flush: 'sync' });
+const selectedItems = computed(() =>
+    form.items.map((item) => {
+        const record = filteredRecords.value.find(
+            (record) => record.id === item.waste_record_id,
+        );
+        return {
+            item,
+            record,
+            error: planQuantityError(item.quantity, record),
+        };
+    }),
 );
 const canSubmit = computed(
-    () => !form.processing && !!selectedRecord.value && !quantityError.value,
+    () =>
+        !form.processing &&
+        !!form.planned_date &&
+        !invalidDateRange.value &&
+        form.items.length > 0 &&
+        form.items.length <= 50 &&
+        new Set(form.items.map((item) => item.waste_record_id)).size ===
+            form.items.length &&
+        selectedItems.value.every(({ error }) => !error),
 );
-watch(
-    () => form.quantity,
-    () => form.clearErrors('quantity'),
-);
+function toggleRecord(recordId: string): void {
+    if (form.processing) return;
+    const existing = form.items.findIndex(
+        (item) => item.waste_record_id === recordId,
+    );
+    if (existing >= 0) {
+        form.items.splice(existing, 1);
+    } else if (
+        form.items.length < 50 &&
+        filteredRecords.value.some((record) => record.id === recordId)
+    ) {
+        form.items.push({ waste_record_id: recordId, quantity: '' });
+    }
+    form.clearErrors();
+}
+function fieldError(
+    index: number,
+    field: 'quantity' | 'waste_record_id',
+): string | undefined {
+    return (form.errors as Record<string, string | undefined>)[
+        `items.${index}.${field}`
+    ];
+}
 const flash = computed(
     () => page.props.flash as { success?: string; error?: string } | undefined,
 );
 const quantity = (value: number) =>
     value.toLocaleString('id-ID', { maximumFractionDigits: 2 });
 let submissionKey: string | undefined;
+let submissionFingerprint: string | undefined;
 function submit(): void {
     if (!canSubmit.value) return;
-    submissionKey ??= crypto.randomUUID();
+    const fingerprint = JSON.stringify({
+        items: form.items,
+        planned_date: form.planned_date,
+        notes: form.notes,
+    });
+    if (!submissionKey || submissionFingerprint !== fingerprint) {
+        submissionKey = crypto.randomUUID();
+        submissionFingerprint = fingerprint;
+    }
     form.post(scopedUrl(store.url()), {
         preserveScroll: true,
         headers: { 'Idempotency-Key': submissionKey },
         onError: () => {
             submissionKey = undefined;
+            submissionFingerprint = undefined;
         },
         onSuccess: () => {
-            if (!flash.value?.error) submissionKey = undefined;
+            if (!flash.value?.error) {
+                submissionKey = undefined;
+                submissionFingerprint = undefined;
+                clearSelection();
+            }
         },
     });
 }
@@ -227,7 +266,9 @@ function submit(): void {
                             <select
                                 id="plan-waste-type"
                                 v-model="selectedWasteTypeId"
-                                :disabled="form.processing"
+                                :disabled="
+                                    form.processing || !wasteTypes.length
+                                "
                                 required
                                 class="h-11 w-full rounded-md border bg-background px-3 text-sm"
                             >
@@ -247,38 +288,160 @@ function submit(): void {
                                 sudah disetujui dan masih tersedia untuk
                                 dialokasikan.
                             </p>
-                        </div>
-                        <div class="space-y-2">
-                            <Label for="plan-record">Batch catatan limbah</Label
-                            ><select
-                                id="plan-record"
-                                v-model="form.waste_record_id"
-                                :disabled="
-                                    !selectedWasteTypeId || form.processing
-                                "
-                                required
-                                class="h-11 w-full rounded-md border bg-background px-3 text-sm"
+                            <p
+                                v-if="!hasPermission('waste_hauling.view_all')"
+                                class="text-sm text-muted-foreground"
                             >
-                                <option value="" disabled>
-                                    {{
-                                        selectedWasteTypeId
-                                            ? 'Pilih batch catatan limbah'
-                                            : 'Pilih jenis limbah terlebih dahulu'
-                                    }}
-                                </option>
-                                <option
+                                Pilihan pengajuan baru hanya berasal dari
+                                catatan yang Anda buat. Untuk batch pengguna
+                                lain, buka rencana koordinator yang sudah
+                                disetujui supervisor pada Daftar rencana untuk
+                                mencatat realisasi.
+                            </p>
+                            <p
+                                v-if="
+                                    !invalidDateRange && !periodRecords.length
+                                "
+                                role="status"
+                                class="text-sm text-muted-foreground"
+                            >
+                                {{
+                                    selectableRecords.length
+                                        ? 'Tidak ada batch tersedia pada rentang tanggal ini. Kosongkan atau ubah rentang tanggal.'
+                                        : 'Belum ada batch yang dapat Anda ajukan: catatan harus disetujui dan masih memiliki saldo untuk alokasi baru.'
+                                }}
+                            </p>
+                        </div>
+                        <fieldset
+                            class="space-y-2 md:col-span-2"
+                            :disabled="form.processing"
+                        >
+                            <legend class="text-sm font-medium">
+                                Batch catatan limbah
+                            </legend>
+                            <p class="text-sm text-muted-foreground">
+                                Pilih satu atau beberapa batch dari jenis limbah
+                                yang sama (maksimal 50). Isi jumlah setiap
+                                batch; tanggal dan catatan berlaku untuk semua
+                                batch terpilih. Persetujuan dan realisasi tetap
+                                per batch.
+                            </p>
+                            <p
+                                v-if="!selectedWasteTypeId"
+                                class="text-sm text-muted-foreground"
+                            >
+                                Pilih jenis limbah terlebih dahulu.
+                            </p>
+                            <div
+                                v-else
+                                class="max-h-64 space-y-2 overflow-y-auto rounded-md border p-3"
+                            >
+                                <label
                                     v-for="record in filteredRecords"
                                     :key="record.id"
-                                    :value="record.id"
+                                    class="flex cursor-pointer items-start gap-3 rounded p-2 hover:bg-muted/50"
                                 >
-                                    {{ record.record_number }} · masuk
-                                    {{ record.date || '-' }} · tersedia
-                                    {{ quantity(record.available_quantity) }}
-                                    {{ record.unit }}
-                                </option></select
-                            ><InputError
-                                :message="form.errors.waste_record_id"
+                                    <input
+                                        type="checkbox"
+                                        class="mt-1 size-4 shrink-0"
+                                        :checked="
+                                            form.items.some(
+                                                (item) =>
+                                                    item.waste_record_id ===
+                                                    record.id,
+                                            )
+                                        "
+                                        :disabled="
+                                            form.processing ||
+                                            (form.items.length >= 50 &&
+                                                !form.items.some(
+                                                    (item) =>
+                                                        item.waste_record_id ===
+                                                        record.id,
+                                                ))
+                                        "
+                                        @change="toggleRecord(record.id)"
+                                    />
+                                    <span class="text-sm"
+                                        >{{ record.record_number }} &bull; masuk
+                                        {{ record.date || '-' }} &bull; tersedia
+                                        {{
+                                            quantity(record.available_quantity)
+                                        }}
+                                        {{ record.unit }}</span
+                                    >
+                                </label>
+                            </div>
+                            <InputError :message="form.errors.items" />
+                            <p
+                                class="text-sm text-muted-foreground"
+                                role="status"
+                            >
+                                {{ form.items.length }} batch dipilih.
+                            </p>
+                        </fieldset>
+                        <div
+                            v-for="(
+                                { item, record, error }, itemIndex
+                            ) in selectedItems"
+                            :key="item.waste_record_id"
+                            class="space-y-2 rounded-md border p-3 md:col-span-2"
+                        >
+                            <Label
+                                :for="`plan-quantity-${item.waste_record_id}`"
+                                >Jumlah rencana
+                                {{
+                                    record?.record_number ||
+                                    'batch tidak tersedia'
+                                }}
+                                {{ record ? `(${record.unit})` : '' }}</Label
+                            >
+                            <Input
+                                :id="`plan-quantity-${item.waste_record_id}`"
+                                v-model="item.quantity"
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                :max="record?.available_quantity"
+                                :disabled="form.processing"
+                                required
+                                class="h-11"
+                                :aria-invalid="!!error && item.quantity !== ''"
+                                :aria-describedby="`plan-error-${item.waste_record_id}`"
                             />
+                            <InputError
+                                :message="
+                                    fieldError(itemIndex, 'waste_record_id')
+                                "
+                            />
+                            <InputError
+                                :id="`plan-error-${item.waste_record_id}`"
+                                role="alert"
+                                :message="
+                                    fieldError(itemIndex, 'quantity') ||
+                                    (item.quantity !== '' ? error : '')
+                                "
+                            />
+                            <p
+                                v-if="record"
+                                class="text-sm text-muted-foreground"
+                            >
+                                Saldo tercatat
+                                {{ quantity(record.remaining_quantity) }}
+                                {{ record.unit }}; tersedia untuk alokasi baru
+                                {{ quantity(record.available_quantity) }}
+                                {{ record.unit }}. Jumlah diisi sesuai rencana
+                                muatan yang diperiksa. Satuan tidak dikonversi
+                                otomatis.
+                            </p>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                :disabled="form.processing"
+                                @click="toggleRecord(item.waste_record_id)"
+                                >Hapus pilihan
+                                {{ record?.record_number }}</Button
+                            >
                         </div>
                         <div class="space-y-2">
                             <Label for="planned-date"
@@ -286,70 +449,18 @@ function submit(): void {
                             ><Input
                                 id="planned-date"
                                 v-model="form.planned_date"
+                                :disabled="form.processing"
                                 type="date"
                                 required
                                 class="h-11"
                             /><InputError :message="form.errors.planned_date" />
                         </div>
                         <div class="space-y-2">
-                            <Label for="plan-quantity"
-                                >Jumlah rencana
-                                {{
-                                    selectedRecord
-                                        ? `(${selectedRecord.unit})`
-                                        : ''
-                                }}</Label
-                            ><Input
-                                id="plan-quantity"
-                                v-model="form.quantity"
-                                type="number"
-                                min="0.01"
-                                step="0.01"
-                                :max="selectedRecord?.available_quantity"
-                                :disabled="!selectedRecord || form.processing"
-                                required
-                                class="h-11"
-                                :aria-invalid="
-                                    !!quantityError && form.quantity !== ''
-                                "
-                                aria-describedby="plan-quantity-help plan-quantity-error"
-                            />
-                            <InputError
-                                id="plan-quantity-error"
-                                role="alert"
-                                :message="
-                                    form.errors.quantity ||
-                                    (form.quantity !== '' ? quantityError : '')
-                                "
-                            />
-                            <p
-                                v-if="selectedRecord"
-                                id="plan-quantity-help"
-                                class="text-sm text-muted-foreground"
-                            >
-                                Saldo tercatat
-                                {{
-                                    quantity(selectedRecord.remaining_quantity)
-                                }}
-                                {{ selectedRecord.unit }}; tersedia untuk
-                                alokasi baru
-                                {{
-                                    quantity(selectedRecord.available_quantity)
-                                }}
-                                {{ selectedRecord.unit }}. Batas ini hanya untuk
-                                batch yang dipilih, setelah dikurangi alokasi
-                                rencana dan realisasi yang masih aktif. Masukkan
-                                jumlah berdasarkan rencana muatan yang sudah
-                                diperiksa, bukan total saldo seluruh jenis
-                                limbah. Satuan mengikuti catatan dan tidak
-                                dikonversi otomatis.
-                            </p>
-                        </div>
-                        <div class="space-y-2">
                             <Label for="plan-notes">Catatan rencana</Label
                             ><Textarea
                                 id="plan-notes"
                                 v-model="form.notes"
+                                :disabled="form.processing"
                                 rows="3"
                             /><InputError :message="form.errors.notes" />
                         </div>

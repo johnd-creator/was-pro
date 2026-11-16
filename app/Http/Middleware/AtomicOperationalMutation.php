@@ -69,6 +69,7 @@ class AtomicOperationalMutation
                     $request->attributes->remove(\App\Services\OperationalInbox::CAPTURE);
                 }
                 $failed = $response->getStatusCode() >= 400
+                    || (($response->exception ?? null) instanceof \Illuminate\Validation\ValidationException)
                     || ($response->isRedirection() && $request->hasSession() && in_array('error', $request->session()->get('_flash.new', []), true));
                 if ($failed) {
                     throw new RejectedOperationalResponse($response);

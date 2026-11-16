@@ -106,3 +106,12 @@ export function formatFabaMovementType(value: string): string {
 
     return labels[value] ?? value;
 }
+
+/** Hide the historical opening-balance notice in the UI without changing domain warnings. */
+export function getFabaDisplayWarnings<T extends { code: string }>(
+    warnings: readonly T[] | null | undefined,
+): T[] {
+    return (warnings ?? []).filter(
+        (warning) => warning.code !== 'missing_opening_balance',
+    );
+}

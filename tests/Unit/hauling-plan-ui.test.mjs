@@ -129,13 +129,12 @@ test('plan options, preselection, selected record and empty state share eligible
     assert.match(source, /availablePlanRecords\(props.records\)/);
     assert.match(source, /selectableRecords.value.find/);
     assert.match(source, /preselectedRecord\?\.waste_type_id/);
-    assert.match(source, /preselectedRecord\?\.id/);
+    assert.match(source, /preselectedRecord\.id/);
     assert.match(source, /filteredRecords.value.find/);
     assert.match(source, /v-for="record in filteredRecords"/);
     assert.match(source, /v-model="selectedWasteTypeId"/);
     assert.match(source, /watch\(\s*selectedWasteTypeId/);
-    assert.match(source, /form\.waste_record_id = ''/);
-    assert.match(source, /form\.quantity = ''/);
+    assert.match(source, /form\.items = \[\]/);
     assert.match(source, /v-if="!selectableRecords.length"/);
     assert.match(source, /tersedia untuk alokasi baru/);
 });
@@ -232,9 +231,16 @@ function mountPicker(records, query = '') {
             reactive({
                 ...initial,
                 processing: false,
-                clearErrors() {},
-                post() {
-                    submissions.push({ ...this });
+                errors: {},
+                clearErrors() {
+                    this.errors = {};
+                },
+                post(url, options) {
+                    submissions.push({
+                        items: this.items.map((item) => ({ ...item })),
+                        url,
+                        options,
+                    });
                 },
             }),
         useOrganizationContext: () => ({ scopedUrl: (url) => url }),
@@ -248,7 +254,6 @@ function mountPicker(records, query = '') {
         availablePlanWasteTypes,
         planRecordsForType,
         planRecordsForDateRange,
-        planRecordsForDateRange,
         planQuantityError,
     };
     const scope = effectScope();
@@ -256,13 +261,13 @@ function mountPicker(records, query = '') {
         new Function(
             ...Object.keys(dependencies),
             compiled +
-                ';return { form, startDate, endDate, selectedWasteTypeId, filteredRecords, selectedRecord, quantityError, canSubmit, submit };',
+                ';return { form, startDate, endDate, selectedWasteTypeId, filteredRecords, selectedItems, canSubmit, submit, toggleRecord };',
         )(...Object.values(dependencies)),
     );
     return { ...state, submissions, stop: () => scope.stop() };
 }
 
-test('picker preserves eligible deep links and clears stale batch and quantity on type or batch changes', () => {
+test('multi picker preserves deep links, explicit quantities and clears stale selections on type change', () => {
     const records = [
         {
             id: 'one',
@@ -286,29 +291,33 @@ test('picker preserves eligible deep links and clears stale batch and quantity o
     const picker = mountPicker(records, '?waste_record=one');
     try {
         assert.equal(picker.selectedWasteTypeId.value, 'a');
-        assert.equal(picker.selectedRecord.value.id, 'one');
-        picker.form.quantity = 2;
+        assert.deepEqual(picker.form.items, [
+            { waste_record_id: 'one', quantity: '' },
+        ]);
+        picker.form.items[0].quantity = 2;
         picker.selectedWasteTypeId.value = 'b';
-        assert.equal(picker.form.waste_record_id, '');
-        assert.equal(picker.form.quantity, '');
-        assert.equal(picker.selectedRecord.value, undefined);
-        assert.deepEqual(
-            picker.filteredRecords.value.map((record) => record.id),
-            ['two', 'three'],
-        );
-        picker.form.waste_record_id = 'two';
-        picker.form.quantity = 4;
-        picker.form.waste_record_id = 'three';
-        assert.equal(picker.form.quantity, '');
-        assert.equal(picker.selectedRecord.value.id, 'three');
-        picker.form.waste_record_id = 'one';
-        assert.equal(picker.selectedRecord.value, undefined);
+        assert.deepEqual(picker.form.items, []);
+        picker.toggleRecord('two');
+        picker.form.items[0].quantity = 4;
+        picker.toggleRecord('three');
+        assert.deepEqual(picker.form.items, [
+            { waste_record_id: 'two', quantity: 4 },
+            { waste_record_id: 'three', quantity: '' },
+        ]);
+        picker.toggleRecord('one');
+        assert.equal(picker.form.items.length, 2);
+        picker.toggleRecord('two');
+        assert.deepEqual(picker.form.items, [
+            { waste_record_id: 'three', quantity: '' },
+        ]);
+        picker.toggleRecord('two');
+        assert.equal(picker.form.items[1].quantity, '');
     } finally {
         picker.stop();
     }
 });
 
-test('picker rejects exhausted or unavailable deep links and starts with no batches until a type is chosen', () => {
+test('multi picker rejects unavailable deep links and cannot select exhausted or unknown batches', () => {
     const records = [
         {
             id: 'empty',
@@ -325,9 +334,11 @@ test('picker rejects exhausted or unavailable deep links and starts with no batc
         const picker = mountPicker(records, query);
         try {
             assert.equal(picker.selectedWasteTypeId.value, '');
-            assert.equal(picker.form.waste_record_id, '');
-            assert.equal(picker.selectedRecord.value, undefined);
-            assert.deepEqual(picker.filteredRecords.value, []);
+            assert.deepEqual(picker.form.items, []);
+            picker.toggleRecord('empty');
+            picker.toggleRecord('not-authorized');
+            assert.deepEqual(picker.form.items, []);
+            assert.equal(picker.canSubmit.value, false);
         } finally {
             picker.stop();
         }
@@ -374,7 +385,7 @@ test('plan quantity validation rejects invalid or over-allocated quantities and 
     );
 });
 
-test('plan submit blocks invalid entries, accepts exact headroom, and rechecks changed batch or availability', () => {
+test('multi submit validates every item and rechecks changed availability with no automatic allocation', () => {
     const records = reactive([
         {
             id: 'one',
@@ -393,30 +404,65 @@ test('plan submit blocks invalid entries, accepts exact headroom, and rechecks c
     ]);
     const picker = mountPicker(records, '?waste_record=one');
     try {
-        assert.equal(picker.canSubmit.value, false);
         for (const value of ['', 0, -2, '0.001', 20.01]) {
-            picker.form.quantity = value;
+            picker.form.items[0].quantity = value;
             assert.equal(picker.canSubmit.value, false);
             picker.submit();
         }
         assert.equal(picker.submissions.length, 0);
-        picker.form.quantity = 20;
+        picker.form.items[0].quantity = 20;
+        picker.toggleRecord('two');
+        assert.equal(picker.canSubmit.value, false);
+        picker.form.items[1].quantity = 5.01;
+        assert.equal(picker.canSubmit.value, false);
+        picker.form.items[1].quantity = 5;
         assert.equal(picker.canSubmit.value, true);
         picker.submit();
         assert.equal(picker.submissions.length, 1);
+        assert.deepEqual(picker.submissions[0].items, [
+            { waste_record_id: 'one', quantity: 20 },
+            { waste_record_id: 'two', quantity: 5 },
+        ]);
         picker.form.processing = true;
+        picker.toggleRecord('one');
         picker.submit();
+        assert.equal(picker.form.items.length, 2);
         assert.equal(picker.submissions.length, 1);
         picker.form.processing = false;
-        records[0].available_quantity = 19;
+        records[1].available_quantity = 4;
         assert.equal(picker.canSubmit.value, false);
         picker.submit();
         assert.equal(picker.submissions.length, 1);
-        picker.form.waste_record_id = 'two';
-        assert.equal(picker.form.quantity, '');
+        picker.form.items[1].quantity = 4;
+        picker.form.planned_date = '';
         assert.equal(picker.canSubmit.value, false);
-        picker.form.quantity = 5;
-        assert.equal(picker.canSubmit.value, true);
+        picker.form.planned_date = '2026-11-12';
+        picker.form.items.push({ waste_record_id: 'one', quantity: 1 });
+        assert.equal(picker.canSubmit.value, false);
+    } finally {
+        picker.stop();
+    }
+});
+
+test('multi picker caps selection and clears the draft after successful submission', () => {
+    const records = Array.from({ length: 51 }, (_, index) => ({
+        id: String(index),
+        waste_type_id: 'a',
+        available_quantity: 2,
+        unit: 'kg',
+        waste_type: null,
+    }));
+    const picker = mountPicker(records);
+    try {
+        picker.selectedWasteTypeId.value = 'a';
+        for (const record of records) picker.toggleRecord(record.id);
+        assert.equal(picker.form.items.length, 50);
+        picker.form.items.forEach((item) => (item.quantity = 1));
+        picker.submit();
+        assert.equal(picker.submissions.length, 1);
+        picker.submissions[0].options.onSuccess();
+        assert.deepEqual(picker.form.items, []);
+        assert.equal(picker.canSubmit.value, false);
     } finally {
         picker.stop();
     }
@@ -462,7 +508,7 @@ test('date range filters inclusively and permits open bounds without mixing unre
     );
 });
 
-test('changing entry date range clears stale batch and quantity', async () => {
+test('changing entry date range clears all selected batches and their quantities', async () => {
     const records = [
         {
             id: 'one',
@@ -481,15 +527,17 @@ test('changing entry date range clears stale batch and quantity', async () => {
     ];
     const picker = mountPicker(records, '?waste_record=one');
     try {
-        picker.form.quantity = 5;
+        picker.form.items[0].quantity = 5;
+        picker.toggleRecord('two');
         picker.startDate.value = '2026-03-01';
         await nextTick();
         assert.equal(picker.selectedWasteTypeId.value, '');
-        assert.equal(picker.form.waste_record_id, '');
-        assert.equal(picker.form.quantity, '');
+        assert.deepEqual(picker.form.items, []);
         assert.equal(picker.canSubmit.value, false);
         picker.selectedWasteTypeId.value = 'a';
         assert.deepEqual(picker.filteredRecords.value, [records[1]]);
+        picker.toggleRecord('two');
+        assert.equal(picker.form.items[0].quantity, '');
     } finally {
         picker.stop();
     }
@@ -508,4 +556,92 @@ test('hauling detail timeline uses an encoding-safe separator without mojibake',
         /\{\{ history\.hauling_date \}\}\s*&bull;\s*\{\{ history\.quantity \}\}/,
     );
     assert.doesNotMatch(source, /[\u00c2\u00c3\ufffd]/);
+});
+
+test('record list and detail route through server-selected plan or legacy actual action', () => {
+    for (const name of ['Index', 'Show']) {
+        const source = readFileSync(
+            new URL(
+                `../../resources/js/pages/waste-management/records/${name}.vue`,
+                import.meta.url,
+            ),
+            'utf8',
+        );
+        assert.match(source, /hauling_action/);
+        assert.match(
+            source,
+            /hauling_action\s*===\s*'plan'[\s\S]*?wasteManagementRoutes\s*\.haulingPlans\s*\.index[\s\S]*?wasteManagementRoutes\s*\.haulings\.create/,
+        );
+        assert.doesNotMatch(source, /Ajukan angkut|Ajukan pengangkutan limbah/);
+    }
+});
+
+test('empty plan choices explain date filters and ownership without granting access', () => {
+    const source = readFileSync(
+        new URL(
+            '../../resources/js/pages/waste-management/hauling-plans/Index.vue',
+            import.meta.url,
+        ),
+        'utf8',
+    );
+    assert.match(source, /form\.processing \|\| !wasteTypes\.length/);
+    assert.match(source, /!invalidDateRange && !periodRecords\.length/);
+    assert.match(source, /Kosongkan atau ubah rentang tanggal/);
+    assert.match(source, /Pilihan pengajuan baru hanya berasal dari\s+catatan/);
+    assert.match(
+        source,
+        /rencana koordinator yang sudah\s+disetujui supervisor/,
+    );
+});
+
+test('multi batch retries retain the key only for the identical outgoing payload', () => {
+    const records = [
+        {
+            id: 'one',
+            waste_type_id: 'a',
+            available_quantity: 20,
+            unit: 'kg',
+            waste_type: null,
+        },
+        {
+            id: 'two',
+            waste_type_id: 'a',
+            available_quantity: 5,
+            unit: 'kg',
+            waste_type: null,
+        },
+    ];
+    const picker = mountPicker(records, '?waste_record=one');
+    const lastKey = () =>
+        picker.submissions.at(-1).options.headers['Idempotency-Key'];
+    try {
+        picker.form.items[0].quantity = 1;
+        picker.submit();
+        const original = lastKey();
+        picker.submit();
+        assert.equal(lastKey(), original);
+        for (const edit of [
+            () => (picker.form.items[0].quantity = 2),
+            () => (picker.form.planned_date = '2026-11-20'),
+            () => (picker.form.notes = 'Updated load'),
+            () => {
+                picker.toggleRecord('two');
+                picker.form.items[1].quantity = 1;
+            },
+        ]) {
+            const before = lastKey();
+            edit();
+            picker.submit();
+            assert.notEqual(lastKey(), before);
+            const retryKey = lastKey();
+            picker.submit();
+            assert.equal(lastKey(), retryKey);
+        }
+        const failedKey = lastKey();
+        picker.submissions.at(-1).options.onError();
+        picker.submit();
+        assert.notEqual(lastKey(), failedKey);
+    } finally {
+        picker.stop();
+    }
 });

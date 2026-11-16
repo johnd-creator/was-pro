@@ -795,3 +795,162 @@ test('actual approval alerts remove rejected and cancelled actuals', function (s
     }
     expect(app(\App\Services\OperationalAlerts::class)->summary($this->supervisor, $this->organization, null)['summary']['pending_hauling_approvals_count'])->toBe(0);
 })->with(['rejected', 'cancelled']);
+
+test('multi batch plans reserve explicit per item quantities and replay without duplicate allocations', function () {
+    $second = WasteRecord::factory()->approved()->create(['waste_type_id' => $this->record->waste_type_id, 'quantity' => 25, 'unit' => 'kg', 'created_by' => $this->creator->id]);
+    $payload = ['planned_date' => now()->addDays(2)->toDateString(), 'notes' => 'Muatan terperiksa', 'items' => [
+        ['waste_record_id' => $this->record->id, 'quantity' => '40.25'],
+        ['waste_record_id' => $second->id, 'quantity' => '10.50'],
+    ]];
+    $url = planRoute($this, 'store');
+    $headers = ['Idempotency-Key' => 'multi-plan-create'];
+    $this->post($url, $payload, $headers)->assertRedirect()->assertSessionHas('success');
+    $this->post($url, $payload, $headers)->assertHeader('Idempotency-Replayed', 'true');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(2)->and(WasteHauling::count())->toBe(0)
+        ->and(OperationalAuditLog::where('module', 'waste_hauling_plans')->count())->toBe(2)
+        ->and($this->record->getRemainingQuantity())->toBe(100.0)->and($second->getRemainingQuantity())->toBe(25.0)
+        ->and(app(HaulingPlans::class)->availableFor($this->record))->toBe(59.75)
+        ->and(app(HaulingPlans::class)->availableFor($second))->toBe(14.5);
+    foreach (WasteHaulingPlan::all() as $plan) {
+        expect($plan->status)->toBe('pending_approval')->and($plan->notes)->toBe('Muatan terperiksa');
+    }
+    $payload['items'][1]['quantity'] = '11.00';
+    $this->post($url, $payload, $headers)->assertSessionHas('error');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(2);
+});
+
+test('multi batch failure on a later item rolls back earlier plans and audit entries', function (string $state) {
+    $second = WasteRecord::factory()->approved()->create(['waste_type_id' => $this->record->waste_type_id, 'quantity' => 25, 'unit' => 'kg', 'created_by' => $this->creator->id]);
+    if ($state === 'draft') {
+        $second->update(['status' => 'draft']);
+    }
+    $payload = ['planned_date' => now()->toDateString(), 'items' => [
+        ['waste_record_id' => $this->record->id, 'quantity' => '20.00'],
+        ['waste_record_id' => $second->id, 'quantity' => $state === 'over' ? '25.01' : '1.00'],
+    ]];
+    $this->post(planRoute($this, 'store'), $payload)->assertSessionHasErrors('items.1.quantity');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(0)->and(OperationalAuditLog::where('module', 'waste_hauling_plans')->count())->toBe(0)
+        ->and($this->record->getReservedHaulingQuantity())->toBe(0.0);
+})->with(['over', 'draft']);
+
+test('multi batch validates each amount and duplicate record before any writes', function (string $case) {
+    $item = ['waste_record_id' => $this->record->id, 'quantity' => '1.00'];
+    $payload = ['planned_date' => now()->toDateString(), 'items' => [$item]];
+    $field = 'items.0.quantity';
+    if ($case === 'duplicate') {
+        $payload['items'][] = [...$item, 'waste_record_id' => strtoupper($this->record->id)];
+        $field = 'items.1.waste_record_id';
+    } elseif ($case === 'empty') {
+        $payload['items'] = [];
+        $field = 'items';
+    } elseif ($case === 'invalid-id') {
+        $payload['items'][0]['waste_record_id'] = 'not-an-id';
+        $field = 'items.0.waste_record_id';
+    } elseif ($case === 'mixed-contract') {
+        $payload['waste_record_id'] = $this->record->id;
+        $field = 'waste_record_id';
+    } elseif ($case === 'injected-status') {
+        $payload['items'][0]['status'] = 'approved';
+        $field = 'items.0';
+    } elseif ($case === 'non-list') {
+        $payload['items'] = ['named' => $item];
+        $field = 'items';
+    } elseif ($case === 'limit') {
+        $payload['items'] = array_fill(0, 51, $item);
+        $field = 'items';
+    } else {
+        $payload['items'][0]['quantity'] = $case;
+    }
+    $this->post(planRoute($this, 'store'), $payload)->assertSessionHasErrors($field);
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(0);
+})->with(['0', '-1', '0.001', '10000000000', 'bad', 'duplicate', 'empty', 'invalid-id', 'mixed-contract', 'injected-status', 'non-list', 'limit']);
+
+test('multi batch rejects mixed waste types and does not convert per batch units', function () {
+    $otherType = WasteRecord::factory()->approved()->create(['quantity' => 20, 'unit' => 'kg', 'created_by' => $this->creator->id]);
+    $payload = ['planned_date' => now()->toDateString(), 'items' => [
+        ['waste_record_id' => $this->record->id, 'quantity' => '1.00'],
+        ['waste_record_id' => $otherType->id, 'quantity' => '2.00'],
+    ]];
+    $this->post(planRoute($this, 'store'), $payload)->assertSessionHasErrors('items');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(0);
+    $otherType->update(['waste_type_id' => $this->record->waste_type_id, 'unit' => 'ton']);
+    $this->post(planRoute($this, 'store'), $payload)->assertSessionHas('success');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::where('waste_record_id', $otherType->id)->firstOrFail()->unit)->toBe('ton')
+        ->and(WasteHaulingPlan::where('waste_record_id', $this->record->id)->firstOrFail()->unit)->toBe('kg');
+});
+
+test('multi batch checks ownership of every item before creating any plan', function () {
+    $operator = planOperationalUser($this, 'operator');
+    $own = WasteRecord::factory()->approved()->create(['waste_type_id' => $this->record->waste_type_id, 'quantity' => 20, 'unit' => 'kg', 'created_by' => $operator->id]);
+    $this->actingAs($operator)->post(planRoute($this, 'store'), ['planned_date' => now()->toDateString(), 'items' => [
+        ['waste_record_id' => $own->id, 'quantity' => '1.00'],
+        ['waste_record_id' => $this->record->id, 'quantity' => '1.00'],
+    ]])->assertForbidden();
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(0);
+});
+
+test('multi batch identifiers must all belong to the selected tenant', function () {
+    $foreign = Organization::factory()->create();
+    $this->tenants->createSchema($foreign->schema_name);
+    $this->tenants->runMigrationsForTenant($foreign->schema_name, 'database/migrations/tenant');
+    $this->tenants->switchToSchema($foreign->schema_name);
+    $record = WasteRecord::factory()->approved()->create(['created_by' => $this->creator->id]);
+    $this->post(planRoute($this, 'store'), ['planned_date' => now()->toDateString(), 'items' => [
+        ['waste_record_id' => $this->record->id, 'quantity' => '1.00'],
+        ['waste_record_id' => $record->id, 'quantity' => '1.00'],
+    ]])->assertSessionHasErrors('items.1.waste_record_id');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(0);
+});
+
+test('multi batch replay fails closed when an item owner changes', function () {
+    $payload = ['planned_date' => now()->toDateString(), 'items' => [['waste_record_id' => $this->record->id, 'quantity' => '1.00']]];
+    $headers = ['Idempotency-Key' => 'multi-owner-change'];
+    $this->post(planRoute($this, 'store'), $payload, $headers)->assertSessionHas('success');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    $this->record->update(['created_by' => $this->supervisor->id]);
+    $this->post(planRoute($this, 'store'), $payload, $headers)->assertForbidden();
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(1);
+});
+
+test('multi batch validation failure leaves no replay receipt and corrected retry can use the same key', function () {
+    $second = WasteRecord::factory()->approved()->create(['waste_type_id' => $this->record->waste_type_id, 'quantity' => 25, 'unit' => 'kg', 'created_by' => $this->creator->id]);
+    $payload = ['planned_date' => now()->toDateString(), 'items' => [
+        ['waste_record_id' => $this->record->id, 'quantity' => '20.00'],
+        ['waste_record_id' => $second->id, 'quantity' => '25.01'],
+    ]];
+    $headers = ['Idempotency-Key' => 'multi-corrected-retry'];
+    $url = planRoute($this, 'store');
+    $this->post($url, $payload, $headers)->assertSessionHasErrors('items.1.quantity');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(0)->and(OperationalAuditLog::where('module', 'waste_hauling_plans')->count())->toBe(0)
+        ->and(\Illuminate\Support\Facades\DB::table('operational_requests')->count())->toBe(0);
+    $payload['items'][1]['quantity'] = '25.00';
+    $this->post($url, $payload, $headers)->assertSessionHas('success')->assertHeaderMissing('Idempotency-Replayed');
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(2)->and(\Illuminate\Support\Facades\DB::table('operational_requests')->count())->toBe(1);
+    $this->post($url, $payload, $headers)->assertHeader('Idempotency-Replayed', 'true');
+});
+
+test('parallel multi batch requests cannot overallocate or leave partial plans', function () {
+    $second = WasteRecord::factory()->approved()->create(['waste_type_id' => $this->record->waste_type_id, 'quantity' => 25, 'unit' => 'kg', 'created_by' => $this->creator->id]);
+    \Illuminate\Support\Facades\DB::unprepared('CREATE FUNCTION multi_plan_delay() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.5); RETURN NEW; END $$; CREATE TRIGGER multi_plan_delay BEFORE INSERT ON waste_hauling_plans FOR EACH ROW EXECUTE FUNCTION multi_plan_delay()');
+    $request = ['url' => planRoute($this, 'store'), 'web_actor' => $this->creator->id, 'body' => ['planned_date' => now()->toDateString(), 'items' => [
+        ['waste_record_id' => $this->record->id, 'quantity' => '60.00'],
+        ['waste_record_id' => $second->id, 'quantity' => '15.00'],
+    ]]];
+    $this->tenants->switchToPublic();
+    runPlanWorkers([$request, $request]);
+    $this->tenants->switchToSchema($this->organization->schema_name);
+    expect(WasteHaulingPlan::count())->toBe(2)->and($this->record->getReservedHaulingQuantity())->toBe(60.0)
+        ->and($second->getReservedHaulingQuantity())->toBe(15.0)->and($this->record->getRemainingQuantity())->toBe(100.0)
+        ->and(OperationalAuditLog::where('module', 'waste_hauling_plans')->count())->toBe(2);
+});

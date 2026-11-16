@@ -21,6 +21,7 @@ import {
 import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
+import { getFabaDisplayWarnings } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 import type { FabaYearlyTotals } from '@/types/faba';
@@ -50,9 +51,16 @@ const breadcrumbItems: BreadcrumbItem[] = [
 
 const form = reactive({ ...props.filters });
 
+const displayMonths = computed(() =>
+    props.recap.months.map((month) => ({
+        ...month,
+        warnings: getFabaDisplayWarnings(month.warnings),
+    })),
+);
+
 const warningPeriods = computed(
     () =>
-        props.recap.months.filter((month) => (month.warnings?.length ?? 0) > 0)
+        displayMonths.value.filter((month) => (month.warnings?.length ?? 0) > 0)
             .length,
 );
 
@@ -266,7 +274,7 @@ const { scopedUrl } = useOrganizationContext();
                         </TableHeader>
                         <TableBody>
                             <TableRow
-                                v-for="month in recap.months"
+                                v-for="month in displayMonths"
                                 :key="month.month"
                                 class="border-slate-200/70 dark:border-slate-800/70"
                             >

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { Head, router } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { Plus } from 'lucide-vue-next';
 import { ref } from 'vue';
+import { index as categoriesIndex } from '@/actions/App/Http/Controllers/WasteManagement/MasterData/CategoriesController';
 import TypesController from '@/actions/App/Http/Controllers/WasteManagement/MasterData/TypesController';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,6 +35,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
+import { usePermissions } from '@/composables/usePermissions';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
 import type { BreadcrumbItem } from '@/types';
 
@@ -73,6 +75,7 @@ type Props = {
 };
 
 const props = defineProps<Props>();
+const { hasPermission } = usePermissions();
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
@@ -220,6 +223,16 @@ const { scopedUrl } = useOrganizationContext();
                             >
                                 Tambah jenis limbah
                                 <Plus class="h-4 w-4" />
+                            </Button>
+                            <Button
+                                v-if="hasPermission('waste_categories.view')"
+                                as-child
+                                variant="outline"
+                                class="w-full"
+                            >
+                                <Link :href="scopedUrl(categoriesIndex())">
+                                    Kelola kategori jenis limbah
+                                </Link>
                             </Button>
                             <div
                                 class="wm-surface-subtle rounded-[22px] p-4 text-sm leading-6 text-slate-600 dark:text-slate-300"

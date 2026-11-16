@@ -112,8 +112,9 @@ class WasteRecordsController extends Controller
         $page = $paginated ? $query->paginate(10)->withQueryString() : null;
         $records = $page?->getCollection() ?? $query->get();
         $allocation = app(\App\Services\HaulingPlans::class)->summaries($records);
+        $haulingActions = $this->haulingActions();
         $records = $records->map(fn (WasteRecord $record): array => [
-            ...$this->serializeWasteRecord($record, false, $allocation[(string) $record->id]),
+            ...$this->serializeWasteRecord($record, false, $allocation[(string) $record->id], $haulingActions),
             'storage_alert' => $alerts->storageAlert($record, $snapshot),
         ])->values();
         $page?->setCollection($records);
@@ -613,8 +614,30 @@ class WasteRecordsController extends Controller
     /**
      * @return array<string, mixed>
      */
-    protected function serializeWasteRecord(WasteRecord $record, bool $includeHistory = false, ?array $allocation = null): array
+    private function haulingActions(): array
     {
+        $user = Auth::user();
+        $actions = ['plan' => false, 'actual' => false, 'all' => false];
+        if (! $user) {
+            return $actions;
+        }
+
+        if (app(\App\Services\HaulingPlans::class)->enabled()) {
+            foreach (['waste_hauling.view_all', 'waste_hauling.view_own', 'waste_hauling.approve', 'waste_hauling.reject'] as $permission) {
+                if ($user->hasPermission($permission)) {
+                    return [...$actions, 'plan' => true];
+                }
+            }
+
+            return $actions;
+        }
+
+        return [...$actions, 'actual' => $user->hasPermission('waste_hauling.create'), 'all' => $user->hasPermission('waste_hauling.view_all')];
+    }
+
+    protected function serializeWasteRecord(WasteRecord $record, bool $includeHistory = false, ?array $allocation = null, ?array $haulingActions = null): array
+    {
+        $haulingActions ??= $this->haulingActions();
         $payload = [
             'id' => $record->id,
             'record_number' => $record->record_number,
@@ -625,6 +648,7 @@ class WasteRecordsController extends Controller
             'unit' => $record->unit,
             'source' => $record->source,
             'source_id' => $record->source_id,
+            'hauling_action' => $haulingActions['plan'] ? 'plan' : ($haulingActions['actual'] && ($haulingActions['all'] || $record->created_by === Auth::id()) ? 'actual' : null),
             'source_name' => $record->source_name,
             'description' => $record->description,
             'notes' => $record->notes,

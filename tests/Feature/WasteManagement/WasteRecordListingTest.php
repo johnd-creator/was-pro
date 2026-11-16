@@ -263,3 +263,51 @@ test('legacy and paginated record contracts keep identical attention and owner b
             ->assertJsonPath('props.filters.attention', 'expired')->assertJsonPath('props.recordSummary.total', 2);
     }
 });
+
+test('record hauling links lead operators and coordinators through plans without expanding write access', function () {
+    config(['hauling-plans.enabled' => true]);
+    $foreign = listingRecord($this);
+    $this->tenants->switchToPublic();
+    $operator = User::factory()->create(['organization_id' => $this->organization->id, 'role_id' => Role::where('slug', 'operator')->value('id'), 'is_super_admin' => false, 'email_verified_at' => now()]);
+    $coordinator = User::factory()->create(['organization_id' => $this->organization->id, 'role_id' => Role::where('slug', 'coordinator')->value('id'), 'is_super_admin' => false, 'email_verified_at' => now()]);
+    $params = ['organization_id' => $this->organization->id];
+    $this->actingAs($operator)->get(listingUrl($this))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('wasteRecords.data.0.hauling_action', 'plan'));
+    $this->get(route('waste-management.records.show', [$foreign->id, ...$params]))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('wasteRecord.hauling_action', 'plan'));
+    $this->get(route('waste-management.hauling-plans.index', [...$params, 'waste_record' => $foreign->id]))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->has('records', 0));
+    $this->get(route('waste-management.haulings.create', [...$params, 'waste_record' => $foreign->id]))->assertForbidden();
+    $this->actingAs($coordinator)->get(route('waste-management.hauling-plans.index', [...$params, 'waste_record' => $foreign->id]))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->has('records', 1)->where('records.0.id', $foreign->id));
+});
+
+test('legacy record hauling action requires create permission and existing record ownership scope', function () {
+    config(['hauling-plans.enabled' => false]);
+    $record = listingRecord($this);
+    $this->get(listingUrl($this))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->where('wasteRecords.data.0.hauling_action', null));
+    $this->role->permissions()->attach(Permission::where('slug', 'waste_hauling.create')->value('id'));
+    $this->user->unsetRelation('role');
+    $this->get(listingUrl($this))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->where('wasteRecords.data.0.hauling_action', 'actual'));
+    $this->tenants->switchToPublic();
+    $operator = User::factory()->create(['organization_id' => $this->organization->id, 'role_id' => Role::where('slug', 'operator')->value('id'), 'is_super_admin' => false, 'email_verified_at' => now()]);
+    $this->actingAs($operator)->get(listingUrl($this))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->where('wasteRecords.data.0.hauling_action', null));
+    $this->get(route('waste-management.haulings.create', ['organization_id' => $this->organization->id, 'waste_record' => $record->id]))->assertForbidden();
+});
+
+test('hauling action permission queries do not grow with the number of listed records', function () {
+    config(['hauling-plans.enabled' => true]);
+    listingRecord($this);
+    $permissionQueries = [];
+    \Illuminate\Support\Facades\DB::listen(function ($query) use (&$permissionQueries): void {
+        if (str_contains($query->sql, '"permissions"')) {
+            $permissionQueries[] = $query->sql;
+        }
+    });
+    $this->get(listingUrl($this))->assertOk();
+    $singleCount = count($permissionQueries);
+    for ($i = 0; $i < 9; $i++) {
+        listingRecord($this);
+    }
+    $permissionQueries = [];
+    $this->get(listingUrl($this))->assertOk();
+    expect(count($permissionQueries))->toBe($singleCount);
+});

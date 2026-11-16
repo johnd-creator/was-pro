@@ -13,6 +13,7 @@ import {
     Users,
 } from 'lucide-vue-next';
 import { index as fabaMastersIndex } from '@/actions/App/Http/Controllers/WasteManagement/MasterData/FabaMastersController';
+import { index as sourcesIndex } from '@/actions/App/Http/Controllers/WasteManagement/MasterData/SourcesController';
 import { index as auditIndex } from '@/actions/App/Http/Controllers/WasteManagement/OperationalAuditController';
 import { index as haulingPlansIndex } from '@/actions/App/Http/Controllers/WasteManagement/WasteHaulingPlansController';
 import { dashboard as dashboardRoute, guide } from '@/routes';
@@ -164,13 +165,7 @@ export const appNavigationItems: NavItem[] = [
             },
             {
                 title: 'Sumber Limbah',
-                href: '/waste-management/master-data/sources',
-                icon: Tag,
-                permission: 'waste_categories.view',
-            },
-            {
-                title: 'Kategori Limbah',
-                href: wasteManagementRoutes.masterData.categories.index.url(),
+                href: sourcesIndex.url(),
                 icon: Tag,
                 permission: 'waste_categories.view',
             },

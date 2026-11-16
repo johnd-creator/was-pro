@@ -47,6 +47,7 @@ interface WasteRecord {
     operational_status_label: string;
     approved_hauled_quantity: number;
     remaining_quantity: number;
+    hauling_action?: 'plan' | 'actual' | null;
     has_simulated_hauling: boolean;
     reserved_quantity: number;
     rejection_reason: string | null;
@@ -766,7 +767,8 @@ const { scopedUrl } = useOrganizationContext();
                                 <div
                                     v-if="
                                         wasteRecord.status === 'approved' &&
-                                        wasteRecord.remaining_quantity > 0
+                                        wasteRecord.remaining_quantity > 0 &&
+                                        wasteRecord.hauling_action
                                     "
                                     class="sm:col-span-2"
                                 >
@@ -777,17 +779,26 @@ const { scopedUrl } = useOrganizationContext();
                                     >
                                         <Link
                                             :href="
-                                                wasteManagementRoutes.haulings.create.url(
-                                                    {
-                                                        query: {
-                                                            waste_record:
-                                                                wasteRecord.id,
-                                                        },
+                                                (wasteRecord.hauling_action ===
+                                                'plan'
+                                                    ? wasteManagementRoutes
+                                                          .haulingPlans.index
+                                                    : wasteManagementRoutes
+                                                          .haulings.create
+                                                ).url({
+                                                    query: {
+                                                        waste_record:
+                                                            wasteRecord.id,
                                                     },
-                                                )
+                                                })
                                             "
                                         >
-                                            Ajukan pengangkutan limbah
+                                            {{
+                                                wasteRecord.hauling_action ===
+                                                'plan'
+                                                    ? 'Rencana angkut'
+                                                    : 'Catat pengangkutan'
+                                            }}
                                         </Link>
                                     </Button>
                                 </div>

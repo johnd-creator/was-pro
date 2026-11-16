@@ -8,8 +8,11 @@ use App\Models\User;
 use App\Models\WasteCategory;
 use App\Models\WasteCharacteristic;
 use App\Models\WasteRecord;
+use App\Models\WasteSource;
 use App\Models\WasteType;
 use App\Services\TenantService;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 beforeEach(function () {
     $this->tenantService = app(TenantService::class);
@@ -233,4 +236,164 @@ test('operator cannot approve waste record via api', function () {
 
     $response->assertForbidden()
         ->assertJsonPath('error_code', 'FORBIDDEN');
+});
+test('api creates and returns a structured source without replacing historical text', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    $source = WasteSource::query()->create(['name' => 'Pemeliharaan', 'is_active' => true]);
+    $this->tenantService->switchToPublic();
+
+    $response = $this->withToken($this->operatorToken)->postJson('/api/v1/waste-records', [
+        'date' => now()->toDateString(),
+        'waste_type_id' => $this->wasteType->id,
+        'quantity' => 25.5,
+        'unit' => 'kg',
+        'source_id' => $source->id,
+        'source' => 'Historis gudang',
+        'description' => 'Catatan asli',
+    ])->assertCreated();
+
+    $recordId = $response->json('data.id');
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    $record = WasteRecord::query()->findOrFail($recordId);
+    expect($record->source_id)->toBe($source->id)
+        ->and($record->source)->toBe('Historis gudang')
+        ->and($record->description)->toBe('Catatan asli')
+        ->and($record->waste_type_id)->toBe($this->wasteType->id);
+
+    $response->assertJsonPath('data.source_id', $source->id);
+    $this->withToken($this->operatorToken)->getJson('/api/v1/waste-records/'.$recordId)
+        ->assertSuccessful()->assertJsonPath('data.source_id', $source->id);
+    $this->withToken($this->operatorToken)->getJson('/api/v1/waste-records')
+        ->assertSuccessful()->assertJsonPath('data.0.source_id', $source->id);
+});
+
+test('api preserves omitted source fields and supports reassignment and explicit clearing', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    $original = WasteSource::query()->create(['name' => 'Operasi', 'is_active' => true]);
+    $replacement = WasteSource::query()->create(['name' => 'Laboratorium', 'is_active' => true]);
+    $record = WasteRecord::factory()->draft()->create([
+        'waste_type_id' => $this->wasteType->id,
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+        'source_id' => $original->id,
+        'source' => 'Teks sumber historis',
+        'description' => 'Deskripsi historis',
+    ]);
+    $this->tenantService->switchToPublic();
+    $payload = [
+        'date' => $record->date->toDateString(),
+        'waste_type_id' => $record->waste_type_id,
+        'quantity' => $record->quantity,
+        'unit' => $record->unit,
+    ];
+
+    foreach ([[], ['source_id' => $replacement->id], ['source_id' => null]] as $change) {
+        $expectedSource = array_key_exists('source_id', $change) ? $change['source_id'] : $original->id;
+        $response = $this->withToken($this->operatorToken)
+            ->putJson('/api/v1/waste-records/'.$record->id, [...$payload, ...$change])
+            ->assertSuccessful();
+
+        $this->tenantService->switchToSchema($this->organization->schema_name);
+        expect($record->fresh()->source_id)->toBe($expectedSource)
+            ->and($record->fresh()->source)->toBe('Teks sumber historis')
+            ->and($record->fresh()->description)->toBe('Deskripsi historis');
+        $response->assertJsonPath('data.source_id', $expectedSource);
+    }
+
+    $this->withToken($this->operatorToken)->putJson('/api/v1/waste-records/'.$record->id, [
+        ...$payload, 'source' => null, 'description' => null,
+    ])->assertSuccessful();
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    expect($record->fresh()->source)->toBeNull()->and($record->fresh()->description)->toBeNull();
+});
+
+test('api rejects unavailable sources on create and update without changing the record', function (string $kind) {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    $original = WasteSource::query()->create(['name' => 'Sumber awal', 'is_active' => true]);
+    $record = WasteRecord::factory()->draft()->create([
+        'waste_type_id' => $this->wasteType->id,
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+        'source_id' => $original->id,
+        'source' => 'Historis',
+    ]);
+
+    if ($kind === 'foreign') {
+        $other = Organization::factory()->create();
+        $this->tenantService->createSchema($other->schema_name);
+        $this->tenantService->runMigrationsForTenant($other->schema_name, 'database/migrations/tenant');
+        $this->tenantService->switchToSchema($other->schema_name);
+    }
+
+    $candidate = WasteSource::query()->create(['name' => 'Sumber ditolak', 'is_active' => $kind !== 'inactive']);
+    if ($kind === 'deleted') {
+        $candidate->delete();
+    }
+    $sourceId = match ($kind) {
+        'missing' => (string) Str::uuid(),
+        'malformed' => 'not-a-uuid',
+        default => $candidate->id,
+    };
+    $this->tenantService->switchToPublic();
+    $payload = [
+        'date' => $record->date->toDateString(),
+        'waste_type_id' => $record->waste_type_id,
+        'quantity' => $record->quantity,
+        'unit' => $record->unit,
+        'source_id' => $sourceId,
+    ];
+
+    $this->withToken($this->operatorToken)->postJson('/api/v1/waste-records', $payload)
+        ->assertUnprocessable()->assertJsonValidationErrors('source_id');
+    $this->withToken($this->operatorToken)->putJson('/api/v1/waste-records/'.$record->id, $payload)
+        ->assertUnprocessable()->assertJsonValidationErrors('source_id');
+
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    expect(WasteRecord::query()->count())->toBe(1)
+        ->and($record->fresh()->source_id)->toBe($original->id)
+        ->and($record->fresh()->source)->toBe('Historis');
+})->with(['inactive', 'deleted', 'foreign', 'missing', 'malformed']);
+
+test('api can retain an existing inactive source', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    $source = WasteSource::query()->create(['name' => 'Historis nonaktif', 'is_active' => false]);
+    $record = WasteRecord::factory()->draft()->create([
+        'waste_type_id' => $this->wasteType->id,
+        'created_by' => $this->operator->id,
+        'updated_by' => $this->operator->id,
+        'source_id' => $source->id,
+    ]);
+    $this->tenantService->switchToPublic();
+
+    $this->withToken($this->operatorToken)->putJson('/api/v1/waste-records/'.$record->id, [
+        'date' => $record->date->toDateString(),
+        'waste_type_id' => $record->waste_type_id,
+        'quantity' => $record->quantity,
+        'unit' => $record->unit,
+        'source_id' => $source->id,
+    ])->assertSuccessful()->assertJsonPath('data.source_id', $source->id);
+});
+
+test('api remains compatible with tenants without the structured source migration', function () {
+    $this->tenantService->switchToSchema($this->organization->schema_name);
+    Schema::table('waste_records', fn ($table) => $table->dropConstrainedForeignId('source_id'));
+    Schema::drop('waste_sources');
+    $this->tenantService->switchToPublic();
+    $payload = [
+        'date' => now()->toDateString(),
+        'waste_type_id' => $this->wasteType->id,
+        'quantity' => 10,
+        'unit' => 'kg',
+        'source_id' => '',
+        'source' => 'Sumber lama',
+    ];
+
+    $response = $this->withToken($this->operatorToken)->postJson('/api/v1/waste-records', $payload)
+        ->assertCreated()->assertJsonPath('data.source', 'Sumber lama');
+    $id = $response->json('data.id');
+    unset($payload['source']);
+    $this->withToken($this->operatorToken)->putJson('/api/v1/waste-records/'.$id, $payload)
+        ->assertSuccessful()->assertJsonPath('data.source', 'Sumber lama');
+    $this->withToken($this->operatorToken)->getJson('/api/v1/waste-records/'.$id)->assertSuccessful();
+    $this->withToken($this->operatorToken)->getJson('/api/v1/waste-records')->assertSuccessful();
 });

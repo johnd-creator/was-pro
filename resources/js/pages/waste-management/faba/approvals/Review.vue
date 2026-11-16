@@ -8,6 +8,7 @@ import {
     ShieldCheck,
     ShieldX,
 } from 'lucide-vue-next';
+import { computed } from 'vue';
 import Link from '@/components/OrganizationLink.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +22,7 @@ import {
     formatFabaMaterial,
     formatFabaMovementType,
     formatFabaStatus,
+    getFabaDisplayWarnings,
 } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
@@ -60,6 +62,10 @@ const props = defineProps<{
     movements: FabaMovement[];
     auditLogs: FabaAuditLog[];
 }>();
+
+const visibleWarnings = computed(() =>
+    getFabaDisplayWarnings(props.recap.warnings),
+);
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
@@ -327,8 +333,8 @@ const { scopedUrl } = useOrganizationContext();
                                     class="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300"
                                 >
                                     {{
-                                        recap.warnings.length > 0
-                                            ? `${recap.warnings.length} warning aktif perlu diperiksa sebelum keputusan final.`
+                                        visibleWarnings.length > 0
+                                            ? `${visibleWarnings.length} warning aktif perlu diperiksa sebelum keputusan final.`
                                             : 'Tidak ada warning aktif pada periode ini.'
                                     }}
                                 </p>
@@ -519,7 +525,7 @@ const { scopedUrl } = useOrganizationContext();
                         </Card>
 
                         <Card
-                            v-if="recap.warnings.length > 0"
+                            v-if="visibleWarnings.length > 0"
                             class="rounded-[28px] border-amber-200/80 bg-white/90 shadow-[0_22px_45px_-32px_rgba(15,23,42,0.28)] dark:bg-slate-950/85"
                         >
                             <CardHeader>
@@ -527,7 +533,7 @@ const { scopedUrl } = useOrganizationContext();
                             </CardHeader>
                             <CardContent class="space-y-3">
                                 <div
-                                    v-for="warning in recap.warnings"
+                                    v-for="warning in visibleWarnings"
                                     :key="warning.code"
                                     class="flex gap-3 rounded-[18px] border border-amber-200/70 bg-amber-50/80 px-4 py-3"
                                 >

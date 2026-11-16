@@ -16,6 +16,7 @@ use Maatwebsite\Excel\Events\AfterSheet;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\Response;
 
 class WasteReportService
@@ -250,12 +251,16 @@ class WasteReportService
 
     public function downloadPdf(string $kind, User $user, array $filters): Response
     {
-        $report = $kind === 'storage' ? $this->storageReport($user, $filters) : $this->annualReport($user, $filters);
+        if ($kind === 'storage') {
+            return $this->downloadStoragePdf($this->storageReport($user, $filters), $filters);
+        }
 
-        $rowCount = $kind === 'storage' ? count($report['entries']) : count($report['annual_rows']) * 3;
+        $report = $this->annualReport($user, $filters);
+
+        $rowCount = count($report['annual_rows']) * 3;
         if ($rowCount > 150) {
             throw ValidationException::withMessages([
-                'export' => 'PDF dibatasi 150 baris agar tetap dapat diproses. Gunakan Excel untuk laporan lengkap atau pilih periode yang lebih pendek untuk lembar penyimpanan.',
+                'export' => 'PDF neraca tahunan dibatasi 150 baris agar tetap dapat diproses. Gunakan Excel untuk laporan lengkap.',
             ]);
         }
 
@@ -267,6 +272,49 @@ class WasteReportService
         $canvas->page_text($canvas->get_width() - 130, $canvas->get_height() - 14, 'Halaman {PAGE_NUM} / {PAGE_COUNT}', $font, 7);
 
         return $pdf->download($this->fileName($kind, $filters).'.pdf');
+    }
+
+    /**
+     * Keep only a small HTML layout tree in memory while appending to one PDF.
+     * The shared canvas belongs to an empty document, not a retained chunk tree.
+     */
+    private function downloadStoragePdf(array $report, array $filters): Response
+    {
+        $document = app('dompdf')->setPaper('a4', 'landscape');
+        $canvas = $document->getCanvas();
+        $entries = $report['entries'];
+        $rowCount = count($entries);
+        $chunkSize = 20;
+
+        for ($offset = 0; $offset < max(1, $rowCount); $offset += $chunkSize) {
+            if ($offset > 0) {
+                $canvas->new_page();
+            }
+
+            $renderer = app('dompdf');
+            $renderer->setCanvas($canvas);
+            $renderer->getFontMetrics()->setCanvas($canvas);
+            $renderer->loadHtml(view('waste.reports.storage', [
+                'report' => [...$report, 'entries' => array_slice($entries, $offset, $chunkSize)],
+                'format' => 'pdf',
+                'rowOffset' => $offset,
+                'includeSignatures' => $offset + $chunkSize >= $rowCount,
+            ])->render());
+            $renderer->render();
+            unset($renderer);
+            gc_collect_cycles();
+        }
+
+        $font = $document->getFontMetrics()->getFont('DejaVu Sans');
+        $canvas->page_text($canvas->get_width() - 130, $canvas->get_height() - 14, 'Halaman {PAGE_NUM} / {PAGE_COUNT}', $font, 7);
+        $output = $canvas->output();
+        $filename = $this->fileName('storage', $filters).'.pdf';
+
+        return new Response($output, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => HeaderUtils::makeDisposition('attachment', $filename),
+            'Content-Length' => strlen($output),
+        ]);
     }
 
     private function displayUnit(string $unit): array

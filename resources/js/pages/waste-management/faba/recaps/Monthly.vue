@@ -31,6 +31,7 @@ import {
     formatFabaMaterial,
     formatFabaMovementType,
     formatFabaStatus,
+    getFabaDisplayWarnings,
 } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
@@ -91,6 +92,10 @@ const breadcrumbItems: BreadcrumbItem[] = [
 const form = reactive({
     selectedPeriod: `${props.filters.year}-${String(props.filters.month).padStart(2, '0')}`,
 });
+
+const visibleWarnings = computed(() =>
+    getFabaDisplayWarnings(props.detail.recap.warnings),
+);
 
 const hasEntries = computed(() => props.detail.movements.length > 0);
 
@@ -215,7 +220,7 @@ const { scopedUrl } = useOrganizationContext();
                                 <div
                                     class="wm-chip-blue px-3 py-1.5 text-xs font-medium"
                                 >
-                                    Warning: {{ detail.recap.warnings.length }}
+                                    Warning: {{ visibleWarnings.length }}
                                 </div>
                                 <div
                                     class="wm-chip-emerald px-3 py-1.5 text-xs font-medium"
@@ -387,15 +392,12 @@ const { scopedUrl } = useOrganizationContext();
                     </AlertDescription>
                 </Alert>
 
-                <Alert
-                    v-if="detail.recap.warnings.length > 0"
-                    variant="destructive"
-                >
+                <Alert v-if="visibleWarnings.length > 0" variant="destructive">
                     <AlertTitle>Peringatan rekap</AlertTitle>
                     <AlertDescription>
                         <ul class="space-y-1">
                             <li
-                                v-for="warning in detail.recap.warnings"
+                                v-for="warning in visibleWarnings"
                                 :key="warning.code"
                             >
                                 {{ warning.message }}

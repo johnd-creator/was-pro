@@ -15,6 +15,7 @@ import {
     formatFabaMaterial,
     formatFabaMovementType,
     formatFabaStatus,
+    getFabaDisplayWarnings,
 } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
@@ -49,6 +50,7 @@ const props = defineProps<{
     }>;
     readyClosingPeriods: FabaVerificationQueueItem[];
     warnings: Array<{
+        code: string;
         month: number;
         period_label: string;
         message: string;
@@ -88,6 +90,15 @@ const breadcrumbItems: BreadcrumbItem[] = [
 ];
 const latestOperationalMovements = computed(() =>
     props.latestMovements.slice(0, 6),
+);
+const visibleWarnings = computed(() => getFabaDisplayWarnings(props.warnings));
+const displayClosingPeriods = computed(() =>
+    props.readyClosingPeriods.map((item) => ({
+        ...item,
+        warning_count: visibleWarnings.value.filter(
+            (warning) => warning.month === item.month,
+        ).length,
+    })),
 );
 const trendRows = computed(() =>
     props.trend.map((item) => ({
@@ -352,16 +363,16 @@ const { scopedUrl } = useOrganizationContext();
                 </div>
             </section>
             <div
-                v-if="warnings.length || stats.negative_periods"
+                v-if="visibleWarnings.length || stats.negative_periods"
                 role="alert"
                 class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
             >
                 <p v-if="stats.negative_periods" class="font-semibold">
                     {{ stats.negative_periods }} periode memiliki saldo negatif.
                 </p>
-                <ul v-if="warnings.length" class="space-y-1">
+                <ul v-if="visibleWarnings.length" class="space-y-1">
                     <li
-                        v-for="item in warnings"
+                        v-for="item in visibleWarnings"
                         :key="`${item.month}-${item.message}`"
                     >
                         <strong>{{ item.period_label }}:</strong>
@@ -637,7 +648,7 @@ const { scopedUrl } = useOrganizationContext();
                             </div>
                             <div v-else class="space-y-3">
                                 <Link
-                                    v-for="item in readyClosingPeriods"
+                                    v-for="item in displayClosingPeriods"
                                     :key="`${item.year}-${item.month}`"
                                     :href="
                                         wasteManagementRoutes.faba.approvals.index.url(

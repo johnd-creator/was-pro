@@ -126,6 +126,12 @@ class OperationalIdempotency
             $owners['body_parent'] = \App\Models\WasteRecord::query()->find($request->input('waste_record_id'))?->only(['id', 'created_by']);
         }
 
+        if ($request->route()?->getName() === 'waste-management.hauling-plans.store' && is_array($request->input('items'))) {
+            $ids = collect(array_slice($request->input('items'), 0, 50))->pluck('waste_record_id')
+                ->filter(fn ($id) => is_string($id) && \Illuminate\Support\Str::isUuid($id))->map(fn ($id) => strtolower($id))->unique()->sort()->values();
+            $owners['body_parents'] = \App\Models\WasteRecord::query()->whereIn('id', $ids)->orderBy('id')->get(['id', 'created_by'])->toArray();
+        }
+
         return hash('sha256', json_encode([$actor->only(['id', 'organization_id', 'role_id', 'is_super_admin']), $actor->role?->getAttributes(), $permissions, $owners], JSON_THROW_ON_ERROR));
     }
 }

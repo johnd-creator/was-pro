@@ -114,3 +114,19 @@ test('hauling and vendor headers are compact while operational records remain av
     assert.match(vendors, /props.vendors.length/);
     assert.match(vendors, /openCreateDialog/);
 });
+
+test('master navigation keeps real sources and category classification separate', () => {
+    const nav = readFileSync(
+        new URL('../../resources/js/lib/app-navigation.ts', import.meta.url),
+        'utf8',
+    );
+    assert.equal(nav.split("title: 'Sumber Limbah'").length - 1, 1);
+    assert.ok(nav.includes('href: sourcesIndex.url()'));
+    assert.ok(!nav.includes("title: 'Kategori Limbah'"));
+    const types = source('master-data/Types.vue');
+    assert.ok(types.includes("hasPermission('waste_categories.view')"));
+    assert.ok(types.includes('scopedUrl(categoriesIndex())'));
+    assert.ok(types.includes('Kelola kategori jenis limbah'));
+    assert.ok(source('master-data/Sources.vue').includes('scopedUrl'));
+    assert.ok(source('records/Create.vue').includes('source_id'));
+});

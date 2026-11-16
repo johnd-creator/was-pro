@@ -80,6 +80,7 @@ interface WasteRecord {
     status: 'draft' | 'pending_review' | 'approved' | 'rejected';
     approved_hauled_quantity: number;
     remaining_quantity: number;
+    hauling_action?: 'plan' | 'actual' | null;
     has_simulated_hauling: boolean;
     reserved_quantity: number;
     operational_status: 'not_hauled' | 'partially_hauled' | 'completed';
@@ -831,7 +832,8 @@ function handleCreateSuccess(): void {
                                         <Button
                                             v-if="
                                                 record.status === 'approved' &&
-                                                record.remaining_quantity > 0
+                                                record.remaining_quantity > 0 &&
+                                                record.hauling_action
                                             "
                                             variant="ghost"
                                             size="sm"
@@ -839,17 +841,27 @@ function handleCreateSuccess(): void {
                                         >
                                             <Link
                                                 :href="
-                                                    wasteManagementRoutes.haulings.create.url(
-                                                        {
-                                                            query: {
-                                                                waste_record:
-                                                                    record.id,
-                                                            },
+                                                    (record.hauling_action ===
+                                                    'plan'
+                                                        ? wasteManagementRoutes
+                                                              .haulingPlans
+                                                              .index
+                                                        : wasteManagementRoutes
+                                                              .haulings.create
+                                                    ).url({
+                                                        query: {
+                                                            waste_record:
+                                                                record.id,
                                                         },
-                                                    )
+                                                    })
                                                 "
                                             >
-                                                Ajukan angkut
+                                                {{
+                                                    record.hauling_action ===
+                                                    'plan'
+                                                        ? 'Rencana angkut'
+                                                        : 'Catat pengangkutan'
+                                                }}
                                             </Link>
                                         </Button>
                                     </TableCell>

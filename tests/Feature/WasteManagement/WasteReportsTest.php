@@ -41,6 +41,44 @@ function b3ReportUrl(string $name = 'index', array $filters = []): string
 }
 
 /**
+ * Read the unencrypted page streams emitted by the installed CPDF backend.
+ * Assertions inspect the actual UTF-16 text commands, not the HTML input.
+ */
+function b3PdfPages(string $pdf): array
+{
+    preg_match_all('/(\d+) 0 obj(.*?)endobj/s', $pdf, $objects, PREG_SET_ORDER);
+    $streams = [];
+    foreach ($objects as $object) {
+        if (preg_match('/stream\r?\n/', $object[2], $start, PREG_OFFSET_CAPTURE)) {
+            $dictionary = substr($object[2], 0, $start[0][1]);
+            preg_match('/\/Length\s+(\d+)/', $dictionary, $length);
+            $stream = substr($object[2], $start[0][1] + strlen($start[0][0]), (int) $length[1]);
+            $streams[$object[1]] = str_contains($dictionary, '/FlateDecode') ? gzuncompress($stream) : $stream;
+        }
+    }
+    preg_match_all('/\/Type\s*\/Page\b[^>]*\/Contents\s+(\d+)\s+0\s+R/', $pdf, $pages);
+
+    return array_map(fn (string $id): string => $streams[$id], $pages[1]);
+}
+
+function assertB3PdfRows(string $pdf, int $rowCount): array
+{
+    $pages = b3PdfPages($pdf);
+    expect($pages)->not->toBeEmpty();
+    $text = implode('\n', $pages);
+    for ($index = 1; $index <= $rowCount; $index++) {
+        expect(substr_count($text, mb_convert_encoding(sprintf('SRC%04d', $index), 'UTF-16BE')))->toBe(1);
+    }
+    foreach ($pages as $index => $page) {
+        expect($page)->toContain(mb_convert_encoding('Halaman '.($index + 1).' / '.count($pages), 'UTF-16BE'));
+    }
+    expect(substr_count($text, mb_convert_encoding('Manager Operasi', 'UTF-16BE')))->toBe(1)
+        ->and($pages[array_key_last($pages)])->toContain(mb_convert_encoding('Manager Operasi', 'UTF-16BE'));
+
+    return $pages;
+}
+
+/**
  * Run memory bounds in a fresh PHP process, not after the suite's retained caches.
  * Use the supported Pest CLI because runtime fluent calls cannot enable isolation.
  */
@@ -192,8 +230,8 @@ test('operator can export storage reports and cannot switch tenant', function ()
     }
 });
 
-test('large PDF export returns actionable validation rather than rendering an unbounded table', function () {
-    if (runB3ReportMemoryTestInFreshProcess('large PDF export returns actionable validation rather than rendering an unbounded table')) {
+test('storage PDF exports all 1001 rows in bounded chunks under 128 megabytes', function () {
+    if (runB3ReportMemoryTestInFreshProcess('storage PDF exports all 1001 rows in bounded chunks under 128 megabytes')) {
         return;
     }
 
@@ -201,16 +239,48 @@ test('large PDF export returns actionable validation rather than rendering an un
     ini_set('memory_limit', '128M');
     try {
         expect(ini_get('memory_limit'))->toBe('128M');
-        WasteRecord::factory()->approved()->count(151)->create(['waste_type_id' => \App\Models\WasteType::factory()->create()->id, 'created_by' => $this->admin->id, 'date' => '2026-10-01']);
-        $this->from(b3ReportUrl())->get(b3ReportUrl('storage.pdf'))->assertRedirect(b3ReportUrl())->assertSessionHasErrors('export');
+        config(['waste-reports.pln_organization_ids' => [$this->organization->id]]);
+        WasteRecord::factory()->approved()->count(1001)->sequence(fn ($sequence) => ['source' => sprintf('SRC%04d', $sequence->index + 1)])->create(['waste_type_id' => \App\Models\WasteType::factory()->create()->id, 'created_by' => $this->admin->id, 'date' => '2026-10-01', 'unit' => 'kg']);
+        $response = $this->get(b3ReportUrl('storage.pdf'))->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        expect($response->getContent())->toStartWith('%PDF-');
+        assertB3PdfRows($response->getContent(), 1001);
+        if (getenv('WASPRO_REPORT_VISUAL_QA') === 'true') {
+            file_put_contents(storage_path('bounded-storage-1001.pdf'), $response->getContent());
+            file_put_contents(storage_path('bounded-storage-1001-memory.json'), json_encode([
+                'peak_bytes' => memory_get_peak_usage(true), 'limit' => ini_get('memory_limit'),
+            ]));
+        }
         $this->get(b3ReportUrl('storage.xlsx'))->assertOk();
     } finally {
         ini_set('memory_limit', $previousLimit);
     }
 });
 
-test('storage PDF renders at the row limit under 128 megabytes', function () {
-    if (runB3ReportMemoryTestInFreshProcess('storage PDF renders at the row limit under 128 megabytes')) {
+test('storage PDF preserves empty and exact chunk boundary reports', function (int $rows) {
+    if ($rows > 0) {
+        WasteRecord::factory()->approved()->count($rows)
+            ->sequence(fn ($sequence) => ['source' => sprintf('SRC%04d', $sequence->index + 1).($rows === 21 ? ' '.str_repeat('sumber terverifikasi ', 8) : '')])
+            ->create([
+                'waste_type_id' => \App\Models\WasteType::factory()->create()->id,
+                'created_by' => $this->admin->id, 'date' => '2026-10-01', 'unit' => 'kg',
+            ]);
+    }
+    $response = $this->get(b3ReportUrl('storage.pdf'))->assertOk()->assertHeader('Content-Type', 'application/pdf');
+    $pages = assertB3PdfRows($response->getContent(), $rows);
+    if ($rows === 0) {
+        expect(implode('\n', $pages))->toContain(mb_convert_encoding('Tidak ada catatan', 'UTF-16BE'));
+    }
+})->with([0, 20, 21]);
+
+test('annual PDF retains its separate memory guard', function () {
+    $this->partialMock(WasteReportService::class, function ($mock): void {
+        $mock->shouldReceive('annualReport')->once()->andReturn(['annual_rows' => array_fill(0, 51, [])]);
+    });
+    $this->from(b3ReportUrl())->get(b3ReportUrl('balance.pdf'))->assertRedirect(b3ReportUrl())->assertSessionHasErrors('export');
+});
+
+test('storage PDF still renders 150 rows under 128 megabytes', function () {
+    if (runB3ReportMemoryTestInFreshProcess('storage PDF still renders 150 rows under 128 megabytes')) {
         return;
     }
 

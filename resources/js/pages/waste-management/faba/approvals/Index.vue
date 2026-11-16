@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
-import { formatFabaStatus } from '@/lib/faba';
+import { formatFabaStatus, getFabaDisplayWarnings } from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 import type { FabaPeriodSummary } from '@/types/faba';
@@ -36,8 +36,18 @@ const filterForm = reactive({
     year: props.year,
 });
 
+const displayPeriods = computed(() =>
+    props.periods.map((item) => ({
+        ...item,
+        recap: {
+            ...item.recap,
+            warnings: getFabaDisplayWarnings(item.recap.warnings),
+        },
+    })),
+);
+
 const totalWarnings = computed(() =>
-    props.periods.reduce(
+    displayPeriods.value.reduce(
         (total, item) => total + item.recap.warnings.length,
         0,
     ),
@@ -269,7 +279,7 @@ const { scopedUrl } = useOrganizationContext();
                         class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
                     >
                         <article
-                            v-for="item in periods"
+                            v-for="item in displayPeriods"
                             :key="`${item.year}-${item.month}`"
                             class="wm-surface-elevated rounded-[26px] p-5 transition-all hover:-translate-y-0.5 hover:border-amber-200/80 hover:bg-white dark:bg-slate-950"
                         >

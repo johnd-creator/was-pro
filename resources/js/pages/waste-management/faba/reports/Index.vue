@@ -26,7 +26,11 @@ import {
 import Heading from '@/components/waste-management/CompactPageHeading.vue';
 import { useOrganizationContext } from '@/composables/useOrganizationContext';
 import WasteManagementLayout from '@/layouts/waste-management/Layout.vue';
-import { formatFabaMaterial, formatFabaMovementType } from '@/lib/faba';
+import {
+    formatFabaMaterial,
+    formatFabaMovementType,
+    getFabaDisplayWarnings,
+} from '@/lib/faba';
 import wasteManagementRoutes from '@/routes/waste-management';
 import type { BreadcrumbItem } from '@/types';
 import type {
@@ -126,6 +130,13 @@ const props = defineProps<{
     analysisMatrix: FabaAnalysisMatrix;
     tpsCapacitySummary: FabaCapacitySummary;
 }>();
+
+const visibleWarnings = computed(() =>
+    getFabaDisplayWarnings(props.monthlyRecap.warnings),
+);
+const visibleAnomalies = computed(() =>
+    getFabaDisplayWarnings(props.anomalyReport.items),
+);
 
 const exportVersion = ref('draft');
 watch(
@@ -316,8 +327,8 @@ function applyFilters(): void {
                                                 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-100"
                                             >
                                                 {{
-                                                    anomalyReport.items.length +
-                                                    monthlyRecap.warnings.length
+                                                    visibleAnomalies.length +
+                                                    visibleWarnings.length
                                                 }}
                                             </p>
                                         </div>
@@ -643,7 +654,7 @@ function applyFilters(): void {
 
                             <div class="mt-4 flex flex-wrap gap-2">
                                 <Badge
-                                    v-for="warning in monthlyRecap.warnings"
+                                    v-for="warning in visibleWarnings"
                                     :key="warning.code"
                                     variant="secondary"
                                     class="rounded-full border border-amber-200/80 bg-amber-50/90 text-amber-800"
@@ -651,7 +662,7 @@ function applyFilters(): void {
                                     {{ warning.message }}
                                 </Badge>
                                 <span
-                                    v-if="monthlyRecap.warnings.length === 0"
+                                    v-if="visibleWarnings.length === 0"
                                     class="rounded-full border border-emerald-200/80 bg-emerald-50/90 px-2.5 py-1 text-[11px] font-medium text-emerald-800"
                                 >
                                     Tidak ada warning snapshot
@@ -1541,7 +1552,7 @@ function applyFilters(): void {
                                     <p
                                         class="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-slate-100"
                                     >
-                                        {{ anomalyReport.items.length }}
+                                        {{ visibleAnomalies.length }}
                                     </p>
                                 </div>
                                 <div
@@ -1556,7 +1567,7 @@ function applyFilters(): void {
                                         class="mt-2 text-sm leading-6 font-medium text-slate-700 dark:text-slate-200"
                                     >
                                         {{
-                                            anomalyReport.items.length > 0
+                                            visibleAnomalies.length > 0
                                                 ? 'Perlu review lanjutan'
                                                 : 'Tidak ada temuan pada filter ini'
                                         }}

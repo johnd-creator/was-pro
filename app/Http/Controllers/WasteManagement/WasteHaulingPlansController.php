@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\WasteManagement;
 
+use App\Exceptions\OperationalConflict;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\WasteManagement\ApproveWasteHaulingRequest;
 use App\Http\Requests\WasteManagement\CloseWasteHaulingPlanRequest;
@@ -12,6 +13,7 @@ use App\Models\WasteRecord;
 use App\Services\ApprovalSeparation;
 use App\Services\HaulingPlans;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -48,12 +50,45 @@ class WasteHaulingPlansController extends Controller
     public function store(WasteHaulingPlanRequest $request): RedirectResponse
     {
         $this->enabled();
-        $record = WasteRecord::query()->findOrFail($request->validated('waste_record_id'));
-        abort_unless($this->all() || $record->created_by === auth()->id(), 403);
-        $plan = WasteHaulingPlan::query()->create([...$request->validated(), 'unit' => $record->unit,
-            'status' => 'pending_approval', 'created_by' => auth()->id(), 'submitted_by' => auth()->id(), 'submitted_at' => now()]);
+        $data = $request->validated();
+        $multiple = isset($data['items']);
+        $items = $data['items'] ?? [['waste_record_id' => $data['waste_record_id'], 'quantity' => $data['quantity']]];
+        $records = collect($items)->map(function (array $item): WasteRecord {
+            $record = WasteRecord::query()->findOrFail($item['waste_record_id']);
+            abort_unless($this->all() || $record->created_by === auth()->id(), 403);
 
-        return redirect()->route('waste-management.hauling-plans.show', $plan)->with('success', 'Rencana diajukan. Saldo limbah belum berkurang.');
+            return $record;
+        });
+        if ($multiple && $records->pluck('waste_type_id')->unique()->count() !== 1) {
+            throw ValidationException::withMessages(['items' => 'Pilih batch dari satu jenis limbah yang sama.']);
+        }
+
+        $plans = [];
+        foreach ($items as $index => $item) {
+            try {
+                $plans[] = WasteHaulingPlan::query()->create([
+                    'waste_record_id' => $records[$index]->id,
+                    'quantity' => $item['quantity'],
+                    'unit' => $records[$index]->unit,
+                    'planned_date' => $data['planned_date'],
+                    'notes' => $data['notes'] ?? null,
+                    'status' => 'pending_approval',
+                    'created_by' => auth()->id(),
+                    'submitted_by' => auth()->id(),
+                    'submitted_at' => now(),
+                ]);
+            } catch (OperationalConflict $exception) {
+                if (! $multiple) {
+                    throw $exception;
+                }
+
+                throw ValidationException::withMessages(["items.$index.quantity" => $exception->getMessage()]);
+            }
+        }
+
+        return count($plans) === 1
+            ? redirect()->route('waste-management.hauling-plans.show', $plans[0])->with('success', 'Rencana diajukan. Saldo limbah belum berkurang.')
+            : redirect()->route('waste-management.hauling-plans.index')->with('success', count($plans).' rencana diajukan. Persetujuan dan realisasi tetap per batch. Saldo limbah belum berkurang.');
     }
 
     public function show(string $wasteHaulingPlan): Response
